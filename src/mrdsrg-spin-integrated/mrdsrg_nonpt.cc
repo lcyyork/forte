@@ -254,6 +254,67 @@ void MRDSRG::compute_hbar_sequential_rotation() {
     Hbar0_ += 0.5 * Hbar1_["uv"] * Gamma1_["vu"];
     Hbar0_ += 0.5 * Hbar1_["UV"] * Gamma1_["VU"];
 
+    bool tryV3 = true;
+    bool twoBodyNOV3 = true;
+    bool firstVall = true;
+
+    ambit::BlockedTensor Hbar1_V3, O1_V3, C1_V3, DT1_V3, DT2_V3, Hbar2_V3, O2_V3, C2_V3, V_V3, D1V3, D2V3;
+    double Hbar0_V3 = Hbar0_;
+    if (eri_df_ && tryV3) {
+        // Generate blocks for Hbar2_, O2_ and C2_
+        std::vector<std::string> blocks_exclude_V3;
+        for (std::string s0 : {"c", "a", "v"}) {
+            for (std::string s1 : {"c", "a", "v"}) {
+                for (std::string s2 : {"c", "a", "v"}) {
+                    for (std::string s3 : {"c", "a", "v"}) {
+                        std::string s = s0 + s1 + s2 + s3;
+                        if (std::count(s.begin(), s.end(), 'v') < 3) {
+                            blocks_exclude_V3.push_back(s);
+                        }
+                    }
+                }
+            }
+        }
+
+        BlockedTensor::set_expert_mode(true);
+
+        Hbar1_V3 = BTF_->build(tensor_type_, "Hbar1V3", spin_cases({"gg"}));
+        O1_V3 = BTF_->build(tensor_type_, "O1V3", spin_cases({"gg"}));
+        C1_V3 = BTF_->build(tensor_type_, "C1V3", spin_cases({"gg"}));
+        D1V3 = BTF_->build(tensor_type_, "D1V3", spin_cases({"gg"}));
+        DT1_V3 = BTF_->build(tensor_type_, "DT1V3", spin_cases({"hp"}));
+        DT2_V3 = BTF_->build(tensor_type_, "DT2V3", spin_cases({"hhpp"}));
+
+        if (twoBodyNOV3) {
+            Hbar2_V3 = BTF_->build(tensor_type_, "Hbar2V3", spin_cases(blocks_exclude_V3));
+            O2_V3 = BTF_->build(tensor_type_, "O2V3", spin_cases(blocks_exclude_V3));
+            C2_V3 = BTF_->build(tensor_type_, "C2V3", spin_cases(blocks_exclude_V3));
+        } else {
+            Hbar2_V3 = BTF_->build(tensor_type_, "Hbar2V3", spin_cases({"gggg"}));
+            O2_V3 = BTF_->build(tensor_type_, "O2V3", spin_cases({"gggg"}));
+            C2_V3 = BTF_->build(tensor_type_, "C2V3", spin_cases({"gggg"}));
+        }
+
+        if (twoBodyNOV3 || omit_V3_) {
+            D2V3 = BTF_->build(tensor_type_, "D2V3", spin_cases(blocks_exclude_V3));
+        } else {
+            D2V3 = BTF_->build(tensor_type_, "D2V3", spin_cases({"gggg"}));
+        }
+
+        V_V3 = BTF_->build(tensor_type_, "VV3", spin_cases({"gggg"}));
+
+        Hbar1_V3["pq"] = Hbar1_["pq"];
+        Hbar1_V3["PQ"] = Hbar1_["PQ"];
+
+        V_V3["pqrs"] = B_["gpr"] * B_["gqs"];
+        V_V3["pqrs"] -= B_["gps"] * B_["gqr"];
+
+        V_V3["pQrS"] = B_["gpr"] * B_["gQS"];
+
+        V_V3["PQRS"] = B_["gPR"] * B_["gQS"];
+        V_V3["PQRS"] -= B_["gPS"] * B_["gQR"];
+    }
+
     ambit::BlockedTensor B;
     if (eri_df_) {
         B = BTF_->build(tensor_type_, "B 3-idx", {"Lgg", "LGG"});
@@ -321,6 +382,32 @@ void MRDSRG::compute_hbar_sequential_rotation() {
         Hbar1_["PQ"] += Hbar2_["PVQU"] * Gamma1_["UV"];
     }
 
+    if (eri_df_ && tryV3) {
+        Hbar2_V3["pqrs"] = U1["pt"] * U1["qo"] * V_V3["to45"] * U1["r4"] * U1["s5"];
+        Hbar2_V3["pQrS"] = U1["pt"] * U1["QO"] * V_V3["tO49"] * U1["r4"] * U1["S9"];
+        Hbar2_V3["PQRS"] = U1["PT"] * U1["QO"] * V_V3["TO89"] * U1["R8"] * U1["S9"];
+
+        // for simplicity, create a core-core density matrix
+        BlockedTensor D1c = BTF_->build(tensor_type_, "Gamma1 core", spin_cases({"cc"}));
+        for (size_t m = 0, nc = core_mos_.size(); m < nc; ++m) {
+            D1c.block("cc").data()[m * nc + m] = 1.0;
+            D1c.block("CC").data()[m * nc + m] = 1.0;
+        }
+
+        Hbar1_V3["pq"] += Hbar2_V3["pnqm"] * D1c["mn"];
+        Hbar1_V3["pq"] += Hbar2_V3["pNqM"] * D1c["MN"];
+        Hbar1_V3["pq"] += Hbar2_V3["pvqu"] * Gamma1_["uv"];
+        Hbar1_V3["pq"] += Hbar2_V3["pVqU"] * Gamma1_["UV"];
+
+        Hbar1_V3["PQ"] += Hbar2_V3["nPmQ"] * D1c["mn"];
+        Hbar1_V3["PQ"] += Hbar2_V3["PNQM"] * D1c["MN"];
+        Hbar1_V3["PQ"] += Hbar2_V3["vPuQ"] * Gamma1_["uv"];
+        Hbar1_V3["PQ"] += Hbar2_V3["PVQU"] * Gamma1_["UV"];
+
+        D1V3["pq"] = Hbar1_V3["pq"] - Hbar1_["pq"];
+        outfile->Printf("\nLine %d: Hbar1_V3[pq] - Hbar1_[pq] norm = %e", __LINE__, D1V3.norm());
+    }
+
     // compute fully contracted term from T1
     for (const std::string block : {"cc", "CC"}) {
         Hbar1_.block(block).iterate([&](const std::vector<size_t>& i, double& value) {
@@ -331,6 +418,8 @@ void MRDSRG::compute_hbar_sequential_rotation() {
     }
     Hbar0_ += 0.5 * Hbar1_["uv"] * Gamma1_["vu"];
     Hbar0_ += 0.5 * Hbar1_["UV"] * Gamma1_["VU"];
+
+    Hbar0_V3 = Hbar0_;
 
     if (eri_df_) {
         Hbar0_ += 0.25 * B["gux"] * B["gvy"] * Lambda2_["xyuv"];
@@ -344,7 +433,16 @@ void MRDSRG::compute_hbar_sequential_rotation() {
         Hbar0_ += Hbar2_["uVxY"] * Lambda2_["xYuV"];
     }
 
+    if (eri_df_ && tryV3) {
+        Hbar0_V3 += 0.25 * Hbar2_V3["uvxy"] * Lambda2_["xyuv"];
+        Hbar0_V3 += 0.25 * Hbar2_V3["UVXY"] * Lambda2_["XYUV"];
+        Hbar0_V3 += Hbar2_V3["uVxY"] * Lambda2_["xYuV"];
+
+        outfile->Printf("\nLine %d: Hbar0_V3 - Hbar0_ = %e", __LINE__, Hbar0_V3 - Hbar0_);
+    }
+
     Hbar0_ += Efrzc_ + Enuc_ - Eref_;
+    Hbar0_V3 += Efrzc_ + Enuc_ - Eref_;
 
     rotation.stop();
 
@@ -374,6 +472,24 @@ void MRDSRG::compute_hbar_sequential_rotation() {
         O2_["PQRS"] = Hbar2_["PQRS"];
     }
 
+    if (eri_df_ && tryV3) {
+        D2V3["pqrs"] = Hbar2_V3["pqrs"] - Hbar2_["pqrs"];
+        outfile->Printf("\nLine %d: Hbar2_V3[pqrs] - Hbar2_[pqrs] norm = %e", __LINE__, D2V3.norm());
+
+        D1V3["pq"] = Hbar1_V3["pq"] - Hbar1_["pq"];
+        outfile->Printf("\nLine %d: Hbar1_V3[pq] - Hbar1_[pq] norm = %e", __LINE__, D1V3.norm());
+
+        O1_V3["pq"] = Hbar1_V3["pq"];
+        O1_V3["PQ"] = Hbar1_V3["PQ"];
+
+        D1V3["pq"] = O1_V3["pq"] - O1_["pq"];
+        outfile->Printf("\nLine %d: O1_V3[pq] - O1_[pq] norm = %e", __LINE__, D1V3.norm());
+
+        O2_V3["pqrs"] = Hbar2_V3["pqrs"];
+        O2_V3["pQrS"] = Hbar2_V3["pQrS"];
+        O2_V3["PQRS"] = Hbar2_V3["PQRS"];
+    }
+
     // iteration variables
     converged = false;
 
@@ -393,26 +509,109 @@ void MRDSRG::compute_hbar_sequential_rotation() {
             outfile->Printf("\n    %s", dash.c_str());
         }
 
+        double C0_temp = 0.0;
+        ambit::BlockedTensor C1_temp = BTF_->build(tensor_type_, "C1temp", spin_cases({"gg"}));
+        ambit::BlockedTensor C2_temp = BTF_->build(tensor_type_, "C2temp", spin_cases({"gggg"}));
+
         if (n == 1 && eri_df_) {
             // zero-body
             H1_T2_C0(O1_, T2_, factor, C0);
+            C0_temp = C0;
             H2_T2_C0_DF(B, T2_, factor, C0);
             // one-body
             H1_T2_C1(O1_, T2_, factor, C1_);
+            C1_temp["pq"] = C1_["pq"];
             H2_T2_C1_DF(B, T2_, factor, C1_);
             // two-body
             H1_T2_C2(O1_, T2_, factor, C2_);
+            C2_temp["pqrs"] = C2_["pqrs"];
             H2_T2_C2_DF(B, T2_, factor, C2_);
         } else {
             // zero-body
             H1_T2_C0(O1_, T2_, factor, C0);
+            C0_temp = C0;
             H2_T2_C0(O2_, T2_, factor, C0);
             // one-body
             H1_T2_C1(O1_, T2_, factor, C1_);
+            C1_temp["pq"] = C1_["pq"];
             H2_T2_C1(O2_, T2_, factor, C1_);
             // two-body
             H1_T2_C2(O1_, T2_, factor, C2_);
+            C2_temp["pqrs"] = C2_["pqrs"];
             H2_T2_C2(O2_, T2_, factor, C2_);
+        }
+
+        double C0V3 = 0.0;
+        C1_V3.zero();
+        C2_V3.zero();
+        if (eri_df_ && tryV3) {
+            outfile->Printf("\n\niter %d", n);
+            ambit::BlockedTensor O2_temp;
+            if (n == 1) {
+                O2_temp = BTF_->build(tensor_type_, "O2temp", spin_cases({"gggg"}));
+                O2_temp["pqrs"] = B["gpr"] * B["gqs"];
+                O2_temp["pqrs"] -= B["gps"] * B["gqr"];
+
+                O2_temp["pQrS"] = B["gpr"] * B["gQS"];
+
+                O2_temp["PQRS"] = B["gPR"] * B["gQS"];
+                O2_temp["PQRS"] -= B["gPS"] * B["gQR"];
+            }
+
+            D1V3["pq"] = O1_V3["pq"] - O1_["pq"];
+            outfile->Printf("\nLine %d: O1_V3[pq] - O1_[pq] norm = %e", __LINE__, D1V3.norm());
+            if (n == 1 && twoBodyNOV3 && firstVall) {
+                D2V3["pqrs"] = O2_V3["pqrs"] - O2_temp["pqrs"];
+                outfile->Printf("\nLine %d: O2_V3[pqrs] - O2_temp[pqrs] norm = %e", __LINE__, D2V3.norm());
+
+                // zero-body
+                H1_T2_C0(O1_V3, T2_, factor, C0V3);
+                outfile->Printf("\nLine %d: C0V3 - C0_temp = %e", __LINE__, C0V3 - C0_temp);
+                H2_T2_C0(O2_temp, T2_, factor, C0V3);
+                outfile->Printf("\nLine %d: C0V3 - C0_ = %e", __LINE__, C0V3 - C0);
+                // one-body
+                H1_T2_C1(O1_V3, T2_, factor, C1_V3);
+                D1V3["pq"] = C1_V3["pq"] - C1_temp["pq"];
+                outfile->Printf("\nLine %d: C1_V3[pq] - C1_temp[pq] norm = %e", __LINE__, D1V3.norm());
+                H2_T2_C1(O2_temp, T2_, factor, C1_V3);
+                D1V3["pq"] = C1_V3["pq"] - C1_["pq"];
+                outfile->Printf("\nLine %d: C1_V3[pq] - C1_[pq] norm = %e", __LINE__, D1V3.norm());
+                // two-body
+                H1_T2_C2(O1_V3, T2_, factor, C2_V3);
+                D2V3["pqrs"] = C2_V3["pqrs"] - C2_temp["pqrs"];
+                outfile->Printf("\nLine %d: C2_V3[pqrs] - C2_temp[pqrs] norm = %e", __LINE__, D2V3.norm());
+                H2_T2_C2(O2_temp, T2_, factor, C2_V3);
+                D2V3["pqrs"] = C2_V3["pqrs"] - C2_["pqrs"];
+                outfile->Printf("\nLine %d: C2_V3[pqrs] - C2_[pqrs] norm = %e", __LINE__, D2V3.norm());
+            } else {
+                if (n == 1) {
+                    D2V3["pqrs"] = O2_V3["pqrs"] - O2_temp["pqrs"];
+                    outfile->Printf("\nLine %d: O2_V3[pqrs] - O2_temp[pqrs] norm = %e", __LINE__, D2V3.norm());
+                } else {
+                    D2V3["pqrs"] = O2_V3["pqrs"] - O2_["pqrs"];
+                    outfile->Printf("\nLine %d: O2_V3[pqrs] - O2_[pqrs] norm = %e", __LINE__, D2V3.norm());
+                }
+
+                // zero-body
+                H1_T2_C0(O1_V3, T2_, factor, C0V3);
+                outfile->Printf("\nLine %d: C0V3 - C0_temp = %e", __LINE__, C0V3 - C0_temp);
+                H2_T2_C0(O2_V3, T2_, factor, C0V3);
+                outfile->Printf("\nLine %d: C0V3 - C0_ = %e", __LINE__, C0V3 - C0);
+                // one-body
+                H1_T2_C1(O1_V3, T2_, factor, C1_V3);
+                D1V3["pq"] = C1_V3["pq"] - C1_temp["pq"];
+                outfile->Printf("\nLine %d: C1_V3[pq] - C1_temp[pq] norm = %e", __LINE__, D1V3.norm());
+                H2_T2_C1(O2_V3, T2_, factor, C1_V3);
+                D1V3["pq"] = C1_V3["pq"] - C1_["pq"];
+                outfile->Printf("\nLine %d: C1_V3[pq] - C1_[pq] norm = %e", __LINE__, D1V3.norm());
+                // two-body
+                H1_T2_C2(O1_V3, T2_, factor, C2_V3);
+                D2V3["pqrs"] = C2_V3["pqrs"] - C2_temp["pqrs"];
+                outfile->Printf("\nLine %d: C2_V3[pqrs] - C2_temp[pqrs] norm = %e", __LINE__, D2V3.norm());
+                H2_T2_C2(O2_V3, T2_, factor, C2_V3);
+                D2V3["pqrs"] = C2_V3["pqrs"] - C2_["pqrs"];
+                outfile->Printf("\nLine %d: C2_V3[pqrs] - C2_[pqrs] norm = %e", __LINE__, D2V3.norm());
+            }
         }
 
         // printing level
@@ -450,6 +649,44 @@ void MRDSRG::compute_hbar_sequential_rotation() {
         O2_["pqrs"] = C2_["pqrs"];
         O2_["pQrS"] = C2_["pQrS"];
         O2_["PQRS"] = C2_["PQRS"];
+
+        if (eri_df_ && tryV3) {
+            // [H, A] = [H, T] + [H, T]^dagger
+            if (dsrg_trans_type_ == "UNITARY") {
+                C0V3 *= 2.0;
+                O1_V3["pq"] = C1_V3["pq"];
+                O1_V3["PQ"] = C1_V3["PQ"];
+                C1_V3["pq"] += O1_V3["qp"];
+                C1_V3["PQ"] += O1_V3["QP"];
+                O2_V3["pqrs"] = C2_V3["pqrs"];
+                O2_V3["pQrS"] = C2_V3["pQrS"];
+                O2_V3["PQRS"] = C2_V3["PQRS"];
+                C2_V3["pqrs"] += O2_V3["rspq"];
+                C2_V3["pQrS"] += O2_V3["rSpQ"];
+                C2_V3["PQRS"] += O2_V3["RSPQ"];
+            }
+
+            // Hbar += C
+            Hbar0_V3 += C0V3;
+            Hbar1_V3["pq"] += C1_V3["pq"];
+            Hbar1_V3["PQ"] += C1_V3["PQ"];
+            Hbar2_V3["pqrs"] += C2_V3["pqrs"];
+            Hbar2_V3["pQrS"] += C2_V3["pQrS"];
+            Hbar2_V3["PQRS"] += C2_V3["PQRS"];
+
+            // copy C to O for next level commutator
+            O1_V3["pq"] = C1_V3["pq"];
+            O1_V3["PQ"] = C1_V3["PQ"];
+            O2_V3["pqrs"] = C2_V3["pqrs"];
+            O2_V3["pQrS"] = C2_V3["pQrS"];
+            O2_V3["PQRS"] = C2_V3["PQRS"];
+
+            outfile->Printf("\nLine %d: Hbar0_V3 - Hbar0_ = %e", __LINE__, Hbar0_V3 - Hbar0_);
+            D1V3["pq"] = Hbar1_V3["pq"] - Hbar1_["pq"];
+            outfile->Printf("\nLine %d: Hbar1_V3[pq] - Hbar1_[pq] norm = %e", __LINE__, D1V3.norm());
+            D2V3["pqrs"] = Hbar2_V3["pqrs"] - Hbar2_["pqrs"];
+            outfile->Printf("\nLine %d: Hbar2_V3[pqrs] - Hbar2_[pqrs] norm = %e", __LINE__, D2V3.norm());
+        }
 
         // test convergence of C
         double norm_C1 = C1_.norm();
