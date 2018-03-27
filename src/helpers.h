@@ -174,6 +174,12 @@ Matrix tensor_to_matrix(ambit::Tensor t, Dimension dims);
 
 SharedMatrix tensor_to_matrix(ambit::Tensor t);
 
+/// Save a vector of double to file
+void write_disk_vector_double(const std::string& filename, const std::vector<double>& data);
+
+/// Read a vector of double from file
+void read_disk_vector_double(const std::string& filename, std::vector<double>& data);
+
 /**
  * @brief print_method_banner Print a banner
  * @param text A vector of strings to print in the banner. Each string is a
