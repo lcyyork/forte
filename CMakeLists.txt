@@ -40,7 +40,6 @@ include(cmake/git-version.cmake)
 
 # List of CC files
 add_psi4_plugin(forte
-src/active_dsrgpt2.cc
 src/active_space_solver.cc
 src/ao_helper.cc
 src/avas.cc
@@ -140,6 +139,7 @@ src/mrdsrg-spin-integrated/mrdsrg_pt.cc
 src/mrdsrg-spin-integrated/mrdsrg_smart_s.cc
 src/mrdsrg-spin-integrated/mrdsrg_srg.cc
 src/mrdsrg-spin-integrated/three_dsrg_mrpt2.cc
+src/mrdsrg-spin-integrated/active_dsrgpt2.cc
 src/mrdsrg-spin-integrated/dwms_mrpt2.cc
 src/orbital-helper/localize.cc
 src/orbital-helper/unpaired_density.cc

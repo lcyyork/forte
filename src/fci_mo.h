@@ -51,14 +51,14 @@
 #include "psi4/libqt/qt.h"
 #include "psi4/physconst.h"
 
-#include "active_dsrgpt2.h"
-#include "ci_rdm/ci_rdms.h"
+#include "ci_rdms.h"
 #include "helpers.h"
 #include "integrals/integrals.h"
 #include "reference.h"
 #include "sparse_ci/sparse_ci_solver.h"
 #include "fci/fci_integrals.h"
 #include "sparse_ci/determinant.h"
+#include "mrdsrg-spin-integrated/active_dsrgpt2.h"
 
 using d1 = std::vector<double>;
 using d2 = std::vector<d1>;

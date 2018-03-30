@@ -38,12 +38,12 @@
 #include "psi4/libmints/petitelist.h"
 #include "psi4/physconst.h"
 
+#include "../mini-boost/boost/format.hpp"
 #include "../fci/fci_integrals.h"
-#include "fci_mo.h"
-#include "semi_canonicalize.h"
-#include "mrdsrg-spin-integrated/master_mrdsrg.h"
+#include "../fci_mo.h"
+#include "../semi_canonicalize.h"
+#include "master_mrdsrg.h"
 #include "active_dsrgpt2.h"
-#include "mini-boost/boost/format.hpp"
 
 namespace psi {
 namespace forte {
