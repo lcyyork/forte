@@ -64,7 +64,7 @@ dsrg_mrpt2_tests = ["mr-dsrg-pt2-1","mr-dsrg-pt2-2","mr-dsrg-pt2-3","mr-dsrg-pt2
 active_dsrgpt2_tests = ["actv-dsrg-1-C2H4-cis", "actv-dsrg-2-C2H4-cisd", "actv-dsrg-3-C4H6-cisd",
                         "actv-dsrg-4-C4H6-triplet", "actv-dsrg-5-actv-independence",
                         "actv-dsrg-size-intensive", "actv-dsrg-ipea-1", "actv-dsrg-ipea-2"]
-dwms_dsrgpt2_tests = ["dwms-dsrgpt-1-sa"]
+dwms_dsrgpt_tests = ["dwms-dsrgpt-1-sa", "dwms-dsrgpt-5-ms", "dwms-dsrgpt-8-separated"]
 
 casscf_tests = ["casscf", "casscf-2","casscf-3", "casscf-4", "casscf-5", "casscf-6", "casscf-7",
                 "df-casscf-1"]
@@ -72,7 +72,7 @@ dmrg_tests = ["dmrgscf-1", "df-dmrgscf-1", "cd-dmrgscf-1", "dmrg-dsrg-mrpt2-1", 
 
 #tests =  fci_tests + casscf_tests + dsrg_mrpt2_tests + adaptive_ci_tests + pci_tests + fciqmc_tests + ct_tests + dsrg_tests
 tests = fci_tests + casscf_tests + dsrg_mrpt2_tests + dsrg_mrpt3_tests + mrdsrg_tests + mrdsrg_df_tests + adaptive_ci_tests + pci_tests + pci_hashvec_tests
-tests += active_dsrgpt2_tests + dwms_dsrgpt2_tests
+tests += active_dsrgpt2_tests + dwms_dsrgpt_tests
 
 maindir = os.getcwd()
 if len(sys.argv) == 1:
