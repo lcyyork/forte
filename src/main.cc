@@ -58,7 +58,7 @@ namespace forte {
  * @brief Read options from the input file. Called by psi4 before everything
  * else.
  */
-extern "C" PSI_API 
+extern "C" PSI_API
 int read_options(std::string name, Options& options) {
 
     ForteOptions foptions; // <<
