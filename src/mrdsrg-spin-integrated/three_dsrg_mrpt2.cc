@@ -3053,8 +3053,6 @@ void THREE_DSRG_MRPT2::form_Hbar() {
     Hbar2_["UVXY"] += C2["XYUV"];
     outfile->Printf("Done. Timing: %10.3f s.", timer.elapsed());
 
-
-
     if (integral_type_ == DiskDF) {
         C1.zero();
         timer.reset();
