@@ -38,38 +38,38 @@
 #include "helpers/helpers.h"
 #include "helpers/printing.h"
 #include "helpers/timer.h"
-#include "cc.h"
+#include "cc_si.h"
 
 using namespace psi;
 
 namespace forte {
 
-std::unique_ptr<CC_SO> make_cc_so(RDMs rdms, std::shared_ptr<SCFInfo> scf_info,
+std::unique_ptr<CC_SI> make_cc_si(RDMs rdms, std::shared_ptr<SCFInfo> scf_info,
                                   std::shared_ptr<ForteOptions> options,
                                   std::shared_ptr<ForteIntegrals> ints,
                                   std::shared_ptr<MOSpaceInfo> mo_space_info) {
-    return std::make_unique<CC_SO>(rdms, scf_info, options, ints, mo_space_info);
+    return std::make_unique<CC_SI>(rdms, scf_info, options, ints, mo_space_info);
 }
 
-CC_SO::CC_SO(RDMs rdms, std::shared_ptr<SCFInfo> scf_info,
-                     std::shared_ptr<ForteOptions> options, std::shared_ptr<ForteIntegrals> ints,
-                     std::shared_ptr<MOSpaceInfo> mo_space_info)
+CC_SI::CC_SI(RDMs rdms, std::shared_ptr<SCFInfo> scf_info,
+             std::shared_ptr<ForteOptions> options, std::shared_ptr<ForteIntegrals> ints,
+             std::shared_ptr<MOSpaceInfo> mo_space_info)
     : DynamicCorrelationSolver(rdms, scf_info, options, ints, mo_space_info),
       BTF_(new BlockedTensorFactory()), tensor_type_(ambit::CoreTensor) {
     print_method_banner(
-        {"Spin-Orbital Coupled Cluster Using Generated Equations", "Chenyang Li"});
+    {"Spin-Integrated Coupled Cluster Using Generated Equations", "Chenyang Li"});
     startup();
     print_summary();
 }
 
-CC_SO::~CC_SO() {}
+CC_SI::~CC_SI() {}
 
-std::shared_ptr<ActiveSpaceIntegrals> CC_SO::compute_Heff_actv() {
+std::shared_ptr<ActiveSpaceIntegrals> CC_SI::compute_Heff_actv() {
     throw psi::PSIEXCEPTION(
         "Computing active-space Hamiltonian is not yet implemented for spin-orbital code.");
 }
 
-void CC_SO::startup() {
+void CC_SI::startup() {
     BlockedTensor::reset_mo_spaces();
     BlockedTensor::set_expert_mode(true);
 
@@ -78,6 +78,9 @@ void CC_SO::startup() {
     Efrzc_ = ints_->frozen_core_energy();
 
     corr_level_ = foptions_->get_str("CC_LEVEL");
+    if (corr_level_ != "CCSD" and corr_level_ != "CCSDT") {
+        throw PSIEXCEPTION("NOT implemented");
+    }
     do_triples_ = corr_level_.find("CCSDT") != std::string::npos or corr_level_.find("CC3") != std::string::npos;
 
     e_convergence_ = foptions_->get_double("E_CONVERGENCE");
@@ -108,105 +111,85 @@ void CC_SO::startup() {
     }
 
     // orbital spaces
-    acore_sos_ = mo_space_info_->get_corr_abs_mo("GENERALIZED HOLE");
-    avirt_sos_ = mo_space_info_->get_corr_abs_mo("RESTRICTED_UOCC");
-
-    // put all beta behind alpha
-    size_t mo_shift = mo_space_info_->size("CORRELATED");
-    for (size_t idx : mo_space_info_->get_corr_abs_mo("RESTRICTED_DOCC")) {
-        bcore_sos_.push_back(idx + mo_shift);
-    }
-    for (size_t idx : mo_space_info_->get_corr_abs_mo("GENERALIZED PARTICLE")) {
-        bvirt_sos_.push_back(idx + mo_shift);
-    }
-
-    // spin orbital indices
-    core_sos_ = acore_sos_;
-    virt_sos_ = avirt_sos_;
-    core_sos_.insert(core_sos_.end(), bcore_sos_.begin(), bcore_sos_.end());
-    virt_sos_.insert(virt_sos_.end(), bvirt_sos_.begin(), bvirt_sos_.end());
+    acore_mos_ = mo_space_info_->get_corr_abs_mo("GENERALIZED HOLE");
+    avirt_mos_ = mo_space_info_->get_corr_abs_mo("RESTRICTED_UOCC");
+    bcore_mos_ = mo_space_info_->get_corr_abs_mo("RESTRICTED_DOCC");
+    bvirt_mos_ = mo_space_info_->get_corr_abs_mo("GENERALIZED PARTICLE");
 
     // size of each spin orbital space
-    nc_ = core_sos_.size();
-    nv_ = virt_sos_.size();
-    nso_ = nc_ + nv_;
-    nmo_ = nso_ / 2;
+    nc_ = acore_mos_.size();
+    nv_ = avirt_mos_.size();
+    nmo_ = nc_ + nv_;
 
-    BTF_->add_mo_space("c", "i,j,k,l,m,n,c0,c1,c2,c3,c4,c5,c6,c7,c8,c9", core_sos_, NoSpin);
-    BTF_->add_mo_space("v", "a,b,c,d,e,f,v0,v1,v2,v3,v4,v5,v6,v7,v8,v9", virt_sos_, NoSpin);
+    BTF_->add_mo_space("c", "i,j,k,l,m,n,c0,c1,c2,c3,c4,c5,c6,c7,c8,c9", acore_mos_, AlphaSpin);
+    BTF_->add_mo_space("v", "a,b,c,d,e,f,v0,v1,v2,v3,v4,v5,v6,v7,v8,v9", avirt_mos_, AlphaSpin);
+    BTF_->add_mo_space("C", "I,J,K,L,M,N,C0,C1,C2,C3,C4,C5,C6,C7,C8,C9", bcore_mos_, BetaSpin);
+    BTF_->add_mo_space("V", "A,B,C,D,E,F,V0,V1,V2,V3,V4,V5,V6,V7,V8,V9", bvirt_mos_, BetaSpin);
 
     BTF_->add_composite_mo_space("g", "p,q,r,s,t,o,g0,g1,g2,g3,g4,g5,g6,g7,g8,g9", {"c", "v"});
+    BTF_->add_composite_mo_space("G", "P,Q,R,S,T,O,G0,G1,G2,G3,G4,G5,G6,G7,G8,G9", {"C", "V"});
 
     // prepare one-electron integrals
-    H_ = BTF_->build(tensor_type_, "H", {"gg"});
-    H_.iterate([&](const std::vector<size_t>& i, const std::vector<SpinType>&, double& value) {
-        if (i[0] < nmo_ && i[1] < nmo_) {
+    H_ = BTF_->build(tensor_type_, "H", spin_cases({"gg"}));
+    H_.iterate([&](const std::vector<size_t>& i, const std::vector<SpinType>& spin, double& value) {
+        if (spin[0] == AlphaSpin) {
             value = ints_->oei_a(i[0], i[1]);
-        }
-        if (i[0] >= nmo_ && i[1] >= nmo_) {
-            value = ints_->oei_b(i[0] - nmo_, i[1] - nmo_);
+        } else {
+            value = ints_->oei_b(i[0], i[1]);
         }
     });
 
     // prepare two-electron integrals
-    V_ = BTF_->build(tensor_type_, "V", {"gggg"});
-    V_.iterate([&](const std::vector<size_t>& i, const std::vector<SpinType>&, double& value) {
-        bool spin0 = i[0] < nmo_;
-        bool spin1 = i[1] < nmo_;
-        bool spin2 = i[2] < nmo_;
-        bool spin3 = i[3] < nmo_;
-        if (spin0 && spin1 && spin2 && spin3) {
+    V_ = BTF_->build(tensor_type_, "V", spin_cases({"gggg"}));
+    V_.iterate([&](const std::vector<size_t>& i, const std::vector<SpinType>& spin, double& value) {
+        if ((spin[0] == AlphaSpin) and (spin[1] == AlphaSpin))
             value = ints_->aptei_aa(i[0], i[1], i[2], i[3]);
-        }
-        if ((!spin0) && (!spin1) && (!spin2) && (!spin3)) {
-            value = ints_->aptei_bb(i[0] - nmo_, i[1] - nmo_, i[2] - nmo_, i[3] - nmo_);
-        }
-        if (spin0 && (!spin1) && spin2 && (!spin3)) {
-            value = ints_->aptei_ab(i[0], i[1] - nmo_, i[2], i[3] - nmo_);
-        }
-        if (spin1 && (!spin0) && spin3 && (!spin2)) {
-            value = ints_->aptei_ab(i[1], i[0] - nmo_, i[3], i[2] - nmo_);
-        }
-        if (spin0 && (!spin1) && spin3 && (!spin2)) {
-            value = -ints_->aptei_ab(i[0], i[1] - nmo_, i[3], i[2] - nmo_);
-        }
-        if (spin1 && (!spin0) && spin2 && (!spin3)) {
-            value = -ints_->aptei_ab(i[1], i[0] - nmo_, i[2], i[3] - nmo_);
-        }
+        if ((spin[0] == AlphaSpin) and (spin[1] == BetaSpin))
+            value = ints_->aptei_ab(i[0], i[1], i[2], i[3]);
+        if ((spin[0] == BetaSpin) and (spin[1] == BetaSpin))
+            value = ints_->aptei_bb(i[0], i[1], i[2], i[3]);
     });
 
     // build Fock matrix (initial guess of one-body Hamiltonian)
-    F_ = BTF_->build(tensor_type_, "Fock", {"gg"});
+    F_ = BTF_->build(tensor_type_, "Fock", spin_cases({"gg"}));
     F_["pq"] = H_["pq"];
+    F_["PQ"] = H_["PQ"];
 
-    auto K1 = BTF_->build(tensor_type_, "Kronecker delta", {"cc"});
-    (K1.block("cc")).iterate([&](const std::vector<size_t>& i, double& value) {
+    auto K1 = BTF_->build(tensor_type_, "Kronecker delta", spin_cases({"cc"}));
+    K1.iterate([&](const std::vector<size_t>& i, const std::vector<SpinType>&, double& value) {
         value = (i[0] == i[1] ? 1.0 : 0.0);
     });
-    F_["pq"] += V_["pjqi"] * K1["ij"];
+    F_["pq"] += V_["pnqm"] * K1["mn"];
+    F_["pq"] += V_["pNqM"] * K1["MN"];
+    F_["PQ"] += V_["nPmQ"] * K1["mn"];
+    F_["PQ"] += V_["PNQM"] * K1["MN"];
 
     // obtain diagonal elements of Fock matrix
-    Fd_ = std::vector<double>(nso_);
-    F_.citerate(
-        [&](const std::vector<size_t>& i, const std::vector<SpinType>&, const double& value) {
-            if (i[0] == i[1]) {
-                Fd_[i[0]] = value;
+    Fd_a_ = std::vector<double>(nmo_);
+    Fd_b_ = std::vector<double>(nmo_);
+    F_.citerate([&](const std::vector<size_t>& i, const std::vector<SpinType>& spin, const double& value) {
+        if (i[0] == i[1]) {
+            if (spin[0] == AlphaSpin) {
+                Fd_a_[i[0]] = value;
+            } else {
+                Fd_b_[i[0]] = value;
             }
-        });
+        }
+    });
 
     // print orbital energies
-    size_t nc_a = acore_sos_.size();
-    size_t nc_b = bcore_sos_.size();
     print_h2("Orbital Energies");
     outfile->Printf("\n     MO     Alpha           Beta");
     outfile->Printf("\n    ---------------------------------");
     for (size_t i = 0; i < nmo_; ++i) {
-        outfile->Printf("\n    %3zu %11.6f(%d) %11.6f(%d)", i + 1, Fd_[i], i < nc_a, Fd_[i + nmo_], i < nc_b);
+        bool find_a = std::find(acore_mos_.begin(), acore_mos_.end(), i) != acore_mos_.end();
+        bool find_b = std::find(bcore_mos_.begin(), bcore_mos_.end(), i) != bcore_mos_.end();
+        outfile->Printf("\n    %3zu %11.6f(%d) %11.6f(%d)", i + 1, Fd_a_[i], find_a, Fd_b_[i], find_b);
     }
     outfile->Printf("\n    ---------------------------------");
 }
 
-void CC_SO::print_summary() {
+void CC_SI::print_summary() {
     // Print a summary
     std::vector<std::pair<std::string, int>> calculation_info_int{
         {"Max Iteration", maxiter_},
@@ -237,170 +220,158 @@ void CC_SO::print_summary() {
     }
 }
 
-void CC_SO::guess_t2() {
+void CC_SI::guess_t2() {
     local_timer timer;
     std::string str = "Computing T2 amplitudes     ...";
     outfile->Printf("\n    %-35s", str.c_str());
 
     T2_["ijab"] = V_["ijab"];
+    T2_["iJaB"] = V_["iJaB"];
+    T2_["IJAB"] = V_["IJAB"];
 
-    T2_.iterate([&](const std::vector<size_t>& i, const std::vector<SpinType>&, double& value) {
-        value *= 1.0 / (Fd_[i[0]] + Fd_[i[1]] - Fd_[i[2]] - Fd_[i[3]]);
+    T2_.iterate([&](const std::vector<size_t>& i, const std::vector<SpinType>& spin, double& value) {
+        if ((spin[0] == AlphaSpin) && (spin[1] == AlphaSpin)) {
+            value *= 1.0 / (Fd_a_[i[0]] + Fd_a_[i[1]] - Fd_a_[i[2]] - Fd_a_[i[3]]);
+        } else if ((spin[0] == AlphaSpin) && (spin[1] == BetaSpin)) {
+            value *= 1.0 / (Fd_a_[i[0]] + Fd_b_[i[1]] - Fd_a_[i[2]] - Fd_b_[i[3]]);
+        } else if ((spin[0] == BetaSpin) && (spin[1] == BetaSpin)) {
+            value *= 1.0 / (Fd_b_[i[0]] + Fd_b_[i[1]] - Fd_b_[i[2]] - Fd_b_[i[3]]);
+        }
     });
 
     // norm and max
-    T2max_ = 0.0, T2norm_ = T2_.norm();
-    T2_.citerate([&](const std::vector<size_t>&, const std::vector<SpinType>&, const double& value) {
-        if (std::fabs(value) > std::fabs(T2max_))
-            T2max_ = value;
-    });
+    T2max_ = T2_.norm(0);
+    T2norm_ = T2_.norm();
 
     outfile->Printf("  Done. Timing %10.3f s", timer.get());
 }
 
-void CC_SO::guess_t1() {
+void CC_SI::guess_t1() {
     local_timer timer;
     std::string str = "Computing T1 amplitudes     ...";
     outfile->Printf("\n    %-35s", str.c_str());
 
-    // use simple single-reference guess
     T1_["ia"] = F_["ia"];
-    T1_.iterate([&](const std::vector<size_t>& i, const std::vector<SpinType>&, double& value) {
-        value *= 1.0 / (Fd_[i[0]] - Fd_[i[1]]);
+    T1_["IA"] = F_["IA"];
+
+    T1_.iterate([&](const std::vector<size_t>& i, const std::vector<SpinType>& spin, double& value) {
+        if (spin[0] == AlphaSpin) {
+            value *= 1.0 / (Fd_a_[i[0]] - Fd_a_[i[1]]);
+        } else {
+            value *= 1.0 / (Fd_b_[i[0]] - Fd_b_[i[1]]);
+        }
     });
 
     // norm and max
-    T1max_ = 0.0, T1norm_ = T1_.norm();
-    T1_.citerate([&](const std::vector<size_t>&, const std::vector<SpinType>&, const double& value) {
-        if (std::fabs(value) > std::fabs(T1max_))
-            T1max_ = value;
-    });
+    T1max_ = T1_.norm(0);
+    T1norm_ = T1_.norm();
 
     outfile->Printf("  Done. Timing %10.3f s", timer.get());
 }
 
-void CC_SO::guess_t3() {
-    local_timer timer;
-    std::string str = "Computing T3 amplitudes     ...";
-    outfile->Printf("\n    %-35s", str.c_str());
-
-    ambit::BlockedTensor C3 = ambit::BlockedTensor::build(tensor_type_, "C3", {"cccvvv"});
-    auto temp = ambit::BlockedTensor::build(CoreTensor, "temp", {"cccvvv"});
-    temp["g2,c0,c1,g0,g1,v0"] += -1.0 * V_["g2,v1,g0,g1"] * T2_["c0,c1,v0,v1"];
-    C3["c0,c1,g2,g0,g1,v0"] += temp["g2,c0,c1,g0,g1,v0"];
-    C3["c0,g2,c1,g0,g1,v0"] -= temp["g2,c0,c1,g0,g1,v0"];
-    C3["g2,c0,c1,g0,g1,v0"] += temp["g2,c0,c1,g0,g1,v0"];
-    C3["c0,c1,g2,g0,v0,g1"] -= temp["g2,c0,c1,g0,g1,v0"];
-    C3["c0,g2,c1,g0,v0,g1"] += temp["g2,c0,c1,g0,g1,v0"];
-    C3["g2,c0,c1,g0,v0,g1"] -= temp["g2,c0,c1,g0,g1,v0"];
-    C3["c0,c1,g2,v0,g0,g1"] += temp["g2,c0,c1,g0,g1,v0"];
-    C3["c0,g2,c1,v0,g0,g1"] -= temp["g2,c0,c1,g0,g1,v0"];
-    C3["g2,c0,c1,v0,g0,g1"] += temp["g2,c0,c1,g0,g1,v0"];
-
-    temp.zero();
-    temp["g1,g2,c0,g0,v0,v1"] += 1.0 * V_["g1,g2,g0,c1"] * T2_["c0,c1,v0,v1"];
-    C3["c0,g1,g2,g0,v0,v1"] += temp["g1,g2,c0,g0,v0,v1"];
-    C3["g1,c0,g2,g0,v0,v1"] -= temp["g1,g2,c0,g0,v0,v1"];
-    C3["g1,g2,c0,g0,v0,v1"] += temp["g1,g2,c0,g0,v0,v1"];
-    C3["c0,g1,g2,v0,g0,v1"] -= temp["g1,g2,c0,g0,v0,v1"];
-    C3["g1,c0,g2,v0,g0,v1"] += temp["g1,g2,c0,g0,v0,v1"];
-    C3["g1,g2,c0,v0,g0,v1"] -= temp["g1,g2,c0,g0,v0,v1"];
-    C3["c0,g1,g2,v0,v1,g0"] += temp["g1,g2,c0,g0,v0,v1"];
-    C3["g1,c0,g2,v0,v1,g0"] -= temp["g1,g2,c0,g0,v0,v1"];
-    C3["g1,g2,c0,v0,v1,g0"] += temp["g1,g2,c0,g0,v0,v1"];
-
-    T3_["ijkabc"] = C3["ijkabc"];
-    T3_["ijkabc"] += C3["abcijk"];
-
-    T3_.iterate([&](const std::vector<size_t>& i, const std::vector<SpinType>&, double& value) {
-        value *= 1.0 / (Fd_[i[0]] + Fd_[i[1]] + Fd_[i[2]] - Fd_[i[3]] - Fd_[i[4]] - Fd_[i[5]]);
-    });
-
-    // norm and max
-    T3max_ = T3_.norm(0), T3norm_ = T3_.norm();
-
-    outfile->Printf("  Done. Timing %10.3f s", timer.get());
-}
-
-void CC_SO::update_t2() {
+void CC_SI::update_t2() {
     // compute DT2 = Hbar2 / D
-    BlockedTensor DT2 = ambit::BlockedTensor::build(tensor_type_, "DT2", {"ccvv"});
+    BlockedTensor DT2 = ambit::BlockedTensor::build(tensor_type_, "DT2", spin_cases({"ccvv"}));
     DT2["ijab"] = Hbar2_["ijab"];
-    DT2.iterate([&](const std::vector<size_t>& i, const std::vector<SpinType>&, double& value) {
-        value *= 1.0 / (Fd_[i[0]] + Fd_[i[1]] - Fd_[i[2]] - Fd_[i[3]]);
+    DT2["iJaB"] = Hbar2_["iJaB"];
+    DT2["IJAB"] = Hbar2_["IJAB"];
+
+    DT2.iterate([&](const std::vector<size_t>& i, const std::vector<SpinType>& spin, double& value) {
+        if ((spin[0] == AlphaSpin) && (spin[1] == AlphaSpin)) {
+            value *= 1.0 / (Fd_a_[i[0]] + Fd_a_[i[1]] - Fd_a_[i[2]] - Fd_a_[i[3]]);
+        } else if ((spin[0] == AlphaSpin) && (spin[1] == BetaSpin)) {
+            value *= 1.0 / (Fd_a_[i[0]] + Fd_b_[i[1]] - Fd_a_[i[2]] - Fd_b_[i[3]]);
+        } else if ((spin[0] == BetaSpin) && (spin[1] == BetaSpin)) {
+            value *= 1.0 / (Fd_b_[i[0]] + Fd_b_[i[1]] - Fd_b_[i[2]] - Fd_b_[i[3]]);
+        }
     });
 
     rms_t2_ = DT2.norm();
 
     T2_["ijab"] += DT2["ijab"];
+    T2_["iJaB"] += DT2["iJaB"];
+    T2_["IJAB"] += DT2["IJAB"];
 
     // norm and max
-    T2max_ = T2_.norm(0), T2norm_ = T2_.norm();
+    T2max_ = T2_.norm(0);
+    T2norm_ = T2_.norm();
 }
 
-void CC_SO::update_t1() {
+void CC_SI::update_t1() {
     // compute DT1 = Hbar1 / D
-    BlockedTensor DT1 = ambit::BlockedTensor::build(tensor_type_, "DT1", {"cv"});
+    BlockedTensor DT1 = ambit::BlockedTensor::build(tensor_type_, "DT1", spin_cases({"cv"}));
     DT1["ia"] = Hbar1_["ia"];
-    DT1.iterate([&](const std::vector<size_t>& i, const std::vector<SpinType>&, double& value) {
-        value *= 1.0 / (Fd_[i[0]] - Fd_[i[1]]);
+    DT1["IA"] = Hbar1_["IA"];
+    DT1.iterate([&](const std::vector<size_t>& i, const std::vector<SpinType>& spin, double& value) {
+        if (spin[0] == AlphaSpin) {
+            value *= 1.0 / (Fd_a_[i[0]] - Fd_a_[i[1]]);
+        } else {
+            value *= 1.0 / (Fd_b_[i[0]] - Fd_b_[i[1]]);
+        }
     });
 
     rms_t1_ = DT1.norm();
 
     T1_["ia"] += DT1["ia"];
+    T1_["IA"] += DT1["IA"];
 
     // norm and max
-    T1max_ = T1_.norm(0), T1norm_ = T1_.norm();
+    T1max_ = T1_.norm(0);
+    T1norm_ = T1_.norm();
 }
 
-void CC_SO::update_t3() {
+void CC_SI::update_t3() {
     // compute DT3 = Hbar3 / D
-    BlockedTensor DT3 = ambit::BlockedTensor::build(tensor_type_, "DT3", {"cccvvv"});
+    BlockedTensor DT3 = ambit::BlockedTensor::build(tensor_type_, "DT3", spin_cases({"cccvvv"}));
     DT3["ijkabc"] = Hbar3_["ijkabc"];
-    DT3.iterate([&](const std::vector<size_t>& i, const std::vector<SpinType>&, double& value) {
-        value *= 1.0 / (Fd_[i[0]] + Fd_[i[1]] + Fd_[i[2]] - Fd_[i[3]] - Fd_[i[4]] - Fd_[i[5]]);
+    DT3["ijKabC"] = Hbar3_["ijKabC"];
+    DT3["iJKaBC"] = Hbar3_["iJKaBC"];
+    DT3["IJKABC"] = Hbar3_["IJKABC"];
+
+    DT3.iterate([&](const std::vector<size_t>& i, const std::vector<SpinType>& spin, double& value) {
+        if ((spin[0] == AlphaSpin) && (spin[1] == AlphaSpin) && (spin[2] == AlphaSpin)) {
+            value *= 1.0 / (Fd_a_[i[0]] + Fd_a_[i[1]] + Fd_a_[i[2]] - Fd_a_[i[3]] - Fd_a_[i[4]] - Fd_a_[i[5]]);
+        } else if ((spin[0] == AlphaSpin) && (spin[1] == AlphaSpin) && (spin[2] == BetaSpin)) {
+            value *= 1.0 / (Fd_a_[i[0]] + Fd_a_[i[1]] + Fd_b_[i[2]] - Fd_a_[i[3]] - Fd_a_[i[4]] - Fd_b_[i[5]]);
+        } else if ((spin[0] == AlphaSpin) && (spin[1] == BetaSpin) && (spin[2] == BetaSpin)) {
+            value *= 1.0 / (Fd_a_[i[0]] + Fd_b_[i[1]] + Fd_b_[i[2]] - Fd_a_[i[3]] - Fd_b_[i[4]] - Fd_b_[i[5]]);
+        } else if ((spin[0] == BetaSpin) && (spin[1] == BetaSpin) && (spin[2] == BetaSpin)) {
+            value *= 1.0 / (Fd_b_[i[0]] + Fd_b_[i[1]] + Fd_b_[i[2]] - Fd_b_[i[3]] - Fd_b_[i[4]] - Fd_b_[i[5]]);
+        }
     });
 
     rms_t3_ = DT3.norm();
 
     T3_["ijkabc"] += DT3["ijkabc"];
+    T3_["ijKabC"] += DT3["ijKabC"];
+    T3_["iJKaBC"] += DT3["iJKaBC"];
+    T3_["IJKABC"] += DT3["IJKABC"];
 
     // norm and max
-    T3max_ = T3_.norm(0), T3norm_ = T3_.norm();
+    T3max_ = T3_.norm(0);
+    T3norm_ = T3_.norm();
 }
 
-double CC_SO::compute_energy() {
-    if (corr_level_ == "CCSD" or corr_level_ == "CCSDT" or corr_level_ == "UCC3" or corr_level_ == "VUCCSD5") {
-        Hbar1_ = BTF_->build(tensor_type_, "Hbar1", {"cv"});
-        Hbar2_ = BTF_->build(tensor_type_, "Hbar2", {"ccvv"});
+double CC_SI::compute_energy() {
+    if (corr_level_ == "CCSD" or corr_level_ == "CCSDT") {
+        Hbar1_ = BTF_->build(tensor_type_, "Hbar1", spin_cases({"cv"}));
+        Hbar2_ = BTF_->build(tensor_type_, "Hbar2", spin_cases({"ccvv"}));
     } else {
         throw PSIEXCEPTION("Not Implemented yet!");
         Hbar1_ = BTF_->build(tensor_type_, "Hbar1", {"gg"});
         Hbar2_ = BTF_->build(tensor_type_, "Hbar2", {"gggg"});
     }
 
-//    // initialize Hbar with bare Hamiltonian
-//    Hbar0_ = 0.0;
-//    Hbar1_["pq"] = F_["pq"];
-//    Hbar2_["pqrs"] = V_["pqrs"];
-
     // build initial amplitudes
     print_h2("Build Initial Cluster Amplitudes");
-    T1_ = BTF_->build(tensor_type_, "T1 Amplitudes", {"cv"});
-    T2_ = BTF_->build(tensor_type_, "T2 Amplitudes", {"ccvv"});
+    T1_ = BTF_->build(tensor_type_, "T1 Amplitudes", spin_cases({"cv"}));
+    T2_ = BTF_->build(tensor_type_, "T2 Amplitudes", spin_cases({"ccvv"}));
     guess_t2();
     guess_t1();
 
     if (do_triples_) {
-        if (corr_level_ == "CCSDT" or corr_level_ == "UCC3") {
-            Hbar3_ = BTF_->build(tensor_type_, "Hbar3", {"cccvvv"});
-        } else {
-            Hbar3_ = BTF_->build(tensor_type_, "Hbar3", {"gggggg"});
-        }
-
-        T3_ = BTF_->build(tensor_type_, "T3 Amplitudes", {"cccvvv"});
-//        guess_t3();
+        Hbar3_ = BTF_->build(tensor_type_, "Hbar3", spin_cases({"cccvvv"}));
+        T3_ = BTF_->build(tensor_type_, "T3 Amplitudes", spin_cases({"cccvvv"}));
     }
 
     // iteration variables
@@ -421,37 +392,41 @@ double CC_SO::compute_energy() {
     for (int cycle = 1; cycle <= maxiter_; ++cycle) {
         if (corr_level_ == "CCSD") {
             compute_ccsd_amp(F_, V_, T1_, T2_, Hbar0_, Hbar1_, Hbar2_);
-        } else if (corr_level_ == "CCSDT") {
-            compute_ccsdt_amp(F_, V_, T1_, T2_, T3_, Hbar0_, Hbar1_, Hbar2_, Hbar3_);
-        } else if (corr_level_ == "UCC3") {
-            double Eeff = 0.0;
-            ambit::BlockedTensor Frot = BTF_->build(tensor_type_, "Frot", {"gg"});
-            ambit::BlockedTensor Vrot = BTF_->build(tensor_type_, "Vrot", {"gggg"});
-            rotate_hamiltonian(Eeff, Frot, Vrot);
-//            outfile->Printf("\n  Eeff = %.15f", Eeff);
-
-            compute_ucc3_amp(Frot, Vrot, T2_, T3_, Hbar0_, Hbar1_, Hbar2_, Hbar3_);
-
-            Hbar0_ += Eeff;
-        } else if (corr_level_ == "VUCCSD5") {
-            double Eeff = 0.0;
-            ambit::BlockedTensor Frot = BTF_->build(tensor_type_, "Frot", {"gg"});
-            ambit::BlockedTensor Vrot = BTF_->build(tensor_type_, "Vrot", {"gggg"});
-            rotate_hamiltonian(Eeff, Frot, Vrot);
-            compute_uccsd5_amp(Frot, Vrot, T2_, Hbar0_, Hbar1_, Hbar2_);
-            Hbar0_ += Eeff;
         }
+        else if (corr_level_ == "CCSDT") {
+            compute_ccsdt_amp(F_, V_, T1_, T2_, T3_, Hbar0_, Hbar1_, Hbar2_, Hbar3_);
+        }
+//        else if (corr_level_ == "UCC3") {
+//            double Eeff = 0.0;
+//            ambit::BlockedTensor Frot = BTF_->build(tensor_type_, "Frot", {"gg"});
+//            ambit::BlockedTensor Vrot = BTF_->build(tensor_type_, "Vrot", {"gggg"});
+//            rotate_hamiltonian(Eeff, Frot, Vrot);
+
+//            compute_ucc3_amp(Frot, Vrot, T2_, T3_, Hbar0_, Hbar1_, Hbar2_, Hbar3_);
+
+//            Hbar0_ += Eeff;
+//        } else if (corr_level_ == "VUCCSD5") {
+//            double Eeff = 0.0;
+//            ambit::BlockedTensor Frot = BTF_->build(tensor_type_, "Frot", {"gg"});
+//            ambit::BlockedTensor Vrot = BTF_->build(tensor_type_, "Vrot", {"gggg"});
+//            rotate_hamiltonian(Eeff, Frot, Vrot);
+//            compute_uccsd5_amp(Frot, Vrot, T2_, Hbar0_, Hbar1_, Hbar2_);
+//            Hbar0_ += Eeff;
+//        }
 
         double Edelta = Eref_ + Hbar0_ - Etotal;
         Etotal = Eref_ + Hbar0_;
 
         // norm of non-diagonal Hbar
-        BlockedTensor temp = ambit::BlockedTensor::build(tensor_type_, "temp", {"cv"});
+        BlockedTensor temp = ambit::BlockedTensor::build(tensor_type_, "temp", spin_cases({"cv"}));
         temp["ia"] = Hbar1_["ia"];
+        temp["IA"] = Hbar1_["IA"];
         double Hbar1Nnorm = temp.norm();
 
-        temp = ambit::BlockedTensor::build(tensor_type_, "temp", {"ccvv"});
+        temp = ambit::BlockedTensor::build(tensor_type_, "temp", spin_cases({"ccvv"}));
         temp["ijab"] = Hbar2_["ijab"];
+        temp["iJaB"] = Hbar2_["iJaB"];
+        temp["IJAB"] = Hbar2_["IJAB"];
         double Hbar2Nnorm = temp.norm();
         for (const std::string block: temp.block_labels()) {
             temp.block(block).reset();
@@ -487,7 +462,7 @@ double CC_SO::compute_energy() {
     outfile->Printf("\n  * Total energy            = %25.15f\n", Etotal);
 
     if (not converged) {
-        throw PSIEXCEPTION("CC_SO computation did not converged.");
+        throw PSIEXCEPTION("CC_SI computation did not converged.");
     }
 
     psi::Process::environment.globals["CURRENT ENERGY"] = Etotal;
@@ -495,53 +470,53 @@ double CC_SO::compute_energy() {
     return Etotal;
 }
 
-void CC_SO::rotate_hamiltonian(double& Eeff, BlockedTensor& Fnew, BlockedTensor& Vnew) {
-    ambit::BlockedTensor A1 = BTF_->build(tensor_type_, "A1 Amplitudes", {"gg"});
-    A1["ia"] = T1_["ia"];
-    A1["ai"] -= T1_["ia"];
+//void CC_SI::rotate_hamiltonian(double& Eeff, BlockedTensor& Fnew, BlockedTensor& Vnew) {
+//    ambit::BlockedTensor A1 = BTF_->build(tensor_type_, "A1 Amplitudes", {"gg"});
+//    A1["ia"] = T1_["ia"];
+//    A1["ai"] -= T1_["ia"];
 
-    psi::SharedMatrix A1_m(new psi::Matrix("A1", nso_, nso_));
-    A1.iterate([&](const std::vector<size_t>& i, const std::vector<SpinType>&, double& value) {
-        A1_m->set(i[0], i[1], value);
-    });
+//    psi::SharedMatrix A1_m(new psi::Matrix("A1", nso_, nso_));
+//    A1.iterate([&](const std::vector<size_t>& i, const std::vector<SpinType>&, double& value) {
+//        A1_m->set(i[0], i[1], value);
+//    });
 
-    // >=3 is required for high energy convergence
-    A1_m->expm(3);
+//    // >=3 is required for high energy convergence
+//    A1_m->expm(3);
 
-    ambit::BlockedTensor U1 = BTF_->build(tensor_type_, "Transformer", {"gg"});
-    U1.iterate([&](const std::vector<size_t>& i, const std::vector<SpinType>&, double& value) {
-        value = A1_m->get(i[0], i[1]);
-    });
+//    ambit::BlockedTensor U1 = BTF_->build(tensor_type_, "Transformer", {"gg"});
+//    U1.iterate([&](const std::vector<size_t>& i, const std::vector<SpinType>&, double& value) {
+//        value = A1_m->get(i[0], i[1]);
+//    });
 
-    // Recompute Hbar0 (ref. energy + T1 correlation), Fnew (Fock), and Vnew (aptei)
-    // E = 0.5 * ( H["ji"] + F["ji] ) * D1["ij"]
+//    // Recompute Hbar0 (ref. energy + T1 correlation), Fnew (Fock), and Vnew (aptei)
+//    // E = 0.5 * ( H["ji"] + F["ji] ) * D1["ij"]
 
-    Fnew["rs"] = U1["rp"] * H_["pq"] * U1["sq"];
+//    Fnew["rs"] = U1["rp"] * H_["pq"] * U1["sq"];
 
-    Eeff = 0.0;
-    Fnew.block("cc").iterate([&](const std::vector<size_t>& i, double& value) {
-        if (i[0] == i[1]) {
-            Eeff += 0.5 * value;
-        }
-    });
+//    Eeff = 0.0;
+//    Fnew.block("cc").iterate([&](const std::vector<size_t>& i, double& value) {
+//        if (i[0] == i[1]) {
+//            Eeff += 0.5 * value;
+//        }
+//    });
 
-    Vnew["g0,g1,g2,g3"] = U1["g0,g4"] * U1["g1,g5"] * V_["g4,g5,g6,g7"] * U1["g2,g6"] * U1["g3,g7"];
+//    Vnew["g0,g1,g2,g3"] = U1["g0,g4"] * U1["g1,g5"] * V_["g4,g5,g6,g7"] * U1["g2,g6"] * U1["g3,g7"];
 
-    auto K1 = BTF_->build(tensor_type_, "Kronecker delta", {"cc"});
-    (K1.block("cc")).iterate([&](const std::vector<size_t>& i, double& value) {
-        value = (i[0] == i[1] ? 1.0 : 0.0);
-    });
-    Fnew["pq"] += Vnew["pjqi"] * K1["ij"];
+//    auto K1 = BTF_->build(tensor_type_, "Kronecker delta", {"cc"});
+//    (K1.block("cc")).iterate([&](const std::vector<size_t>& i, double& value) {
+//        value = (i[0] == i[1] ? 1.0 : 0.0);
+//    });
+//    Fnew["pq"] += Vnew["pjqi"] * K1["ij"];
 
-    // compute fully contracted term from T1
-    Fnew.block("cc").iterate([&](const std::vector<size_t>& i, double& value) {
-        if (i[0] == i[1]) {
-            Eeff += 0.5 * value;
-        }
-    });
+//    // compute fully contracted term from T1
+//    Fnew.block("cc").iterate([&](const std::vector<size_t>& i, double& value) {
+//        if (i[0] == i[1]) {
+//            Eeff += 0.5 * value;
+//        }
+//    });
 
-    Eeff += Efrzc_ + Enuc_ - Eref_;
-}
+//    Eeff += Efrzc_ + Enuc_ - Eref_;
+//}
 
 //void CC_SO::compute_lhbar() {
 

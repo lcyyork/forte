@@ -60,6 +60,8 @@
 #include "sparse_ci/determinant_sq_operator.h"
 
 #include "cc-so/cc.h"
+#include "cc-mo/cc_si.h"
+#include "cc-mo/cc_sa.h"
 
 namespace py = pybind11;
 using namespace pybind11::literals;
@@ -200,6 +202,8 @@ PYBIND11_MODULE(forte, m) {
     m.def("make_dsrg_spin_adapted", &make_dsrg_spin_adapted,
           "Make a DSRG pointer (spin-adapted implementation)");
     m.def("make_cc_so", &make_cc_so, "Make a CC pointer (spin-orbital implementation)");
+    m.def("make_cc_si", &make_cc_si, "Make a CC pointer (spin-integrated implementation)");
+    m.def("make_cc_sa", &make_cc_sa, "Make a CC pointer (spin-adapted implementation)");
 
     export_ForteOptions(m);
 
@@ -312,6 +316,18 @@ PYBIND11_MODULE(forte, m) {
     py::class_<CC_SO>(m, "CC_SO")
         .def("compute_energy", &CC_SO::compute_energy, "Compute CC energy")
         .def("compute_Heff_actv", &CC_SO::compute_Heff_actv,
+             "Return the CC dressed ActiveSpaceIntegrals");
+
+    // export CC_SI
+    py::class_<CC_SI>(m, "CC_SI")
+        .def("compute_energy", &CC_SI::compute_energy, "Compute CC energy")
+        .def("compute_Heff_actv", &CC_SI::compute_Heff_actv,
+             "Return the CC dressed ActiveSpaceIntegrals");
+
+    // export CC_SA
+    py::class_<CC_SA>(m, "CC_SA")
+        .def("compute_energy", &CC_SA::compute_energy, "Compute CC energy")
+        .def("compute_Heff_actv", &CC_SA::compute_Heff_actv,
              "Return the CC dressed ActiveSpaceIntegrals");
 }
 

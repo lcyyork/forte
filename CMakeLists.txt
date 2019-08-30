@@ -82,6 +82,11 @@ src/cc-so/ccsd.cc
 src/cc-so/ccsdt.cc
 src/cc-so/ucc3.cc
 src/cc-so/vuccsd5.cc
+src/cc-mo/cc_sa.cc
+src/cc-mo/ccsd_sa.cc
+src/cc-mo/cc_si.cc
+src/cc-mo/ccsd_si.cc
+src/cc-mo/ccsdt_si.cc
 src/ci_rdm/ci_rdms.cc
 src/ci_rdm/ci_rdms_dynamic.cc
 src/sparse_ci/ci_reference.cc

@@ -269,6 +269,10 @@ def compute_dsrg_unrelaxed_energy(correlation_solver_type, rdms, scf_info, optio
 
     if correlation_solver_type == "CC_SO":
         dsrg = forte.make_cc_so(rdms, scf_info, options, ints, mo_space_info)
+    elif correlation_solver_type == "CC_SI":
+        dsrg = forte.make_cc_si(rdms, scf_info, options, ints, mo_space_info)
+    elif correlation_solver_type == "CC_SA":
+        dsrg = forte.make_cc_sa(rdms, scf_info, options, ints, mo_space_info)
     elif correlation_solver_type == "MRDSRG_SO":
         dsrg = forte.make_dsrg_so_y(rdms, scf_info, options, ints, mo_space_info)
     elif correlation_solver_type == "SOMRDSRG":
