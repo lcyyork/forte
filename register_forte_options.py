@@ -21,6 +21,7 @@ def register_forte_options(forte_options):
     register_casscf_options(forte_options)
     register_old_options(forte_options)
     register_cc_so_options(forte_options)
+    register_trotter_so_options(forte_options)
 
 def register_driver_options(forte_options):
     forte_options.add_str('JOB_TYPE', 'NEWDRIVER', [
@@ -870,6 +871,16 @@ def register_cc_so_options(forte_options):
                           n = 5-7: increasing orders
                           n = 8: maximum order
                           other values: automatically change to 4 or 8""")
+
+
+def register_trotter_so_options(forte_options):
+    forte_options.add_str("TROTTER_CORR_LEVEL", "CCSD", ["CCSD"],
+                          "Coupled cluster level")
+
+    forte_options.add_int("TROTTER_LEVEL", 1, "Number of Trotter level")
+
+    forte_options.add_bool("TROTTER_SYMM", False, "Symmetrize Hamiltonian at each step if true")
+
 
 
     #    /*- The minimum excitation level (Default value: 0) -*/

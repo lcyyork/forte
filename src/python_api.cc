@@ -60,6 +60,7 @@
 #include "sparse_ci/determinant_sq_operator.h"
 
 #include "cc-so/cc.h"
+#include "trotter-so/trotter_so.h"
 
 namespace py = pybind11;
 using namespace pybind11::literals;
@@ -200,6 +201,8 @@ PYBIND11_MODULE(forte, m) {
     m.def("make_dsrg_spin_adapted", &make_dsrg_spin_adapted,
           "Make a DSRG pointer (spin-adapted implementation)");
     m.def("make_cc_so", &make_cc_so, "Make a CC pointer (spin-orbital implementation)");
+    m.def("make_trotter_so", &make_trotter_so,
+          "Make a Trotter UCC pointer (spin-orbital implementation)");
 
     export_ForteOptions(m);
 
@@ -313,6 +316,12 @@ PYBIND11_MODULE(forte, m) {
         .def("compute_energy", &CC_SO::compute_energy, "Compute CC energy")
         .def("compute_Heff_actv", &CC_SO::compute_Heff_actv,
              "Return the CC dressed ActiveSpaceIntegrals");
+
+    // export TROTTER_SO
+    py::class_<TROTTER_SO>(m, "TROTTER_SO")
+        .def("compute_energy", &TROTTER_SO::compute_energy, "Compute Trotter CC energy")
+        .def("compute_Heff_actv", &TROTTER_SO::compute_Heff_actv,
+             "Return the Trotter CC dressed ActiveSpaceIntegrals");
 }
 
 } // namespace forte
