@@ -877,6 +877,9 @@ def register_trotter_so_options(forte_options):
     forte_options.add_str("TROTTER_CORR_LEVEL", "CCSD", ["CCSD"],
                           "Coupled cluster level")
 
+    forte_options.add_int("TROTTER_RSC_LEVEL", 1,
+                          "Recursive commutator level")
+
     forte_options.add_int("TROTTER_LEVEL", 1, "Number of Trotter level")
 
     forte_options.add_bool("TROTTER_SYMM", False, "Symmetrize Hamiltonian at each step if true")

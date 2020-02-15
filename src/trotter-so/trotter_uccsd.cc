@@ -31,14 +31,16 @@ void TROTTER_SO::compute_trotter_uccsd(BlockedTensor& H1, BlockedTensor& H2, Blo
 
     // transform Hamiltonian
     for (int i = 1; i <= trotter_level_; ++i) {
-        build_ccsd_Hamiltonian(Y1, Y2, T1, T2, X0, X1, X2);
+        //        build_ccsd_Hamiltonian(Y1, Y2, T1, T2, X0, X1, X2);
+        transform_hamiltonian_recursive(Y1, Y2, T1, T2, X0, X1, X2);
 
         double Z0 = X0;
 
         Y1["pq"] = X1["qp"];
         Y2["pqrs"] = X2["rspq"];
 
-        build_ccsd_Hamiltonian(Y1, Y2, T1, T2, X0, X1, X2);
+        //        build_ccsd_Hamiltonian(Y1, Y2, T1, T2, X0, X1, X2);
+        transform_hamiltonian_recursive(Y1, Y2, T1, T2, X0, X1, X2);
 
         C0 += Z0 + X0;
         if (trotter_sym_) {
@@ -423,6 +425,68 @@ void TROTTER_SO::build_ccsd_Hamiltonian(BlockedTensor& H1, BlockedTensor& H2, Bl
         temp["c0,a0,a1,a2"] += 1.0 * H2["v0,a0,a1,a2"] * T1["c0,v0"];
         C2["c0,a0,a1,a2"] += temp["c0,a0,a1,a2"];
         C2["a0,c0,a1,a2"] -= temp["c0,a0,a1,a2"];
+    }
+}
+
+void TROTTER_SO::transform_hamiltonian_recursive(BlockedTensor& H1, BlockedTensor& H2,
+                                                 BlockedTensor& T1, BlockedTensor& T2, double& C0,
+                                                 BlockedTensor& C1, BlockedTensor& C2) {
+    // copy initial one-body Hamiltonian
+    C0 = 0.0;
+    C1["pq"] = H1["pq"];
+    C2["pqrs"] = H2["pqrs"];
+
+    BlockedTensor O1 = ambit::BlockedTensor::build(tensor_type_, "O1", {"gg"});
+    BlockedTensor O2 = ambit::BlockedTensor::build(tensor_type_, "O2", {"gggg"});
+    O1["pq"] = H1["pq"];
+    O2["pqrs"] = H2["pqrs"];
+
+    // iterator variables
+    int maxn = foptions_->get_int("DSRG_RSC_NCOMM");
+    double ct_threshold = foptions_->get_double("DSRG_RSC_THRESHOLD");
+    double X0 = 0.0;
+    BlockedTensor X1 = ambit::BlockedTensor::build(tensor_type_, "X1", {"gg"});
+    BlockedTensor X2 = ambit::BlockedTensor::build(tensor_type_, "X2", {"gggg"});
+
+    double W0 = 0.0;
+    BlockedTensor W1 = ambit::BlockedTensor::build(tensor_type_, "W1", {"gg"});
+    BlockedTensor W2 = ambit::BlockedTensor::build(tensor_type_, "W2", {"gggg"});
+
+    // compute Hbar recursively
+    for (int n = 1; n <= maxn; ++n) {
+        // prefactor before n-nested commutator
+        double factor = 1.0 / n;
+
+        H_Ta_C(factor, O1, O2, T1, T2, X0, X1, X2);
+        if (n >= 1 and n <= 4) {
+            ccsd_hamiltonian(n, O1, O2, T1, T2, X0, X1, X2);
+        }
+
+        // add to Hbar
+        C0 += X0;
+        C1["pq"] += X1["pq"];
+        C2["pqrs"] += X2["pqrs"];
+
+        // add quadratic commutator contribution
+        if (foptions_->get_int("TROTTER_RSC_LEVEL") > 1) {
+            X0 += W0;
+            X1["pq"] += W1["pq"];
+            X2["pqrs"] += W2["pqrs"];
+            comm2_O_Ta_C(n, O2, T1, T2, W0, W1, W2);
+        }
+
+        // copy X to O for next level commutator
+        O1["pq"] = X1["pq"];
+        O2["pqrs"] = X2["pqrs"];
+
+        // test convergence of C
+        double norm_C1 = X1.norm();
+        double norm_C2 = X2.norm();
+
+        if (std::sqrt(norm_C2 * norm_C2 + norm_C1 * norm_C1) < ct_threshold) {
+            outfile->Printf("\n Recursion ends at n = %d", n);
+            break;
+        }
     }
 }
 

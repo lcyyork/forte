@@ -194,6 +194,7 @@ src/pci/pci.cc
 src/pci/pci_sigma.cc
 src/trotter-so/trotter_so.cc
 src/trotter-so/trotter_uccsd.cc
+src/trotter-so/trotter_comm_test.cc
 src/v2rdm/v2rdm.cc
 )
 

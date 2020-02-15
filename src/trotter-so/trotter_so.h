@@ -186,6 +186,26 @@ class TROTTER_SO : public DynamicCorrelationSolver {
                                 BlockedTensor& C2);
     void compute_trotter_uccsd(BlockedTensor& H1, BlockedTensor& H2, BlockedTensor& T1,
                                BlockedTensor& T2, double& C0, BlockedTensor& C1, BlockedTensor& C2);
+
+    /// Compute C = factor * [H, Ta] where Ta contains one or more active indices
+    void H_Ta_C(double factor, BlockedTensor& H1, BlockedTensor& H2, BlockedTensor& T1,
+                BlockedTensor& T2, double& C0, BlockedTensor& C1, BlockedTensor& C2);
+    //    /// Compute C = 0.5 * [[H, Te], Ta] + 0.5 * [[H, Ta], Te]
+    //    void H_TaTe_C(BlockedTensor& H1, BlockedTensor& H2, BlockedTensor& T1, BlockedTensor& T2,
+    //                  double& C0, BlockedTensor& C1, BlockedTensor& C2);
+    //    /// Compute C = 0.5 * [[H, Ta], Ta]
+    //    void H_TaTa_C(BlockedTensor& H1, BlockedTensor& H2, BlockedTensor& T1, BlockedTensor& T2,
+    //                  double& C0, BlockedTensor& C1, BlockedTensor& C2);
+
+    void transform_hamiltonian_recursive(BlockedTensor& H1, BlockedTensor& H2, BlockedTensor& T1,
+                                         BlockedTensor& T2, double& C0, BlockedTensor& C1,
+                                         BlockedTensor& C2);
+    /// Compute C = (1 / (k * (k + 1))) * [[H2, T2]_3, Ta]
+    void comm2_O_Ta_C(int k, BlockedTensor& H2, BlockedTensor& T1,
+                      BlockedTensor& T2, double& C0, BlockedTensor& C1, BlockedTensor& C2);
+
+    void ccsd_hamiltonian(int level, BlockedTensor& H1, BlockedTensor& H2, BlockedTensor& T1,
+                          BlockedTensor& T2, double& C0, BlockedTensor& C1, BlockedTensor& C2);
 };
 
 std::unique_ptr<TROTTER_SO> make_trotter_so(RDMs rdms, std::shared_ptr<SCFInfo> scf_info,
