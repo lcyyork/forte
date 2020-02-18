@@ -462,11 +462,6 @@ void TROTTER_SO::transform_hamiltonian_recursive(BlockedTensor& H1, BlockedTenso
             ccsd_hamiltonian(n, O1, O2, T1, T2, X0, X1, X2);
         }
 
-        // add to Hbar
-        C0 += X0;
-        C1["pq"] += X1["pq"];
-        C2["pqrs"] += X2["pqrs"];
-
         // add quadratic commutator contribution
         if (foptions_->get_int("TROTTER_RSC_LEVEL") > 1) {
             X0 += W0;
@@ -474,6 +469,11 @@ void TROTTER_SO::transform_hamiltonian_recursive(BlockedTensor& H1, BlockedTenso
             X2["pqrs"] += W2["pqrs"];
             comm2_O_Ta_C(n, O2, T1, T2, W0, W1, W2);
         }
+
+        // add to Hbar
+        C0 += X0;
+        C1["pq"] += X1["pq"];
+        C2["pqrs"] += X2["pqrs"];
 
         // copy X to O for next level commutator
         O1["pq"] = X1["pq"];
