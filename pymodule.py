@@ -184,10 +184,10 @@ def forte_driver(state_weights_map, scf_info, options, ints, mo_space_info):
                 Ub = semi.Ub_t()
 
                 # Compute DSRG in the semicanonical basis
-                dsrg = forte.make_dsrg_method(correlation_solver_type, rdms,
-                                              scf_info, options, ints, mo_space_info)
-                dsrg.set_Uactv(Ua, Ub)
-                Edsrg = dsrg.compute_energy()
+                Edsrg, dsrg, Heff_actv_implemented = compute_dsrg_unrelaxed_energy(correlation_solver_type,
+                                                                                   rdms, scf_info, options,
+                                                                                   ints, mo_space_info,
+                                                                                   Ua, Ub)
 
                 if do_dipole:
                     udm_x = psi4.core.variable('UNRELAXED DIPOLE X')
@@ -272,6 +272,7 @@ def compute_dsrg_unrelaxed_energy(correlation_solver_type, rdms, scf_info, optio
     elif correlation_solver_type == "MRDSRG_SO":
         dsrg = forte.make_dsrg_so_y(rdms, scf_info, options, ints, mo_space_info)
     elif correlation_solver_type == "TROTTER_SO":
+        Heff_actv_implemented = True
         dsrg = forte.make_trotter_so(rdms, scf_info, options, ints, mo_space_info)
     elif correlation_solver_type == "SOMRDSRG":
         dsrg = forte.make_dsrg_so_f(rdms, scf_info, options, ints, mo_space_info)

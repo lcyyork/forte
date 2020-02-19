@@ -62,28 +62,76 @@ TROTTER_SO::TROTTER_SO(RDMs rdms, std::shared_ptr<SCFInfo> scf_info,
 TROTTER_SO::~TROTTER_SO() {}
 
 std::shared_ptr<ActiveSpaceIntegrals> TROTTER_SO::compute_Heff_actv() {
-    throw psi::PSIEXCEPTION(
-        "Computing active-space Hamiltonian is not yet implemented for spin-orbital code.");
+    double Edsrg = Eref_ + Hbar0_;
 
-    return std::make_shared<ActiveSpaceIntegrals>(
-        ints_, mo_space_info_->get_corr_abs_mo("ACTIVE"),
-        mo_space_info_->get_corr_abs_mo("RESTRICTED_DOCC"));
+    // scalar from H1 and H2
+    Edsrg -= Hbar1_["vu"] * L1_["uv"];
+    Edsrg += 0.5 * L1_["uv"] * Hbar2_["vyux"] * L1_["xy"];
+    Edsrg -= 0.25 * Hbar2_["xyuv"] * L2_["uvxy"];
 
-    //    // de-normal-order DSRG transformed Hamiltonian
-    //    double Edsrg = Eref__ + Hbar0_;
-    //    deGNO_ints("Hamiltonian", Edsrg, Hbar1_, Hbar2_);
-    //    rotate_ints_semi_to_origin("Hamiltonian", Hbar1_, Hbar2_);
+    // Hbar1
+    Hbar1_["uv"] -= Hbar2_["uxvy"] * L1_["yx"];
 
-    //    // create FCIIntegral shared_ptr
-    //    std::shared_ptr<ActiveSpaceIntegrals> fci_ints =
-    //        std::make_shared<ActiveSpaceIntegrals>(ints_, actv_mos_, core_mos_);
-    //    fci_ints->set_active_integrals(Hbar2_.block("aaaa"), Hbar2_.block("aAaA"),
-    //                                   Hbar2_.block("AAAA"));
-    //    fci_ints->set_restricted_one_body_operator(Hbar1_.block("aa").data(),
-    //                                               Hbar1_.block("AA").data());
-    //    fci_ints->set_scalar_energy(Edsrg - Enuc_ - Efrzc_);
+    // create spin-integrated integrals
+    size_t na_mo = na_ / 2;
 
-    //    return fci_ints;
+    auto H1a = ambit::Tensor::build(tensor_type_, "H1a", std::vector<size_t>(2, na_mo));
+    H1a.iterate([&](const std::vector<size_t>& i, double& value) {
+        size_t index = i[0] * na_ + i[1];
+        value = (Hbar1_.block("aa")).data()[index];
+    });
+
+    auto H1b = ambit::Tensor::build(tensor_type_, "H1b", std::vector<size_t>(2, na_mo));
+    H1b.iterate([&](const std::vector<size_t>& i, double& value) {
+        size_t index = (i[0] + na_mo) * na_ + (i[1] + na_mo);
+        value = (Hbar1_.block("aa")).data()[index];
+    });
+
+    auto myPow = [](size_t x, size_t p) {
+        size_t i = 1;
+        for (size_t j = 1; j <= p; j++)
+            i *= x;
+        return i;
+    };
+
+    auto H2aa = ambit::Tensor::build(tensor_type_, "H2aa", std::vector<size_t>(4, na_mo));
+    H2aa.iterate([&](const std::vector<size_t>& i, double& value) {
+        size_t index = 0;
+        for (int m = 0; m < 4; ++m) {
+            index += i[m] * myPow(na_, 3 - m);
+        }
+        value = (Hbar2_.block("aaaa")).data()[index];
+    });
+
+    auto H2ab = ambit::Tensor::build(tensor_type_, "H2ab", std::vector<size_t>(4, na_mo));
+    H2ab.iterate([&](const std::vector<size_t>& i, double& value) {
+        size_t i0 = i[0];
+        size_t i1 = i[1] + na_mo;
+        size_t i2 = i[2];
+        size_t i3 = i[3] + na_mo;
+        size_t index = 0;
+        index = i0 * myPow(na_, 3) + i1 * myPow(na_, 2) + i2 * myPow(na_, 1) + i3;
+        value = (Hbar2_.block("aaaa")).data()[index];
+    });
+
+    auto H2bb = ambit::Tensor::build(tensor_type_, "H2bb", std::vector<size_t>(4, na_mo));
+    H2bb.iterate([&](const std::vector<size_t>& i, double& value) {
+        size_t index = 0;
+        for (int m = 0; m < 4; ++m) {
+            index += (i[m] + na_mo) * myPow(na_, 3 - m);
+        }
+        value = (Hbar2_.block("aaaa")).data()[index];
+    });
+
+    // create FCIIntegral shared_ptr
+    std::shared_ptr<ActiveSpaceIntegrals> fci_ints =
+        std::make_shared<ActiveSpaceIntegrals>(ints_, mo_space_info_->get_corr_abs_mo("ACTIVE"),
+                                               mo_space_info_->get_corr_abs_mo("RESTRICTED_DOCC"));
+    fci_ints->set_active_integrals(H2aa, H2ab, H2bb);
+    fci_ints->set_restricted_one_body_operator(H1a.data(), H1b.data());
+    fci_ints->set_scalar_energy(Edsrg - ints_->nuclear_repulsion_energy() - Efrzc_);
+
+    return fci_ints;
 }
 
 void TROTTER_SO::startup() {
@@ -463,6 +511,10 @@ void TROTTER_SO::guess_t1() {
 }
 
 void TROTTER_SO::update_t2() {
+    // create a temp for Hbar2
+    auto temp = ambit::BlockedTensor::build(tensor_type_, "temp", {"aaaa"});
+    temp["uvxy"] = Hbar2_["uvxy"];
+
     // compute DT2 = Hbar2 * (1 - exp(-s * D * D)) / D - T2 * exp(-s * D * D)
     BlockedTensor DT2 = ambit::BlockedTensor::build(tensor_type_, "DT2", {"hhpp"});
     DT2["ijab"] = Hbar2_["ijab"];
@@ -489,6 +541,8 @@ void TROTTER_SO::update_t2() {
     // norm and max
     t2_max_ = T2_.norm(0);
     t2_norm_ = T2_.norm();
+
+    Hbar2_["uvxy"] = temp["uvxy"];
 }
 
 void TROTTER_SO::update_t1() {
