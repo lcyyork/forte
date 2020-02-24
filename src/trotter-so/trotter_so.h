@@ -197,9 +197,107 @@ class TROTTER_SO : public DynamicCorrelationSolver {
     //    void H_TaTa_C(BlockedTensor& H1, BlockedTensor& H2, BlockedTensor& T1, BlockedTensor& T2,
     //                  double& C0, BlockedTensor& C1, BlockedTensor& C2);
 
+    /// Compute MRCCSD Hbar using Francesco scheme
+    void build_mrccsd_Hamiltonian(BlockedTensor& H1, BlockedTensor& H2, BlockedTensor& T1,
+                                  BlockedTensor& T2, double& C0, BlockedTensor& C1,
+                                  BlockedTensor& C2);
+    void ccsd_0(BlockedTensor& H1, BlockedTensor& H2, BlockedTensor& T1, BlockedTensor& T2,
+                double& C0);
+    void ccsd_aa(BlockedTensor& H1, BlockedTensor& H2, BlockedTensor& T1, BlockedTensor& T2,
+                 BlockedTensor& C1);
+    void ccsd_ac(BlockedTensor& H1, BlockedTensor& H2, BlockedTensor& T1, BlockedTensor& T2,
+                 BlockedTensor& C1);
+    void ccsd_av(BlockedTensor& H1, BlockedTensor& H2, BlockedTensor& T1, BlockedTensor& T2,
+                 BlockedTensor& C1);
+    void ccsd_ca(BlockedTensor& H1, BlockedTensor& H2, BlockedTensor& T1, BlockedTensor& T2,
+                 BlockedTensor& C1);
+    void ccsd_cc(BlockedTensor& H1, BlockedTensor& H2, BlockedTensor& T1, BlockedTensor& T2,
+                 BlockedTensor& C1);
+    void ccsd_cv(BlockedTensor& H1, BlockedTensor& H2, BlockedTensor& T1, BlockedTensor& T2,
+                 BlockedTensor& C1);
+    void ccsd_va(BlockedTensor& H1, BlockedTensor& H2, BlockedTensor& T1, BlockedTensor& T2,
+                 BlockedTensor& C1);
+    void ccsd_vc(BlockedTensor& H1, BlockedTensor& H2, BlockedTensor& T1, BlockedTensor& T2,
+                 BlockedTensor& C1);
+    void ccsd_vv(BlockedTensor& H1, BlockedTensor& H2, BlockedTensor& T1, BlockedTensor& T2,
+                 BlockedTensor& C1);
+    void ccsd_aaaa(BlockedTensor& H1, BlockedTensor& H2, BlockedTensor& T1, BlockedTensor& T2,
+                   BlockedTensor& C2);
+    void ccsd_aaca(BlockedTensor& H1, BlockedTensor& H2, BlockedTensor& T1, BlockedTensor& T2,
+                   BlockedTensor& C2);
+    void ccsd_aacc(BlockedTensor& H1, BlockedTensor& H2, BlockedTensor& T1, BlockedTensor& T2,
+                   BlockedTensor& C2);
+    void ccsd_aava(BlockedTensor& H1, BlockedTensor& H2, BlockedTensor& T1, BlockedTensor& T2,
+                   BlockedTensor& C2);
+    void ccsd_aavc(BlockedTensor& H1, BlockedTensor& H2, BlockedTensor& T1, BlockedTensor& T2,
+                   BlockedTensor& C2);
+    void ccsd_aavv(BlockedTensor& H1, BlockedTensor& H2, BlockedTensor& T1, BlockedTensor& T2,
+                   BlockedTensor& C2);
+    void ccsd_caaa(BlockedTensor& H1, BlockedTensor& H2, BlockedTensor& T1, BlockedTensor& T2,
+                   BlockedTensor& C2);
+    void ccsd_caca(BlockedTensor& H1, BlockedTensor& H2, BlockedTensor& T1, BlockedTensor& T2,
+                   BlockedTensor& C2);
+    void ccsd_cacc(BlockedTensor& H1, BlockedTensor& H2, BlockedTensor& T1, BlockedTensor& T2,
+                   BlockedTensor& C2);
+    void ccsd_cava(BlockedTensor& H1, BlockedTensor& H2, BlockedTensor& T1, BlockedTensor& T2,
+                   BlockedTensor& C2);
+    void ccsd_cavc(BlockedTensor& H1, BlockedTensor& H2, BlockedTensor& T1, BlockedTensor& T2,
+                   BlockedTensor& C2);
+    void ccsd_cavv(BlockedTensor& H1, BlockedTensor& H2, BlockedTensor& T1, BlockedTensor& T2,
+                   BlockedTensor& C2);
+    void ccsd_ccaa(BlockedTensor& H1, BlockedTensor& H2, BlockedTensor& T1, BlockedTensor& T2,
+                   BlockedTensor& C2);
+    void ccsd_ccca(BlockedTensor& H1, BlockedTensor& H2, BlockedTensor& T1, BlockedTensor& T2,
+                   BlockedTensor& C2);
+    void ccsd_cccc(BlockedTensor& H1, BlockedTensor& H2, BlockedTensor& T1, BlockedTensor& T2,
+                   BlockedTensor& C2);
+    void ccsd_ccva(BlockedTensor& H1, BlockedTensor& H2, BlockedTensor& T1, BlockedTensor& T2,
+                   BlockedTensor& C2);
+    void ccsd_ccvc(BlockedTensor& H1, BlockedTensor& H2, BlockedTensor& T1, BlockedTensor& T2,
+                   BlockedTensor& C2);
+    void ccsd_ccvv(BlockedTensor& H1, BlockedTensor& H2, BlockedTensor& T1, BlockedTensor& T2,
+                   BlockedTensor& C2);
+    void ccsd_vaaa(BlockedTensor& H1, BlockedTensor& H2, BlockedTensor& T1, BlockedTensor& T2,
+                   BlockedTensor& C2);
+    void ccsd_vaca(BlockedTensor& H1, BlockedTensor& H2, BlockedTensor& T1, BlockedTensor& T2,
+                   BlockedTensor& C2);
+    void ccsd_vacc(BlockedTensor& H1, BlockedTensor& H2, BlockedTensor& T1, BlockedTensor& T2,
+                   BlockedTensor& C2);
+    void ccsd_vava(BlockedTensor& H1, BlockedTensor& H2, BlockedTensor& T1, BlockedTensor& T2,
+                   BlockedTensor& C2);
+    void ccsd_vavc(BlockedTensor& H1, BlockedTensor& H2, BlockedTensor& T1, BlockedTensor& T2,
+                   BlockedTensor& C2);
+    void ccsd_vavv(BlockedTensor& H1, BlockedTensor& H2, BlockedTensor& T1, BlockedTensor& T2,
+                   BlockedTensor& C2);
+    void ccsd_vcaa(BlockedTensor& H1, BlockedTensor& H2, BlockedTensor& T1, BlockedTensor& T2,
+                   BlockedTensor& C2);
+    void ccsd_vcca(BlockedTensor& H1, BlockedTensor& H2, BlockedTensor& T1, BlockedTensor& T2,
+                   BlockedTensor& C2);
+    void ccsd_vccc(BlockedTensor& H1, BlockedTensor& H2, BlockedTensor& T1, BlockedTensor& T2,
+                   BlockedTensor& C2);
+    void ccsd_vcva(BlockedTensor& H1, BlockedTensor& H2, BlockedTensor& T1, BlockedTensor& T2,
+                   BlockedTensor& C2);
+    void ccsd_vcvc(BlockedTensor& H1, BlockedTensor& H2, BlockedTensor& T1, BlockedTensor& T2,
+                   BlockedTensor& C2);
+    void ccsd_vcvv(BlockedTensor& H1, BlockedTensor& H2, BlockedTensor& T1, BlockedTensor& T2,
+                   BlockedTensor& C2);
+    void ccsd_vvaa(BlockedTensor& H1, BlockedTensor& H2, BlockedTensor& T1, BlockedTensor& T2,
+                   BlockedTensor& C2);
+    void ccsd_vvca(BlockedTensor& H1, BlockedTensor& H2, BlockedTensor& T1, BlockedTensor& T2,
+                   BlockedTensor& C2);
+    void ccsd_vvcc(BlockedTensor& H1, BlockedTensor& H2, BlockedTensor& T1, BlockedTensor& T2,
+                   BlockedTensor& C2);
+    void ccsd_vvva(BlockedTensor& H1, BlockedTensor& H2, BlockedTensor& T1, BlockedTensor& T2,
+                   BlockedTensor& C2);
+    void ccsd_vvvc(BlockedTensor& H1, BlockedTensor& H2, BlockedTensor& T1, BlockedTensor& T2,
+                   BlockedTensor& C2);
+    void ccsd_vvvv(BlockedTensor& H1, BlockedTensor& H2, BlockedTensor& T1, BlockedTensor& T2,
+                   BlockedTensor& C2);
+
     void transform_hamiltonian_recursive(BlockedTensor& H1, BlockedTensor& H2, BlockedTensor& T1,
                                          BlockedTensor& T2, double& C0, BlockedTensor& C1,
                                          BlockedTensor& C2);
+
     /// Compute C = (1 / (k * (k + 1))) * [[H2, T2]_3, Ta]
     void comm2_O_Ta_C(int k, BlockedTensor& H2, BlockedTensor& T1, BlockedTensor& T2, double& C0,
                       BlockedTensor& C1, BlockedTensor& C2);

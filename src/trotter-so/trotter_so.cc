@@ -62,6 +62,20 @@ TROTTER_SO::TROTTER_SO(RDMs rdms, std::shared_ptr<SCFInfo> scf_info,
 TROTTER_SO::~TROTTER_SO() {}
 
 std::shared_ptr<ActiveSpaceIntegrals> TROTTER_SO::compute_Heff_actv() {
+    // symmetrize Hbar = 0.5 * (Hbar * Hbar^+)
+    if (foptions_->get_bool("DO_TROTTER")) {
+        auto temp = ambit::BlockedTensor::build(tensor_type_, "temp", {"aaaa"});
+        temp["uvxy"] = Hbar2_["uvxy"];
+        Hbar2_["uvxy"] += temp["xyuv"];
+
+        temp = ambit::BlockedTensor::build(tensor_type_, "temp", {"aa"});
+        temp["uv"] = Hbar1_["uv"];
+        Hbar1_["uv"] += temp["vu"];
+
+        Hbar2_.scale(0.5);
+        Hbar1_.scale(0.5);
+    }
+
     double Edsrg = Eref_ + Hbar0_;
 
     // scalar from H1 and H2
@@ -603,7 +617,11 @@ double TROTTER_SO::compute_energy() {
 
     for (int cycle = 0; cycle <= maxiter_; ++cycle) {
         if (corr_level_ == "CCSD") {
-            compute_trotter_uccsd(F_, V_, T1_, T2_, Hbar0_, Hbar1_, Hbar2_);
+            if (foptions_->get_bool("DO_TROTTER")) {
+                compute_trotter_uccsd(F_, V_, T1_, T2_, Hbar0_, Hbar1_, Hbar2_);
+            } else {
+                build_mrccsd_Hamiltonian(F_, V_, T1_, T2_, Hbar0_, Hbar1_, Hbar2_);
+            }
         } else {
             outfile->Printf("Not implemented %s", corr_level_.c_str());
         }

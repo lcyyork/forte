@@ -490,4 +490,59 @@ void TROTTER_SO::transform_hamiltonian_recursive(BlockedTensor& H1, BlockedTenso
     }
 }
 
+void TROTTER_SO::build_mrccsd_Hamiltonian(BlockedTensor& H1, BlockedTensor& H2, BlockedTensor& T1,
+                                          BlockedTensor& T2, double& C0, BlockedTensor& C1,
+                                          BlockedTensor& C2) {
+    C0 = 0.0;
+    C1.zero();
+    C2.zero();
+
+    ccsd_0(H1, H2, T1, T2, C0);
+    ccsd_aa(H1, H2, T1, T2, C1);
+    ccsd_ac(H1, H2, T1, T2, C1);
+    ccsd_av(H1, H2, T1, T2, C1);
+    ccsd_ca(H1, H2, T1, T2, C1);
+    ccsd_cc(H1, H2, T1, T2, C1);
+    ccsd_cv(H1, H2, T1, T2, C1);
+    ccsd_va(H1, H2, T1, T2, C1);
+    ccsd_vc(H1, H2, T1, T2, C1);
+    ccsd_vv(H1, H2, T1, T2, C1);
+    ccsd_aaaa(H1, H2, T1, T2, C2);
+    ccsd_aaca(H1, H2, T1, T2, C2);
+    ccsd_aacc(H1, H2, T1, T2, C2);
+    ccsd_aava(H1, H2, T1, T2, C2);
+    ccsd_aavc(H1, H2, T1, T2, C2);
+    ccsd_aavv(H1, H2, T1, T2, C2);
+    ccsd_caaa(H1, H2, T1, T2, C2);
+    ccsd_caca(H1, H2, T1, T2, C2);
+    ccsd_cacc(H1, H2, T1, T2, C2);
+    ccsd_cava(H1, H2, T1, T2, C2);
+    ccsd_cavc(H1, H2, T1, T2, C2);
+    ccsd_cavv(H1, H2, T1, T2, C2);
+    ccsd_ccaa(H1, H2, T1, T2, C2);
+    ccsd_ccca(H1, H2, T1, T2, C2);
+    ccsd_cccc(H1, H2, T1, T2, C2);
+    ccsd_ccva(H1, H2, T1, T2, C2);
+    ccsd_ccvc(H1, H2, T1, T2, C2);
+    ccsd_ccvv(H1, H2, T1, T2, C2);
+    ccsd_vaaa(H1, H2, T1, T2, C2);
+    ccsd_vaca(H1, H2, T1, T2, C2);
+    ccsd_vacc(H1, H2, T1, T2, C2);
+    ccsd_vava(H1, H2, T1, T2, C2);
+    ccsd_vavc(H1, H2, T1, T2, C2);
+    ccsd_vavv(H1, H2, T1, T2, C2);
+    ccsd_vcaa(H1, H2, T1, T2, C2);
+    ccsd_vcca(H1, H2, T1, T2, C2);
+    ccsd_vccc(H1, H2, T1, T2, C2);
+    ccsd_vcva(H1, H2, T1, T2, C2);
+    ccsd_vcvc(H1, H2, T1, T2, C2);
+    ccsd_vcvv(H1, H2, T1, T2, C2);
+    ccsd_vvaa(H1, H2, T1, T2, C2);
+    ccsd_vvca(H1, H2, T1, T2, C2);
+    ccsd_vvcc(H1, H2, T1, T2, C2);
+    ccsd_vvva(H1, H2, T1, T2, C2);
+    ccsd_vvvc(H1, H2, T1, T2, C2);
+    ccsd_vvvv(H1, H2, T1, T2, C2);
+}
+
 } // namespace forte

@@ -884,6 +884,7 @@ def register_trotter_so_options(forte_options):
 
     forte_options.add_bool("TROTTER_SYMM", False, "Symmetrize Hamiltonian at each step if true")
 
+    forte_options.add_bool("DO_TROTTER", True, "Turn off Trotterization if set this to false")
 
 
     #    /*- The minimum excitation level (Default value: 0) -*/

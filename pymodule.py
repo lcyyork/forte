@@ -176,7 +176,7 @@ def forte_driver(state_weights_map, scf_info, options, ints, mo_space_info):
                     rdms = semi.transform_rdms(Ua, Ub, rdms, max_rdm_level)
                 else:
                     rdms = semi.transform_rdms(Ua, Ub, as_solver_relaxed.compute_average_rdms(state_weights_map, 3),
-                                                         max_rdm_level)
+                                               max_rdm_level)
 
                 # Now semicanonicalize the reference and orbitals
                 semi.semicanonicalize(rdms, max_rdm_level)
