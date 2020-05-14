@@ -31,6 +31,7 @@
 
 #include <cmath>
 
+#include "psi4/libdiis/diismanager.h"
 #include "psi4/liboptions/liboptions.h"
 #include "psi4/libmints/wavefunction.h"
 #include "psi4/libpsio/psio.hpp"
@@ -137,6 +138,29 @@ class CC_SO : public DynamicCorrelationSolver {
     TensorType tensor_type_;
 
     bool debug_flag_ = false;
+
+    // => Amplitudes read/write <=
+
+    bool read_amps_;
+    bool dump_amps_;
+    std::string file_prefix_;
+
+    // => DIIS control <=
+
+    /// Shared pointer of DIISManager object from Psi4
+    std::shared_ptr<psi::DIISManager> diis_manager_;
+    /// Amplitudes pointers
+    std::vector<double*> amp_ptrs_;
+    /// Residual pointers
+    std::vector<double*> res_ptrs_;
+    /// Initialize DIISManager
+    void diis_manager_init();
+    /// Add entry for DIISManager
+    void diis_manager_add_entry();
+    /// Extrapolate for DIISManager
+    void diis_manager_extrapolate();
+    /// Clean up for pointers used for DIIS
+    void diis_manager_cleanup();
 
     // => Tensors <= //
 

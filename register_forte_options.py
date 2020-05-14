@@ -969,6 +969,9 @@ def register_cc_so_options(forte_options):
                           "  n = 8: maximum order\n"
                           "  other values: automatically change to 4 or 8")
 
+    forte_options.add_bool("CC_READ_AMPS", False, "Read initial amplitudes from files")
+    forte_options.add_bool("CC_DUMP_AMPS", False, "Dump converged amplitudes to disk")
+
 
     #    /*- The minimum excitation level (Default value: 0) -*/
     #    options.add_int("MIN_EXC_LEVEL", 0)

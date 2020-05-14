@@ -35,6 +35,7 @@
 #include "psi4/libmints/molecule.h"
 
 #include "base_classes/mo_space_info.h"
+#include "helpers/disk_io.h"
 #include "helpers/helpers.h"
 #include "helpers/printing.h"
 #include "helpers/timer.h"

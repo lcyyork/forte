@@ -29,12 +29,14 @@
 #include <algorithm>
 #include <map>
 #include <vector>
+#include <sys/stat.h>
 
 #include "psi4/libpsi4util/process.h"
 #include "psi4/libmints/molecule.h"
 
 #include "base_classes/mo_space_info.h"
 #include "base_classes/scf_info.h"
+#include "helpers/disk_io.h"
 #include "helpers/helpers.h"
 #include "helpers/printing.h"
 #include "helpers/timer.h"
@@ -86,6 +88,12 @@ void CC_SO::startup() {
     maxiter_ = foptions_->get_int("MAXITER");
 
     ntamp_ = foptions_->get_int("NTAMP");
+
+    read_amps_ = foptions_->get_bool("CC_READ_AMPS");
+    dump_amps_ = foptions_->get_bool("CC_DUMP_AMPS");
+    std::string corr_lowercase(corr_level_);
+    std::transform(corr_lowercase.begin(), corr_lowercase.end(), corr_lowercase.begin(), ::tolower);
+    file_prefix_ = "forte." + corr_lowercase;
 
     fink_order_ = foptions_->get_int("LUCCSDT_FINK_ORDER");
     if (fink_order_ < 4) {
@@ -238,14 +246,25 @@ void CC_SO::print_summary() {
 
 void CC_SO::guess_t2() {
     local_timer timer;
-    std::string str = "Computing T2 amplitudes     ...";
-    outfile->Printf("\n    %-35s", str.c_str());
 
-    T2_["ijab"] = V_["ijab"];
+    // use default file name
+    std::string master_file = file_prefix_ + ".t2.master.txt";
 
-    T2_.iterate([&](const std::vector<size_t>& i, const std::vector<SpinType>&, double& value) {
-        value *= 1.0 / (Fd_[i[0]] + Fd_[i[1]] - Fd_[i[2]] - Fd_[i[3]]);
-    });
+    struct stat buf;
+    if (read_amps_ and (stat(master_file.c_str(), &buf) == 0)) {
+        std::string str = "Reading T2 amplitudes from files ...";
+        outfile->Printf("\n    %-35s", str.c_str());
+        read_disk_BT(T2_, master_file);
+    } else {
+        std::string str = "Computing T2 amplitudes     ...";
+        outfile->Printf("\n    %-35s", str.c_str());
+
+        T2_["ijab"] = V_["ijab"];
+
+        T2_.iterate([&](const std::vector<size_t>& i, const std::vector<SpinType>&, double& value) {
+            value *= 1.0 / (Fd_[i[0]] + Fd_[i[1]] - Fd_[i[2]] - Fd_[i[3]]);
+        });
+    }
 
     // norm and max
     T2max_ = 0.0, T2norm_ = T2_.norm();
@@ -260,14 +279,25 @@ void CC_SO::guess_t2() {
 
 void CC_SO::guess_t1() {
     local_timer timer;
-    std::string str = "Computing T1 amplitudes     ...";
-    outfile->Printf("\n    %-35s", str.c_str());
 
-    // use simple single-reference guess
-    T1_["ia"] = F_["ia"];
-    T1_.iterate([&](const std::vector<size_t>& i, const std::vector<SpinType>&, double& value) {
-        value *= 1.0 / (Fd_[i[0]] - Fd_[i[1]]);
-    });
+    // use default file name
+    std::string master_file = file_prefix_ + ".t1.master.txt";
+
+    struct stat buf;
+    if (read_amps_ and (stat(master_file.c_str(), &buf) == 0)) {
+        std::string str = "Reading T1 amplitudes from files ...";
+        outfile->Printf("\n    %-35s", str.c_str());
+        read_disk_BT(T1_, master_file);
+    } else {
+        std::string str = "Computing T1 amplitudes     ...";
+        outfile->Printf("\n    %-35s", str.c_str());
+
+        // use simple single-reference guess
+        T1_["ia"] = F_["ia"];
+        T1_.iterate([&](const std::vector<size_t>& i, const std::vector<SpinType>&, double& value) {
+            value *= 1.0 / (Fd_[i[0]] - Fd_[i[1]]);
+        });
+    }
 
     // norm and max
     T1max_ = 0.0, T1norm_ = T1_.norm();
@@ -282,40 +312,53 @@ void CC_SO::guess_t1() {
 
 void CC_SO::guess_t3() {
     local_timer timer;
-    std::string str = "Computing T3 amplitudes     ...";
-    outfile->Printf("\n    %-35s", str.c_str());
 
-    ambit::BlockedTensor C3 = ambit::BlockedTensor::build(tensor_type_, "C3", {"cccvvv"});
-    auto temp = ambit::BlockedTensor::build(CoreTensor, "temp", {"cccvvv"});
-    temp["g2,c0,c1,g0,g1,v0"] += -1.0 * V_["g2,v1,g0,g1"] * T2_["c0,c1,v0,v1"];
-    C3["c0,c1,g2,g0,g1,v0"] += temp["g2,c0,c1,g0,g1,v0"];
-    C3["c0,g2,c1,g0,g1,v0"] -= temp["g2,c0,c1,g0,g1,v0"];
-    C3["g2,c0,c1,g0,g1,v0"] += temp["g2,c0,c1,g0,g1,v0"];
-    C3["c0,c1,g2,g0,v0,g1"] -= temp["g2,c0,c1,g0,g1,v0"];
-    C3["c0,g2,c1,g0,v0,g1"] += temp["g2,c0,c1,g0,g1,v0"];
-    C3["g2,c0,c1,g0,v0,g1"] -= temp["g2,c0,c1,g0,g1,v0"];
-    C3["c0,c1,g2,v0,g0,g1"] += temp["g2,c0,c1,g0,g1,v0"];
-    C3["c0,g2,c1,v0,g0,g1"] -= temp["g2,c0,c1,g0,g1,v0"];
-    C3["g2,c0,c1,v0,g0,g1"] += temp["g2,c0,c1,g0,g1,v0"];
+    // use default file name
+    std::string master_file = file_prefix_ + ".t3.master.txt";
 
-    temp.zero();
-    temp["g1,g2,c0,g0,v0,v1"] += 1.0 * V_["g1,g2,g0,c1"] * T2_["c0,c1,v0,v1"];
-    C3["c0,g1,g2,g0,v0,v1"] += temp["g1,g2,c0,g0,v0,v1"];
-    C3["g1,c0,g2,g0,v0,v1"] -= temp["g1,g2,c0,g0,v0,v1"];
-    C3["g1,g2,c0,g0,v0,v1"] += temp["g1,g2,c0,g0,v0,v1"];
-    C3["c0,g1,g2,v0,g0,v1"] -= temp["g1,g2,c0,g0,v0,v1"];
-    C3["g1,c0,g2,v0,g0,v1"] += temp["g1,g2,c0,g0,v0,v1"];
-    C3["g1,g2,c0,v0,g0,v1"] -= temp["g1,g2,c0,g0,v0,v1"];
-    C3["c0,g1,g2,v0,v1,g0"] += temp["g1,g2,c0,g0,v0,v1"];
-    C3["g1,c0,g2,v0,v1,g0"] -= temp["g1,g2,c0,g0,v0,v1"];
-    C3["g1,g2,c0,v0,v1,g0"] += temp["g1,g2,c0,g0,v0,v1"];
+    struct stat buf;
+    if (read_amps_ and (stat(master_file.c_str(), &buf) == 0)) {
+        std::string str = "Reading T3 amplitudes from files ...";
+        outfile->Printf("\n    %-35s", str.c_str());
+        read_disk_BT(T3_, master_file);
+    }
 
-    T3_["ijkabc"] = C3["ijkabc"];
-    T3_["ijkabc"] += C3["abcijk"];
+    //    std::string str = "Computing T3 amplitudes     ...";
+    //    outfile->Printf("\n    %-35s", str.c_str());
 
-    T3_.iterate([&](const std::vector<size_t>& i, const std::vector<SpinType>&, double& value) {
-        value *= 1.0 / (Fd_[i[0]] + Fd_[i[1]] + Fd_[i[2]] - Fd_[i[3]] - Fd_[i[4]] - Fd_[i[5]]);
-    });
+    //    ambit::BlockedTensor C3 = ambit::BlockedTensor::build(tensor_type_, "C3", {"cccvvv"});
+    //    auto temp = ambit::BlockedTensor::build(CoreTensor, "temp", {"cccvvv"});
+    //    temp["g2,c0,c1,g0,g1,v0"] += -1.0 * V_["g2,v1,g0,g1"] * T2_["c0,c1,v0,v1"];
+    //    C3["c0,c1,g2,g0,g1,v0"] += temp["g2,c0,c1,g0,g1,v0"];
+    //    C3["c0,g2,c1,g0,g1,v0"] -= temp["g2,c0,c1,g0,g1,v0"];
+    //    C3["g2,c0,c1,g0,g1,v0"] += temp["g2,c0,c1,g0,g1,v0"];
+    //    C3["c0,c1,g2,g0,v0,g1"] -= temp["g2,c0,c1,g0,g1,v0"];
+    //    C3["c0,g2,c1,g0,v0,g1"] += temp["g2,c0,c1,g0,g1,v0"];
+    //    C3["g2,c0,c1,g0,v0,g1"] -= temp["g2,c0,c1,g0,g1,v0"];
+    //    C3["c0,c1,g2,v0,g0,g1"] += temp["g2,c0,c1,g0,g1,v0"];
+    //    C3["c0,g2,c1,v0,g0,g1"] -= temp["g2,c0,c1,g0,g1,v0"];
+    //    C3["g2,c0,c1,v0,g0,g1"] += temp["g2,c0,c1,g0,g1,v0"];
+
+    //    temp.zero();
+    //    temp["g1,g2,c0,g0,v0,v1"] += 1.0 * V_["g1,g2,g0,c1"] * T2_["c0,c1,v0,v1"];
+    //    C3["c0,g1,g2,g0,v0,v1"] += temp["g1,g2,c0,g0,v0,v1"];
+    //    C3["g1,c0,g2,g0,v0,v1"] -= temp["g1,g2,c0,g0,v0,v1"];
+    //    C3["g1,g2,c0,g0,v0,v1"] += temp["g1,g2,c0,g0,v0,v1"];
+    //    C3["c0,g1,g2,v0,g0,v1"] -= temp["g1,g2,c0,g0,v0,v1"];
+    //    C3["g1,c0,g2,v0,g0,v1"] += temp["g1,g2,c0,g0,v0,v1"];
+    //    C3["g1,g2,c0,v0,g0,v1"] -= temp["g1,g2,c0,g0,v0,v1"];
+    //    C3["c0,g1,g2,v0,v1,g0"] += temp["g1,g2,c0,g0,v0,v1"];
+    //    C3["g1,c0,g2,v0,v1,g0"] -= temp["g1,g2,c0,g0,v0,v1"];
+    //    C3["g1,g2,c0,v0,v1,g0"] += temp["g1,g2,c0,g0,v0,v1"];
+
+    //    T3_["ijkabc"] = C3["ijkabc"];
+    //    T3_["ijkabc"] += C3["abcijk"];
+
+    //    T3_.iterate([&](const std::vector<size_t>& i, const std::vector<SpinType>&, double& value)
+    //    {
+    //        value *= 1.0 / (Fd_[i[0]] + Fd_[i[1]] + Fd_[i[2]] - Fd_[i[3]] - Fd_[i[4]] -
+    //        Fd_[i[5]]);
+    //    });
 
     // norm and max
     T3max_ = T3_.norm(0), T3norm_ = T3_.norm();
@@ -325,15 +368,13 @@ void CC_SO::guess_t3() {
 
 void CC_SO::update_t2() {
     // compute DT2 = Hbar2 / D
-    BlockedTensor DT2 = ambit::BlockedTensor::build(tensor_type_, "DT2", {"ccvv"});
-    DT2["ijab"] = Hbar2_["ijab"];
-    DT2.iterate([&](const std::vector<size_t>& i, const std::vector<SpinType>&, double& value) {
+    Hbar2_.iterate([&](const std::vector<size_t>& i, const std::vector<SpinType>&, double& value) {
         value *= 1.0 / (Fd_[i[0]] + Fd_[i[1]] - Fd_[i[2]] - Fd_[i[3]]);
     });
 
-    rms_t2_ = DT2.norm();
+    rms_t2_ = Hbar2_.norm();
 
-    T2_["ijab"] += DT2["ijab"];
+    T2_["ijab"] += Hbar2_["ijab"];
 
     // norm and max
     T2max_ = T2_.norm(0), T2norm_ = T2_.norm();
@@ -341,15 +382,13 @@ void CC_SO::update_t2() {
 
 void CC_SO::update_t1() {
     // compute DT1 = Hbar1 / D
-    BlockedTensor DT1 = ambit::BlockedTensor::build(tensor_type_, "DT1", {"cv"});
-    DT1["ia"] = Hbar1_["ia"];
-    DT1.iterate([&](const std::vector<size_t>& i, const std::vector<SpinType>&, double& value) {
+    Hbar1_.iterate([&](const std::vector<size_t>& i, const std::vector<SpinType>&, double& value) {
         value *= 1.0 / (Fd_[i[0]] - Fd_[i[1]]);
     });
 
-    rms_t1_ = DT1.norm();
+    rms_t1_ = Hbar1_.norm();
 
-    T1_["ia"] += DT1["ia"];
+    T1_["ia"] += Hbar1_["ia"];
 
     // norm and max
     T1max_ = T1_.norm(0), T1norm_ = T1_.norm();
@@ -357,15 +396,13 @@ void CC_SO::update_t1() {
 
 void CC_SO::update_t3() {
     // compute DT3 = Hbar3 / D
-    BlockedTensor DT3 = ambit::BlockedTensor::build(tensor_type_, "DT3", {"cccvvv"});
-    DT3["ijkabc"] = Hbar3_["ijkabc"];
-    DT3.iterate([&](const std::vector<size_t>& i, const std::vector<SpinType>&, double& value) {
+    Hbar3_.iterate([&](const std::vector<size_t>& i, const std::vector<SpinType>&, double& value) {
         value *= 1.0 / (Fd_[i[0]] + Fd_[i[1]] + Fd_[i[2]] - Fd_[i[3]] - Fd_[i[4]] - Fd_[i[5]]);
     });
 
-    rms_t3_ = DT3.norm();
+    rms_t3_ = Hbar3_.norm();
 
-    T3_["ijkabc"] += DT3["ijkabc"];
+    T3_["ijkabc"] += Hbar3_["ijkabc"];
 
     // norm and max
     T3max_ = T3_.norm(0), T3norm_ = T3_.norm();
@@ -404,7 +441,12 @@ double CC_SO::compute_energy() {
         }
 
         T3_ = BTF_->build(tensor_type_, "T3 Amplitudes", {"cccvvv"});
-        //        guess_t3();
+        guess_t3();
+    }
+
+    // setup DIIS
+    if (diis_start_ > 0) {
+        diis_manager_init();
     }
 
     // iteration variables
@@ -476,6 +518,18 @@ double CC_SO::compute_energy() {
             update_t3();
         }
 
+        // DIIS amplitudes
+        if (diis_start_ > 0 and cycle >= diis_start_) {
+            diis_manager_add_entry();
+            outfile->Printf("  S");
+
+            if ((cycle - diis_start_) % diis_freq_ == 0 and
+                diis_manager_->subspace_size() >= diis_min_vec_) {
+                diis_manager_extrapolate();
+                outfile->Printf("/E");
+            }
+        }
+
         // test convergence
         double rms = std::max(std::max(rms_t1_, rms_t2_), rms_t3_);
         if (std::fabs(Edelta) < e_convergence_ && rms < r_convergence_) {
@@ -493,6 +547,21 @@ double CC_SO::compute_energy() {
     outfile->Printf("\n\n\n    %s Energy Summary", corr_level_.c_str());
     outfile->Printf("\n    Correlation energy      = %25.15f", Etotal - Eref_);
     outfile->Printf("\n  * Total energy            = %25.15f\n", Etotal);
+
+    // clean up raw pointers used in DIIS
+    if (diis_start_ > 0) {
+        diis_manager_cleanup();
+    }
+
+    // write amplitudes to files
+    if (dump_amps_) {
+        // default name: file_prefix + "." + name + ".master.txt";
+        write_disk_BT(T1_, "t1", file_prefix_);
+        write_disk_BT(T2_, "t2", file_prefix_);
+        if (do_triples_) {
+            write_disk_BT(T3_, "t3", file_prefix_);
+        }
+    }
 
     if (not converged) {
         throw PSIEXCEPTION("CC_SO computation did not converged.");

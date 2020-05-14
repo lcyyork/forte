@@ -99,6 +99,7 @@ src/ci_ex_states/excited_state_solver.cc
 src/ci_rdm/ci_rdms.cc
 src/ci_rdm/ci_rdms_dynamic.cc
 src/cc-so/cc.cc
+src/cc-so/cc_diis.cc
 src/cc-so/ccsd.cc
 src/cc-so/ccsd_trotter.cc
 src/cc-so/ccsdt.cc
