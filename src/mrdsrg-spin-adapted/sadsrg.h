@@ -79,15 +79,30 @@ class SADSRG : public DynamicCorrelationSolver {
     /// Set unitary matrix (in active space) from original to semicanonical
     void set_Uactv(ambit::Tensor& U);
 
-    /// Set active active occupied MOs (relative to active)
+    /// Set active occupied MOs (relative to active)
     void set_actv_occ(std::vector<size_t> actv_occ) {
         actv_occ_mos_ = std::vector<size_t>(actv_occ);
     }
 
-    /// Set active active unoccupied MOs (relative to active)
+    /// Set active unoccupied MOs (relative to active)
     void set_actv_uocc(std::vector<size_t> actv_uocc) {
         actv_uocc_mos_ = std::vector<size_t>(actv_uocc);
     }
+
+    /// Set master file name for T1
+    void set_t1_file(const std::string& filename) { t1_file_ = filename; }
+
+    /// Set master file name for T2
+    void set_t2_file(const std::string& filename) { t2_file_ = filename; }
+
+    /// Get master file name for T1
+    std::string t1_file() { return t1_file_; }
+
+    /// Get master file name for T2
+    std::string t2_file() { return t2_file_; }
+
+    /// Clean up amplitudes checkpoint files
+    void clean_checkpoints();
 
   protected:
     /// Startup function called in constructor
@@ -148,6 +163,16 @@ class SADSRG : public DynamicCorrelationSolver {
 
     /// Number of threads
     int n_threads_;
+
+    // ==> file names for disk support <==
+
+    /// Prefix for file name
+    std::string filename_prefix_;
+
+    /// Master checkpoint file for T1
+    std::string t1_file_;
+    /// Master checkpoint file for T2
+    std::string t2_file_;
 
     // ==> system memory related <==
 

@@ -734,6 +734,8 @@ def register_dsrg_options(options):
 
     options.add_int("DSRG_DIIS_MAX_VEC", 6, "Maximum size of DIIS vectors")
 
+    options.add_bool("DSRG_RESTART", True, "Restart DSRG amplitudes from a previous calculation")
+
     options.add_bool("DSRG_LAMBDA_FINDIFF", False, "Solve DSRG lambda equation using finite difference if true")
 
     options.add_double("DSRG_LAMBDA_FINDIFF_STEPSIZE", 1.0e-5, "Step size for DSRG numerical lambda equation")

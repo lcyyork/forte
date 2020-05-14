@@ -28,10 +28,13 @@
 
 #include <numeric>
 
+#include "psi4/libmints/molecule.h"
 #include "psi4/libpsi4util/process.h"
 #include "psi4/libpsi4util/PsiOutStream.h"
+#include "psi4/libpsio/psio.hpp"
 
 #include "forte-def.h"
+#include "helpers/disk_io.h"
 #include "helpers/printing.h"
 #include "helpers/timer.h"
 
@@ -115,6 +118,11 @@ void SADSRG::startup() {
 
     // check if using semicanonical orbitals
     semi_canonical_ = check_semi_orbs();
+
+    // set up file name prefix
+    filename_prefix_ = psi::PSIOManager::shared_object()->get_default_path() + "forte." +
+                       std::to_string(getpid()) + "." +
+                       psi::Process::environment.molecule()->name();
 }
 
 void SADSRG::read_options() {
@@ -878,5 +886,14 @@ void SADSRG::print_options_info(
         outfile->Printf("\n    %-40s %15d", str_dim.first.c_str(), str_dim.second);
     }
     outfile->Printf("\n");
+}
+
+void SADSRG::clean_checkpoints() {
+    if (not t1_file_.empty()) {
+        delete_disk_BT(t1_file_);
+    }
+    if (not t2_file_.empty()) {
+        delete_disk_BT(t2_file_);
+    }
 }
 } // namespace forte

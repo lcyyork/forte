@@ -69,6 +69,8 @@ void SA_MRDSRG::read_options() {
     maxiter_ = foptions_->get_int("MAXITER");
     e_conv_ = foptions_->get_double("E_CONVERGENCE");
     r_conv_ = foptions_->get_double("R_CONVERGENCE");
+
+    restart_ = foptions_->get_bool("DSRG_RESTART");
 }
 
 void SA_MRDSRG::startup() {
@@ -119,6 +121,7 @@ void SA_MRDSRG::print_options() {
             return std::string("FALSE");
         }
     };
+    calculation_info_string.push_back({"Restart amplitudes", true_false_string(restart_)});
     calculation_info_string.push_back(
         {"Sequential DSRG transformation", true_false_string(sequential_Hbar_)});
     calculation_info_string.push_back(
@@ -198,18 +201,10 @@ void SA_MRDSRG::build_ints() {
 
 double SA_MRDSRG::compute_energy() {
     // build initial amplitudes
-    print_h2("Build Initial Amplitude from DSRG-MRPT2");
     T1_ = BTF_->build(tensor_type_, "T1 Amplitudes", {"hp"});
     T2_ = BTF_->build(tensor_type_, "T2 Amplitudes", {"hhpp"});
 
-    if (eri_df_) {
-        guess_t_df(B_, T2_, F_, T1_);
-    } else {
-        guess_t(V_, T2_, F_, T1_);
-    }
-
-    // check initial amplitudes
-    analyze_amplitudes("First-Order", T1_, T2_);
+    guess_t(V_, T2_, F_, T1_, B_);
 
     // get reference energy
     double Etotal = Eref_;
@@ -223,6 +218,12 @@ double SA_MRDSRG::compute_energy() {
     //    }
     //    default: { Etotal += compute_energy_ldsrg2_qc(); }
     //    }
+
+    // dump amplitudes to file
+    bool restart_useful = (relax_ref_ != "NONE" or multi_state_);
+    if (restart_ and restart_useful) {
+        dump_amps_to_file();
+    }
 
     return Etotal;
 }
@@ -240,5 +241,4 @@ double SA_MRDSRG::Hbar_od_norm(const int& n, const std::vector<std::string>& blo
 
     return norm;
 }
-
 } // namespace forte
