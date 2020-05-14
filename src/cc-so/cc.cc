@@ -97,7 +97,7 @@ void CC_SO::startup() {
 
     // test for SOCC
     auto socc = scf_info_->soccpi();
-    auto actv_dim = mo_space_info_->get_dimension("ACTIVE");
+    auto actv_dim = mo_space_info_->dimension("ACTIVE");
     if (socc != actv_dim) {
         throw PSIEXCEPTION("Inconsistent dimension for singly occupied orbitals.");
     }
@@ -109,15 +109,15 @@ void CC_SO::startup() {
     }
 
     // orbital spaces
-    acore_sos_ = mo_space_info_->get_corr_abs_mo("GENERALIZED HOLE");
-    avirt_sos_ = mo_space_info_->get_corr_abs_mo("RESTRICTED_UOCC");
+    acore_sos_ = mo_space_info_->corr_absolute_mo("GENERALIZED HOLE");
+    avirt_sos_ = mo_space_info_->corr_absolute_mo("RESTRICTED_UOCC");
 
     // put all beta behind alpha
     size_t mo_shift = mo_space_info_->size("CORRELATED");
-    for (size_t idx : mo_space_info_->get_corr_abs_mo("RESTRICTED_DOCC")) {
+    for (size_t idx : mo_space_info_->corr_absolute_mo("RESTRICTED_DOCC")) {
         bcore_sos_.push_back(idx + mo_shift);
     }
-    for (size_t idx : mo_space_info_->get_corr_abs_mo("GENERALIZED PARTICLE")) {
+    for (size_t idx : mo_space_info_->corr_absolute_mo("GENERALIZED PARTICLE")) {
         bvirt_sos_.push_back(idx + mo_shift);
     }
 
