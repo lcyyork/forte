@@ -29,11 +29,13 @@
 #include <algorithm>
 #include <map>
 #include <vector>
+#include <sys/stat.h>
 
 #include "psi4/libpsi4util/process.h"
 #include "psi4/libmints/molecule.h"
 
 #include "base_classes/mo_space_info.h"
+#include "helpers/disk_io.h"
 #include "helpers/printing.h"
 #include "helpers/timer.h"
 #include "mrdsrg_so.h"
@@ -87,7 +89,17 @@ void MRDSRG_SO::startup() {
     Eref = compute_Eref_from_rdms(rdms_, ints_, mo_space_info_);
     frozen_core_energy = ints_->frozen_core_energy();
 
-    do_t3_ = foptions_->get_str("CORR_LEVEL").find("DSRG3") != std::string::npos;
+    corr_level_ = foptions_->get_str("CORR_LEVEL");
+    ldsrg2_4th_ = foptions_->get_str("LDSRG2_4TH_CORRECTION");
+
+    // read/write amplitudes
+    read_amps_ = foptions_->get_bool("DSRG_READ_AMPS");
+    dump_amps_ = foptions_->get_bool("DSRG_DUMP_AMPS");
+    std::string corr_lowercase(corr_level_);
+    std::transform(corr_lowercase.begin(), corr_lowercase.end(), corr_lowercase.begin(), ::tolower);
+    file_prefix_ = "forte." + corr_lowercase;
+
+    do_t3_ = corr_level_.find("DSRG3") != std::string::npos;
     ldsrg3_ddca_ = foptions_->get_bool("LDSRG3_DDCA");
     ncomm_3body_ = foptions_->get_int("LDSRG3_NCOMM_3BODY");
     if (ncomm_3body_ <= 0) {
@@ -98,9 +110,9 @@ void MRDSRG_SO::startup() {
     //    }
 
     ldsrg3_level_ = 3;
-    if (foptions_->get_str("CORR_LEVEL") == "LDSRG3_2")
+    if (corr_level_ == "LDSRG3_2")
         ldsrg3_level_ = 2;
-    if (foptions_->get_str("CORR_LEVEL") == "LDSRG3_1")
+    if (corr_level_ == "LDSRG3_1")
         ldsrg3_level_ = 1;
 
     ldsrg3_perturb_type_ = foptions_->get_str("LDSRG3_PERTURB_TYPE");
@@ -433,9 +445,13 @@ void MRDSRG_SO::print_summary() {
         {"intruder_tamp", intruder_tamp_}};
 
     std::vector<std::pair<std::string, std::string>> calculation_info_string{
-        {"correlation level", foptions_->get_str("CORR_LEVEL")},
+        {"correlation level", corr_level_},
         {"int_type", foptions_->get_str("INT_TYPE")},
         {"source operator", source_}};
+
+    if (ldsrg2_4th_ != "NONE") {
+        calculation_info_string.push_back({"LDSRG(2) 4TH CORRECTION", ldsrg2_4th_});
+    }
 
     if (do_t3_) {
         calculation_info.push_back({"LDSRG3_NCOMM_3BODY", ncomm_3body_});
@@ -460,14 +476,25 @@ void MRDSRG_SO::print_summary() {
 
 void MRDSRG_SO::guess_t2() {
     local_timer timer;
-    std::string str = "Computing T2 amplitudes     ...";
-    outfile->Printf("\n    %-35s", str.c_str());
 
-    T2["ijab"] = V["ijab"];
+    // use default file name
+    std::string master_file = file_prefix_ + ".t2.master.txt";
 
-    T2.iterate([&](const std::vector<size_t>& i, const std::vector<SpinType>&, double& value) {
-        value *= renormalized_denominator(Fd[i[0]] + Fd[i[1]] - Fd[i[2]] - Fd[i[3]]);
-    });
+    struct stat buf;
+    if (read_amps_ and (stat(master_file.c_str(), &buf) == 0)) {
+        std::string str = "Reading T2 amplitudes from files ...";
+        outfile->Printf("\n    %-35s", str.c_str());
+        read_disk_BT(T2, master_file);
+    } else {
+        std::string str = "Computing T2 amplitudes     ...";
+        outfile->Printf("\n    %-35s", str.c_str());
+
+        T2["ijab"] = V["ijab"];
+
+        T2.iterate([&](const std::vector<size_t>& i, const std::vector<SpinType>&, double& value) {
+            value *= renormalized_denominator(Fd[i[0]] + Fd[i[1]] - Fd[i[2]] - Fd[i[3]]);
+        });
+    }
 
     // zero internal amplitudes
     T2.block("aaaa").zero();
@@ -484,14 +511,25 @@ void MRDSRG_SO::guess_t2() {
 
 void MRDSRG_SO::guess_t1() {
     local_timer timer;
-    std::string str = "Computing T1 amplitudes     ...";
-    outfile->Printf("\n    %-35s", str.c_str());
 
-    // use simple single-reference guess
-    T1["ia"] = F["ia"];
-    T1.iterate([&](const std::vector<size_t>& i, const std::vector<SpinType>&, double& value) {
-        value *= renormalized_denominator(Fd[i[0]] - Fd[i[1]]);
-    });
+    // use default file name
+    std::string master_file = file_prefix_ + ".t1.master.txt";
+
+    struct stat buf;
+    if (read_amps_ and (stat(master_file.c_str(), &buf) == 0)) {
+        std::string str = "Reading T1 amplitudes from files ...";
+        outfile->Printf("\n    %-35s", str.c_str());
+        read_disk_BT(T1, master_file);
+    } else {
+        std::string str = "Computing T1 amplitudes     ...";
+        outfile->Printf("\n    %-35s", str.c_str());
+
+        // use simple single-reference guess
+        T1["ia"] = F["ia"];
+        T1.iterate([&](const std::vector<size_t>& i, const std::vector<SpinType>&, double& value) {
+            value *= renormalized_denominator(Fd[i[0]] - Fd[i[1]]);
+        });
+    }
 
     // zero internal amplitudes
     T1.block("aa").zero();
@@ -508,41 +546,52 @@ void MRDSRG_SO::guess_t1() {
 
 void MRDSRG_SO::guess_t3() {
     local_timer timer;
-    std::string str = "Computing T3 amplitudes     ...";
-    outfile->Printf("\n    %-35s", str.c_str());
 
-    ambit::BlockedTensor C3 = ambit::BlockedTensor::build(tensor_type_, "C3", {"hhhppp"});
-    auto temp = ambit::BlockedTensor::build(CoreTensor, "temp", {"hhhppp"});
-    temp["g2,c0,c1,g0,g1,v0"] += -1.0 * V["g2,v1,g0,g1"] * T2["c0,c1,v0,v1"];
-    C3["c0,c1,g2,g0,g1,v0"] += temp["g2,c0,c1,g0,g1,v0"];
-    C3["c0,g2,c1,g0,g1,v0"] -= temp["g2,c0,c1,g0,g1,v0"];
-    C3["g2,c0,c1,g0,g1,v0"] += temp["g2,c0,c1,g0,g1,v0"];
-    C3["c0,c1,g2,g0,v0,g1"] -= temp["g2,c0,c1,g0,g1,v0"];
-    C3["c0,g2,c1,g0,v0,g1"] += temp["g2,c0,c1,g0,g1,v0"];
-    C3["g2,c0,c1,g0,v0,g1"] -= temp["g2,c0,c1,g0,g1,v0"];
-    C3["c0,c1,g2,v0,g0,g1"] += temp["g2,c0,c1,g0,g1,v0"];
-    C3["c0,g2,c1,v0,g0,g1"] -= temp["g2,c0,c1,g0,g1,v0"];
-    C3["g2,c0,c1,v0,g0,g1"] += temp["g2,c0,c1,g0,g1,v0"];
+    // use default file name
+    std::string master_file = file_prefix_ + ".t3.master.txt";
 
-    temp.zero();
-    temp["g1,g2,c0,g0,v0,v1"] += 1.0 * V["g1,g2,g0,c1"] * T2["c0,c1,v0,v1"];
-    C3["c0,g1,g2,g0,v0,v1"] += temp["g1,g2,c0,g0,v0,v1"];
-    C3["g1,c0,g2,g0,v0,v1"] -= temp["g1,g2,c0,g0,v0,v1"];
-    C3["g1,g2,c0,g0,v0,v1"] += temp["g1,g2,c0,g0,v0,v1"];
-    C3["c0,g1,g2,v0,g0,v1"] -= temp["g1,g2,c0,g0,v0,v1"];
-    C3["g1,c0,g2,v0,g0,v1"] += temp["g1,g2,c0,g0,v0,v1"];
-    C3["g1,g2,c0,v0,g0,v1"] -= temp["g1,g2,c0,g0,v0,v1"];
-    C3["c0,g1,g2,v0,v1,g0"] += temp["g1,g2,c0,g0,v0,v1"];
-    C3["g1,c0,g2,v0,v1,g0"] -= temp["g1,g2,c0,g0,v0,v1"];
-    C3["g1,g2,c0,v0,v1,g0"] += temp["g1,g2,c0,g0,v0,v1"];
+    struct stat buf;
+    if (read_amps_ and (stat(master_file.c_str(), &buf) == 0)) {
+        std::string str = "Reading T3 amplitudes from files ...";
+        outfile->Printf("\n    %-35s", str.c_str());
+        read_disk_BT(T3, master_file);
+    } else {
+        std::string str = "Computing T3 amplitudes     ...";
+        outfile->Printf("\n    %-35s", str.c_str());
 
-    T3["ijkabc"] = C3["ijkabc"];
-    T3["ijkabc"] += C3["abcijk"];
+        ambit::BlockedTensor C3 = ambit::BlockedTensor::build(tensor_type_, "C3", {"hhhppp"});
+        auto temp = ambit::BlockedTensor::build(CoreTensor, "temp", {"hhhppp"});
+        temp["g2,c0,c1,g0,g1,v0"] += -1.0 * V["g2,v1,g0,g1"] * T2["c0,c1,v0,v1"];
+        C3["c0,c1,g2,g0,g1,v0"] += temp["g2,c0,c1,g0,g1,v0"];
+        C3["c0,g2,c1,g0,g1,v0"] -= temp["g2,c0,c1,g0,g1,v0"];
+        C3["g2,c0,c1,g0,g1,v0"] += temp["g2,c0,c1,g0,g1,v0"];
+        C3["c0,c1,g2,g0,v0,g1"] -= temp["g2,c0,c1,g0,g1,v0"];
+        C3["c0,g2,c1,g0,v0,g1"] += temp["g2,c0,c1,g0,g1,v0"];
+        C3["g2,c0,c1,g0,v0,g1"] -= temp["g2,c0,c1,g0,g1,v0"];
+        C3["c0,c1,g2,v0,g0,g1"] += temp["g2,c0,c1,g0,g1,v0"];
+        C3["c0,g2,c1,v0,g0,g1"] -= temp["g2,c0,c1,g0,g1,v0"];
+        C3["g2,c0,c1,v0,g0,g1"] += temp["g2,c0,c1,g0,g1,v0"];
 
-    T3.iterate([&](const std::vector<size_t>& i, const std::vector<SpinType>&, double& value) {
-        value *= renormalized_denominator(Fd[i[0]] + Fd[i[1]] + Fd[i[2]] - Fd[i[3]] - Fd[i[4]] -
-                                          Fd[i[5]]);
-    });
+        temp.zero();
+        temp["g1,g2,c0,g0,v0,v1"] += 1.0 * V["g1,g2,g0,c1"] * T2["c0,c1,v0,v1"];
+        C3["c0,g1,g2,g0,v0,v1"] += temp["g1,g2,c0,g0,v0,v1"];
+        C3["g1,c0,g2,g0,v0,v1"] -= temp["g1,g2,c0,g0,v0,v1"];
+        C3["g1,g2,c0,g0,v0,v1"] += temp["g1,g2,c0,g0,v0,v1"];
+        C3["c0,g1,g2,v0,g0,v1"] -= temp["g1,g2,c0,g0,v0,v1"];
+        C3["g1,c0,g2,v0,g0,v1"] += temp["g1,g2,c0,g0,v0,v1"];
+        C3["g1,g2,c0,v0,g0,v1"] -= temp["g1,g2,c0,g0,v0,v1"];
+        C3["c0,g1,g2,v0,v1,g0"] += temp["g1,g2,c0,g0,v0,v1"];
+        C3["g1,c0,g2,v0,v1,g0"] -= temp["g1,g2,c0,g0,v0,v1"];
+        C3["g1,g2,c0,v0,v1,g0"] += temp["g1,g2,c0,g0,v0,v1"];
+
+        T3["ijkabc"] = C3["ijkabc"];
+        T3["ijkabc"] += C3["abcijk"];
+
+        T3.iterate([&](const std::vector<size_t>& i, const std::vector<SpinType>&, double& value) {
+            value *= renormalized_denominator(Fd[i[0]] + Fd[i[1]] + Fd[i[2]] - Fd[i[3]] - Fd[i[4]] -
+                                              Fd[i[5]]);
+        });
+    }
 
     // zero internal amplitudes
     T3.block("aaaaaa").zero();
@@ -585,6 +634,9 @@ void MRDSRG_SO::update_t2() {
 
     T2["ijab"] = Hbar2["ijab"] + DT2["ijab"];
 
+    // set to DT2 to Hbar for DIIS
+    Hbar2["ijab"] = DT2["ijab"];
+
     // norm and max
     T2max = 0.0, T2norm = T2.norm();
     T2.citerate([&](const std::vector<size_t>&, const std::vector<SpinType>&, const double& value) {
@@ -612,6 +664,9 @@ void MRDSRG_SO::update_t1() {
     rms_t1 = D1.norm();
 
     T1["ia"] = R1["ia"];
+
+    // copy D1 to Hbar1
+    Hbar1["ia"] = D1["ia"];
 
     // norm and max
     T1max = 0.0, T1norm = T1.norm();
@@ -642,6 +697,9 @@ void MRDSRG_SO::update_t3() {
     DT3["ijkabc"] -= T3["ijkabc"];
     DT3.block("aaaaaa").zero();
     rms_t3 = DT3.norm();
+
+    // copy DT3 to Hbar3
+    Hbar3["ijkabc"] = DT3["ijkabc"];
 
     T3["ijkabc"] = Hbar3["ijkabc"] + DT3["ijkabc"];
 
@@ -702,6 +760,11 @@ double MRDSRG_SO::compute_energy() {
     bool converged = false;
     int cycle = 0;
 
+    // setup DIIS
+    if (diis_start_ > 0) {
+        diis_manager_init();
+    }
+
     // start iteration
     outfile->Printf("\n\n  ==> Start Iterations <==\n");
     outfile->Printf("\n    "
@@ -713,10 +776,9 @@ double MRDSRG_SO::compute_energy() {
                     "----------------------------------------------------------"
                     "----------------------------------------");
 
-    std::string corr_level = foptions_->get_str("CORR_LEVEL");
     do {
         // compute hbar
-        if (corr_level == "QDSRG2") {
+        if (corr_level_ == "QDSRG2") {
             compute_qhbar();
         } else {
             // single-commutator by default
@@ -756,6 +818,18 @@ double MRDSRG_SO::compute_energy() {
             //            }
         }
 
+        // DIIS amplitudes
+        if (diis_start_ > 0 and cycle >= diis_start_ - 1) {
+            diis_manager_add_entry();
+            outfile->Printf("  S");
+
+            if ((cycle - diis_start_) % diis_freq_ == 0 and
+                diis_manager_->subspace_size() >= diis_min_vec_) {
+                diis_manager_extrapolate();
+                outfile->Printf("/E");
+            }
+        }
+
         // test convergence
         double rms = std::max(std::max(rms_t1, rms_t2), rms_t3);
         if (std::fabs(Edelta) < foptions_->get_double("E_CONVERGENCE") &&
@@ -775,11 +849,16 @@ double MRDSRG_SO::compute_energy() {
     outfile->Printf("\n    "
                     "----------------------------------------------------------"
                     "----------------------------------------");
-    outfile->Printf("\n\n\n    %s Energy Summary", corr_level.c_str());
+    outfile->Printf("\n\n\n    %s Energy Summary", corr_level_.c_str());
     outfile->Printf("\n    Correlation energy      = %25.15f", Etotal - Eref);
     outfile->Printf("\n  * Total energy            = %25.15f\n", Etotal);
 
-    if (corr_level == "LDSRG2*" or corr_level == "LDSRG2+") {
+    // clean up raw pointers used in DIIS
+    if (diis_start_ > 0) {
+        diis_manager_cleanup();
+    }
+
+    if (ldsrg2_4th_ != "NONE") {
         std::vector<double> e4th_corr = E4th_correction();
         outfile->Printf("\n");
         outfile->Printf("\n    T corr. direct         c1 = %25.15f", e4th_corr[0]);
@@ -811,6 +890,16 @@ double MRDSRG_SO::compute_energy() {
     }
     psi::Process::environment.globals["CURRENT ENERGY"] = Etotal;
 
+    // write amplitudes to files
+    if (dump_amps_) {
+        // default name: file_prefix + "." + name + ".master.txt";
+        write_disk_BT(T1, "t1", file_prefix_);
+        write_disk_BT(T2, "t2", file_prefix_);
+        if (do_t3_) {
+            write_disk_BT(T3, "t3", file_prefix_);
+        }
+    }
+
     return Etotal;
 }
 
@@ -841,7 +930,7 @@ void MRDSRG_SO::compute_lhbar() {
     BlockedTensor C1 = ambit::BlockedTensor::build(tensor_type_, "C1", {"gg"});
     BlockedTensor C2 = ambit::BlockedTensor::build(tensor_type_, "C2", {"gggg"});
 
-    if (foptions_->get_str("CORR_LEVEL") == "LDSRG2+") {
+    if (corr_level_ == "LDSRG2" and ldsrg2_4th_ == "PSEUDO_QUADRATIC") {
         W1 = ambit::BlockedTensor::build(tensor_type_, "W1", {"cv"});
         W2 = ambit::BlockedTensor::build(tensor_type_, "W2", {"ccvv"});
     }

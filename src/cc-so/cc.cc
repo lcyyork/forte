@@ -321,44 +321,44 @@ void CC_SO::guess_t3() {
         std::string str = "Reading T3 amplitudes from files ...";
         outfile->Printf("\n    %-35s", str.c_str());
         read_disk_BT(T3_, master_file);
+    } else {
+        std::string str = "Computing T3 amplitudes     ...";
+        outfile->Printf("\n    %-35s", str.c_str());
+
+        ambit::BlockedTensor C3 = ambit::BlockedTensor::build(tensor_type_, "C3", {"cccvvv"});
+        auto temp = ambit::BlockedTensor::build(CoreTensor, "temp", {"cccvvv"});
+        temp["g2,c0,c1,g0,g1,v0"] += -1.0 * V_["g2,v1,g0,g1"] * T2_["c0,c1,v0,v1"];
+        C3["c0,c1,g2,g0,g1,v0"] += temp["g2,c0,c1,g0,g1,v0"];
+        C3["c0,g2,c1,g0,g1,v0"] -= temp["g2,c0,c1,g0,g1,v0"];
+        C3["g2,c0,c1,g0,g1,v0"] += temp["g2,c0,c1,g0,g1,v0"];
+        C3["c0,c1,g2,g0,v0,g1"] -= temp["g2,c0,c1,g0,g1,v0"];
+        C3["c0,g2,c1,g0,v0,g1"] += temp["g2,c0,c1,g0,g1,v0"];
+        C3["g2,c0,c1,g0,v0,g1"] -= temp["g2,c0,c1,g0,g1,v0"];
+        C3["c0,c1,g2,v0,g0,g1"] += temp["g2,c0,c1,g0,g1,v0"];
+        C3["c0,g2,c1,v0,g0,g1"] -= temp["g2,c0,c1,g0,g1,v0"];
+        C3["g2,c0,c1,v0,g0,g1"] += temp["g2,c0,c1,g0,g1,v0"];
+
+        temp.zero();
+        temp["g1,g2,c0,g0,v0,v1"] += 1.0 * V_["g1,g2,g0,c1"] * T2_["c0,c1,v0,v1"];
+        C3["c0,g1,g2,g0,v0,v1"] += temp["g1,g2,c0,g0,v0,v1"];
+        C3["g1,c0,g2,g0,v0,v1"] -= temp["g1,g2,c0,g0,v0,v1"];
+        C3["g1,g2,c0,g0,v0,v1"] += temp["g1,g2,c0,g0,v0,v1"];
+        C3["c0,g1,g2,v0,g0,v1"] -= temp["g1,g2,c0,g0,v0,v1"];
+        C3["g1,c0,g2,v0,g0,v1"] += temp["g1,g2,c0,g0,v0,v1"];
+        C3["g1,g2,c0,v0,g0,v1"] -= temp["g1,g2,c0,g0,v0,v1"];
+        C3["c0,g1,g2,v0,v1,g0"] += temp["g1,g2,c0,g0,v0,v1"];
+        C3["g1,c0,g2,v0,v1,g0"] -= temp["g1,g2,c0,g0,v0,v1"];
+        C3["g1,g2,c0,v0,v1,g0"] += temp["g1,g2,c0,g0,v0,v1"];
+
+        T3_["ijkabc"] = C3["ijkabc"];
+        T3_["ijkabc"] += C3["abcijk"];
+
+        T3_.iterate([&](const std::vector<size_t>& i, const std::vector<SpinType>&, double& value)
+        {
+            value *= 1.0 / (Fd_[i[0]] + Fd_[i[1]] + Fd_[i[2]] - Fd_[i[3]] - Fd_[i[4]] -
+                    Fd_[i[5]]);
+        });
     }
-
-    //    std::string str = "Computing T3 amplitudes     ...";
-    //    outfile->Printf("\n    %-35s", str.c_str());
-
-    //    ambit::BlockedTensor C3 = ambit::BlockedTensor::build(tensor_type_, "C3", {"cccvvv"});
-    //    auto temp = ambit::BlockedTensor::build(CoreTensor, "temp", {"cccvvv"});
-    //    temp["g2,c0,c1,g0,g1,v0"] += -1.0 * V_["g2,v1,g0,g1"] * T2_["c0,c1,v0,v1"];
-    //    C3["c0,c1,g2,g0,g1,v0"] += temp["g2,c0,c1,g0,g1,v0"];
-    //    C3["c0,g2,c1,g0,g1,v0"] -= temp["g2,c0,c1,g0,g1,v0"];
-    //    C3["g2,c0,c1,g0,g1,v0"] += temp["g2,c0,c1,g0,g1,v0"];
-    //    C3["c0,c1,g2,g0,v0,g1"] -= temp["g2,c0,c1,g0,g1,v0"];
-    //    C3["c0,g2,c1,g0,v0,g1"] += temp["g2,c0,c1,g0,g1,v0"];
-    //    C3["g2,c0,c1,g0,v0,g1"] -= temp["g2,c0,c1,g0,g1,v0"];
-    //    C3["c0,c1,g2,v0,g0,g1"] += temp["g2,c0,c1,g0,g1,v0"];
-    //    C3["c0,g2,c1,v0,g0,g1"] -= temp["g2,c0,c1,g0,g1,v0"];
-    //    C3["g2,c0,c1,v0,g0,g1"] += temp["g2,c0,c1,g0,g1,v0"];
-
-    //    temp.zero();
-    //    temp["g1,g2,c0,g0,v0,v1"] += 1.0 * V_["g1,g2,g0,c1"] * T2_["c0,c1,v0,v1"];
-    //    C3["c0,g1,g2,g0,v0,v1"] += temp["g1,g2,c0,g0,v0,v1"];
-    //    C3["g1,c0,g2,g0,v0,v1"] -= temp["g1,g2,c0,g0,v0,v1"];
-    //    C3["g1,g2,c0,g0,v0,v1"] += temp["g1,g2,c0,g0,v0,v1"];
-    //    C3["c0,g1,g2,v0,g0,v1"] -= temp["g1,g2,c0,g0,v0,v1"];
-    //    C3["g1,c0,g2,v0,g0,v1"] += temp["g1,g2,c0,g0,v0,v1"];
-    //    C3["g1,g2,c0,v0,g0,v1"] -= temp["g1,g2,c0,g0,v0,v1"];
-    //    C3["c0,g1,g2,v0,v1,g0"] += temp["g1,g2,c0,g0,v0,v1"];
-    //    C3["g1,c0,g2,v0,v1,g0"] -= temp["g1,g2,c0,g0,v0,v1"];
-    //    C3["g1,g2,c0,v0,v1,g0"] += temp["g1,g2,c0,g0,v0,v1"];
-
-    //    T3_["ijkabc"] = C3["ijkabc"];
-    //    T3_["ijkabc"] += C3["abcijk"];
-
-    //    T3_.iterate([&](const std::vector<size_t>& i, const std::vector<SpinType>&, double& value)
-    //    {
-    //        value *= 1.0 / (Fd_[i[0]] + Fd_[i[1]] + Fd_[i[2]] - Fd_[i[3]] - Fd_[i[4]] -
-    //        Fd_[i[5]]);
-    //    });
 
     // norm and max
     T3max_ = T3_.norm(0), T3norm_ = T3_.norm();

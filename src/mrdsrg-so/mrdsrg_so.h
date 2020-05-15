@@ -32,7 +32,7 @@
 #include <cmath>
 #include <unordered_set>
 
-
+#include "psi4/libdiis/diismanager.h"
 #include "psi4/libmints/wavefunction.h"
 #include "psi4/libpsio/psio.hpp"
 #include "psi4/libpsio/psio.h"
@@ -57,7 +57,35 @@ class MRDSRG_SO : public DynamicCorrelationSolver {
     /// Called in the destructor
     void cleanup();
 
+    // => Amplitudes read/write <=
+
+    bool read_amps_;
+    bool dump_amps_;
+    std::string file_prefix_;
+
+    // => DIIS control <=
+
+    /// Shared pointer of DIISManager object from Psi4
+    std::shared_ptr<psi::DIISManager> diis_manager_;
+    /// Amplitudes pointers
+    std::vector<double*> amp_ptrs_;
+    /// Residual pointers
+    std::vector<double*> res_ptrs_;
+    /// Initialize DIISManager
+    void diis_manager_init();
+    /// Add entry for DIISManager
+    void diis_manager_add_entry();
+    /// Extrapolate for DIISManager
+    void diis_manager_extrapolate();
+    /// Clean up for pointers used for DIIS
+    void diis_manager_cleanup();
+
     // => Class data <= //
+
+    /// Correlation level
+    std::string corr_level_;
+    /// 4th-order correction for LDSRG(2)
+    std::string ldsrg2_4th_;
 
     /// Print levels
     int print_;
@@ -286,7 +314,7 @@ class MRDSRG_SO : public DynamicCorrelationSolver {
     double E4th_correction_t3();
     void compute_3rd_order_hbar(BlockedTensor& X1, BlockedTensor& X2);
     void compute_2nd_order_t3();
-    double E4th_correction_lambda(BlockedTensor& C1, BlockedTensor& C2); // Lambda-(T) variant
+    double E4th_correction_lambda(BlockedTensor& C1, BlockedTensor& C2);   // Lambda-(T) variant
     double E4th_correction_lambda_1(BlockedTensor& C1, BlockedTensor& C2); // (T) variant
     double E4th_correction_lambda_2(BlockedTensor& C1, BlockedTensor& C2); // [T] variant
 
@@ -303,11 +331,11 @@ class MRDSRG_SO : public DynamicCorrelationSolver {
     void sr_ldsrg2star_comm3_fock(BlockedTensor& C1, BlockedTensor& C2);
     void sr_ldsrg2star_comm3_fink(BlockedTensor& C1, BlockedTensor& C2);
 
-    // => LDSRG(2+) corrections <=
+    // => qDSRG(2) corrections <=
     BlockedTensor W1;
     BlockedTensor W2;
-    void sr_ldsrg2plus(double factor, BlockedTensor& H2, BlockedTensor& T1,
-                       BlockedTensor& T2, BlockedTensor& C1, BlockedTensor& C2);
+    void sr_pseudo_qdsrg2(double factor, BlockedTensor& H2, BlockedTensor& T1, BlockedTensor& T2,
+                          BlockedTensor& C1, BlockedTensor& C2);
 
     // => Lambda equation for LDSRG(2*) truncated to comm-5 energy <=
     BlockedTensor Tbar1;

@@ -601,7 +601,7 @@ def register_dsrg_options(options):
 
     options.add_str("CORR_LEVEL", "PT2",
                      ["PT2", "PT3", "LDSRG2", "LDSRG2_QC", "LSRG2", "SRG_PT2", "QDSRG2",
-                      "LDSRG2*", "LDSRG2+", "LDSRG3", "LDSRG3_2", "LDSRG3_1"],
+                      "LDSRG3", "LDSRG3_2", "LDSRG3_1"],
                      "Correlation level of MR-DSRG")
 
     options.add_str("SOURCE", "STANDARD",
@@ -736,11 +736,18 @@ def register_dsrg_options(options):
 
     options.add_bool("DSRG_RESTART", True, "Restart DSRG amplitudes from a previous calculation")
 
+    options.add_bool("DSRG_READ_AMPS", False, "Read initial amplitudes from files")
+
+    options.add_bool("DSRG_DUMP_AMPS", False, "Dump converged amplitudes to disk")
+
     options.add_bool("DSRG_LAMBDA_FINDIFF", False, "Solve DSRG lambda equation using finite difference if true")
 
     options.add_double("DSRG_LAMBDA_FINDIFF_STEPSIZE", 1.0e-5, "Step size for DSRG numerical lambda equation")
 
     options.add_int("DSRG_LAMBDA_FINDIFF_FORM", 2, "2-point or 4-point formula for DSRG numerical lambda equation")
+
+    options.add_str("LDSRG2_4TH_CORRECTION", "NONE", ["NONE", "STAR", "PSEUDO_QUADRATIC"],
+                    "Add the 4th-order correction for LDSRG(2)")
 
     options.add_bool("LDSRG3_DDCA", False, "Distinguished diagonal component approximation for LDSRG3")
 

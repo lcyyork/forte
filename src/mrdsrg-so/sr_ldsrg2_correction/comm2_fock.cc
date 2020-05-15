@@ -42,7 +42,7 @@ using namespace psi;
 
 namespace forte {
 
-void MRDSRG_SO::sr_ldsrg2plus(double factor, BlockedTensor& H2, BlockedTensor& T1,
+void MRDSRG_SO::sr_pseudo_qdsrg2(double factor, BlockedTensor& H2, BlockedTensor& T1,
                               BlockedTensor& T2, BlockedTensor& C1, BlockedTensor& C2) {
     C1.zero();
     C2.zero();

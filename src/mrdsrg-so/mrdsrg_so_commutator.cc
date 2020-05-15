@@ -1254,7 +1254,7 @@ void MRDSRG_SO::comm_H_A_2(int n, BlockedTensor& H1, BlockedTensor& H2, BlockedT
     C2.scale(factor);
 
     // LDSRG(2*)
-    if (foptions_->get_str("CORR_LEVEL") == "LDSRG2*") {
+    if (ldsrg2_4th_ == "STAR") {
         if (n == 2) {
             sr_ldsrg2star_comm2(C1, C2);
         } else if (n == 3) {
@@ -1262,13 +1262,13 @@ void MRDSRG_SO::comm_H_A_2(int n, BlockedTensor& H1, BlockedTensor& H2, BlockedT
         }
     }
 
-    // LDSRG(2+)
-    if (foptions_->get_str("CORR_LEVEL") == "LDSRG2+") {
+    // qDSRG(2)
+    if (ldsrg2_4th_ == "PSEUDO_QUADRATIC") {
         C1["pq"] += W1["pq"];
         C2["pqrs"] += W2["pqrs"];
 
         double f = factor / (n + 1.0);
-        sr_ldsrg2plus(f, H2, T1, T2, W1, W2);
+        sr_pseudo_qdsrg2(f, H2, T1, T2, W1, W2);
     }
 
     // add T dagger

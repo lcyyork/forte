@@ -151,6 +151,7 @@ src/mrdsrg-helper/dsrg_transformed.cc
 src/mrdsrg-helper/run_dsrg.cc
 src/mrdsrg-so/mrdsrg_so.cc
 src/mrdsrg-so/mrdsrg_so_commutator.cc
+src/mrdsrg-so/mrdsrg_so_diis.cc
 src/mrdsrg-so/sr_ldsrg2_lambda.cc
 src/mrdsrg-so/sr_ldsrg3_comm1.cc
 src/mrdsrg-so/sr_e4th_t3_correction.cc
