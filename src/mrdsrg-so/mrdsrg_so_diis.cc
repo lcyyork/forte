@@ -85,8 +85,7 @@ void MRDSRG_SO::diis_manager_extrapolate() {
     if (not do_t3_) {
         diis_manager_->extrapolate(2, amp_ptrs_[0], amp_ptrs_[1]);
     } else {
-        diis_manager_->add_entry(6, res_ptrs_[0], res_ptrs_[1], res_ptrs_[2], amp_ptrs_[0],
-                                 amp_ptrs_[1], amp_ptrs_[2]);
+        diis_manager_->extrapolate(3, amp_ptrs_[0], amp_ptrs_[1], amp_ptrs_[2]);
     }
 }
 
