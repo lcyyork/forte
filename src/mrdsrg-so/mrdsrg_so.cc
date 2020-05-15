@@ -698,10 +698,10 @@ void MRDSRG_SO::update_t3() {
     DT3.block("aaaaaa").zero();
     rms_t3 = DT3.norm();
 
+    T3["ijkabc"] = Hbar3["ijkabc"] + DT3["ijkabc"];
+
     // copy DT3 to Hbar3
     Hbar3["ijkabc"] = DT3["ijkabc"];
-
-    T3["ijkabc"] = Hbar3["ijkabc"] + DT3["ijkabc"];
 
     // norm and max
     T3max = T3.norm(0), T3norm = T3.norm();
