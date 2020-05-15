@@ -401,7 +401,7 @@ double CC_SO::compute_energy() {
     }
 
     if (not converged) {
-        throw PSIEXCEPTION("CC_SO computation did not converged.");
+        throw PSIEXCEPTION("CC_SO computation did not converge.");
     }
 
     psi::Process::environment.globals["CURRENT ENERGY"] = Etotal;

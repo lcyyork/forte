@@ -89,6 +89,10 @@ void MRDSRG_SO::startup() {
     Eref = compute_Eref_from_rdms(rdms_, ints_, mo_space_info_);
     frozen_core_energy = ints_->frozen_core_energy();
 
+    maxiter_ = foptions_->get_int("MAXITER");
+    e_convergence_ = foptions_->get_double("E_CONVERGENCE");
+    r_convergence_ = foptions_->get_double("R_CONVERGENCE");
+
     corr_level_ = foptions_->get_str("CORR_LEVEL");
     ldsrg2_4th_ = foptions_->get_str("LDSRG2_4TH_CORRECTION");
 
@@ -758,7 +762,6 @@ double MRDSRG_SO::compute_energy() {
     // iteration variables
     double Etotal = Eref;
     bool converged = false;
-    int cycle = 0;
 
     // setup DIIS
     if (diis_start_ > 0) {
@@ -767,16 +770,13 @@ double MRDSRG_SO::compute_energy() {
 
     // start iteration
     outfile->Printf("\n\n  ==> Start Iterations <==\n");
-    outfile->Printf("\n    "
-                    "----------------------------------------------------------"
-                    "----------------------------------------");
-    outfile->Printf("\n           Cycle     Energy (a.u.)     Delta(E)  "
-                    "|Hbar1|_N  |Hbar2|_N    |T1|    |T2|    |T3|  max(T1) max(T2) max(T3)");
-    outfile->Printf("\n    "
-                    "----------------------------------------------------------"
-                    "----------------------------------------");
+    int dash = 140;
+    outfile->Printf("\n    %s", std::string(dash, '-').c_str());
+    outfile->Printf("\n        Cycle      Energy (a.u.)    Delta(E)     T1_RMS     T2_RMS     "
+                    "T3_RMS |Hbar1|_N |Hbar2|_N |Hbar3|_N    |T1| max(T1) max(T2) max(T3) DIIS");
+    outfile->Printf("\n    %s", std::string(dash, '-').c_str());
 
-    do {
+    for (int cycle = 1; cycle <= maxiter_; ++cycle) {
         // compute hbar
         if (corr_level_ == "QDSRG2") {
             compute_qhbar();
@@ -795,14 +795,20 @@ double MRDSRG_SO::compute_energy() {
         temp = ambit::BlockedTensor::build(tensor_type_, "temp", {"hhpv", "hhva", "hcaa", "ccaa"});
         temp["ijab"] = Hbar2["ijab"];
         double Hbar2Nnorm = temp.norm();
-        for (const std::string block : temp.block_labels()) {
-            temp.block(block).reset();
+
+        double Hbar3Nnorm = 0.0;
+        if (do_t3_) {
+            temp = ambit::BlockedTensor::build(
+                tensor_type_, "temp", {"hhhppv", "hhhpva", "hhhvaa", "hhcaaa", "hcaaaa", "caaaaa"});
+            temp["ijkabc"] = Hbar3["ijkabc"];
+            Hbar3Nnorm = temp.norm();
         }
 
-        outfile->Printf("\n      @CT %4d %20.12f %11.3e %10.3e %10.3e %7.4f "
-                        "%7.4f %7.4f %7.4f %7.4f %7.4f",
-                        cycle, Etotal, Edelta, Hbar1Nnorm, Hbar2Nnorm, T1norm, T2norm, T3norm,
-                        T1max, T2max, T3max);
+        outfile->Printf(
+            "\n    @DSRG %3d %18.12f %11.3e %10.3e %10.3e %10.3e %9.2e %9.2e %9.2e %7.4f "
+            "%7.4f %7.4f %7.4f",
+            cycle, Etotal, Edelta, rms_t1, rms_t2, rms_t3, Hbar1Nnorm, Hbar2Nnorm, Hbar3Nnorm,
+            T1norm, T1max, T2max, T3max);
 
         // update amplitudes
         update_t2();
@@ -819,7 +825,7 @@ double MRDSRG_SO::compute_energy() {
         }
 
         // DIIS amplitudes
-        if (diis_start_ > 0 and cycle >= diis_start_ - 1) {
+        if (diis_start_ > 0 and cycle >= diis_start_) {
             diis_manager_add_entry();
             outfile->Printf("  S");
 
@@ -832,23 +838,15 @@ double MRDSRG_SO::compute_energy() {
 
         // test convergence
         double rms = std::max(std::max(rms_t1, rms_t2), rms_t3);
-        if (std::fabs(Edelta) < foptions_->get_double("E_CONVERGENCE") &&
-            rms < foptions_->get_double("R_CONVERGENCE")) {
+        if (std::fabs(Edelta) < e_convergence_ && rms < r_convergence_) {
             converged = true;
         }
-        if (cycle > foptions_->get_int("MAXITER")) {
-            outfile->Printf("\n\n\tThe calculation did not converge in %d "
-                            "cycles\n\tQuitting.\n",
-                            foptions_->get_int("MAXITER"));
-            converged = true;
+        if (converged) {
+            break;
         }
+    }
 
-        ++cycle;
-    } while (!converged);
-
-    outfile->Printf("\n    "
-                    "----------------------------------------------------------"
-                    "----------------------------------------");
+    outfile->Printf("\n    %s", std::string(dash, '-').c_str());
     outfile->Printf("\n\n\n    %s Energy Summary", corr_level_.c_str());
     outfile->Printf("\n    Correlation energy      = %25.15f", Etotal - Eref);
     outfile->Printf("\n  * Total energy            = %25.15f\n", Etotal);
@@ -858,8 +856,18 @@ double MRDSRG_SO::compute_energy() {
         diis_manager_cleanup();
     }
 
+    // write amplitudes to files before convergence test
+    if (dump_amps_) {
+        // default name: file_prefix + "." + name + ".master.txt";
+        write_disk_BT(T1, "t1", file_prefix_);
+        write_disk_BT(T2, "t2", file_prefix_);
+        if (do_t3_) {
+            write_disk_BT(T3, "t3", file_prefix_);
+        }
+    }
+
     if (not converged) {
-        throw PSIEXCEPTION("MRDSRG did not converge!");
+        throw PSIEXCEPTION("MRDSRG_SO did not converge!");
     }
 
     if (ldsrg2_4th_ != "NONE") {
@@ -893,16 +901,6 @@ double MRDSRG_SO::compute_energy() {
         psi::Process::environment.globals["LAMBDA-DSRG(T) ENERGY"] = Etotal + t3;
     }
     psi::Process::environment.globals["CURRENT ENERGY"] = Etotal;
-
-    // write amplitudes to files
-    if (dump_amps_) {
-        // default name: file_prefix + "." + name + ".master.txt";
-        write_disk_BT(T1, "t1", file_prefix_);
-        write_disk_BT(T2, "t2", file_prefix_);
-        if (do_t3_) {
-            write_disk_BT(T3, "t3", file_prefix_);
-        }
-    }
 
     return Etotal;
 }

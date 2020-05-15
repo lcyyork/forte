@@ -87,8 +87,11 @@ class MRDSRG_SO : public DynamicCorrelationSolver {
     /// 4th-order correction for LDSRG(2)
     std::string ldsrg2_4th_;
 
-    /// Print levels
-    int print_;
+    /// Max number of iterations
+    int maxiter_;
+    /// Convergence criteria
+    double e_convergence_;
+    double r_convergence_;
 
     /// List of alpha core SOs
     std::vector<size_t> acore_sos;
@@ -218,7 +221,7 @@ class MRDSRG_SO : public DynamicCorrelationSolver {
     void guess_t2();
     void update_t2();
     void check_t2();
-    double rms_t2;
+    double rms_t2 = 0.0;
     double T2norm;
     double T2max;
 
@@ -227,7 +230,7 @@ class MRDSRG_SO : public DynamicCorrelationSolver {
     void guess_t1();
     void update_t1();
     void check_t1();
-    double rms_t1;
+    double rms_t1 = 0.0;
     double T1norm;
     double T1max;
 
