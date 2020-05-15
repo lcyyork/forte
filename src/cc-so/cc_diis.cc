@@ -47,8 +47,8 @@ void CC_SO::diis_manager_init() {
 
         amp_ptrs_.push_back(T1_.block("cv").data().data());
         amp_ptrs_.push_back(T2_.block("ccvv").data().data());
-        res_ptrs_.push_back(Hbar1_.block("cv").data().data());
-        res_ptrs_.push_back(Hbar2_.block("ccvv").data().data());
+        res_ptrs_.push_back(DT1_.block("cv").data().data());
+        res_ptrs_.push_back(DT2_.block("ccvv").data().data());
 
         diis_manager_->set_error_vector_size(2, DIISEntry::Pointer, t1_nel, DIISEntry::Pointer,
                                              t2_nel);
@@ -61,9 +61,9 @@ void CC_SO::diis_manager_init() {
         amp_ptrs_.push_back(T1_.block("cv").data().data());
         amp_ptrs_.push_back(T2_.block("ccvv").data().data());
         amp_ptrs_.push_back(T3_.block("cccvvv").data().data());
-        res_ptrs_.push_back(Hbar1_.block("cv").data().data());
-        res_ptrs_.push_back(Hbar2_.block("ccvv").data().data());
-        res_ptrs_.push_back(Hbar3_.block("cccvvv").data().data());
+        res_ptrs_.push_back(DT1_.block("cv").data().data());
+        res_ptrs_.push_back(DT2_.block("ccvv").data().data());
+        res_ptrs_.push_back(DT3_.block("cccvvv").data().data());
 
         diis_manager_->set_error_vector_size(3, DIISEntry::Pointer, t1_nel, DIISEntry::Pointer,
                                              t2_nel, DIISEntry::Pointer, t3_nel);

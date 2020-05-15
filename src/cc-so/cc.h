@@ -71,6 +71,20 @@ class CC_SO : public DynamicCorrelationSolver {
     /// Called in the destructor
     void cleanup();
 
+    /// Read options
+    void read_options();
+
+    /// Set up MO space
+    void setup_mo_space();
+
+    /// Set up integrals in ambit BlockedTensor
+    void setup_integrals();
+
+    /// Build Fock matrix
+    void build_Fock();
+    /// Print orbital energies
+    void print_orbital_energies();
+
     // => Class data <= //
 
     /// Correlation level
@@ -78,10 +92,6 @@ class CC_SO : public DynamicCorrelationSolver {
 
     /// The energy of the reference
     double Eref_;
-    /// The nuclear repulsion energy
-    double Enuc_;
-    /// The frozen-core energy
-    double Efrzc_;
 
     /// Convergence criteria
     double e_convergence_;
@@ -94,22 +104,11 @@ class CC_SO : public DynamicCorrelationSolver {
 
     void compute_ccsd_trotter(BlockedTensor& H1, BlockedTensor& H2, BlockedTensor& T1,
                               BlockedTensor& T2, double& C0, BlockedTensor& C1, BlockedTensor& C2);
-    void compute_ccsd_trotter_symm(BlockedTensor& H1, BlockedTensor& H2, BlockedTensor& T1,
-                                   BlockedTensor& T2, double& C0, BlockedTensor& C1,
-                                   BlockedTensor& C2);
-    void compute_ccsd_trotter_asymm(BlockedTensor& H1, BlockedTensor& H2, BlockedTensor& T1,
-                                    BlockedTensor& T2, double& C0, BlockedTensor& C1,
-                                    BlockedTensor& C2);
 
     // => Triples related testing options <= //
 
     /// Include triples or not
     bool do_triples_;
-    /// Perturbation order based on Fink Hamiltonian
-    int fink_order_;
-
-    /// Print levels
-    int print_;
 
     /// List of alpha core SOs
     std::vector<size_t> acore_sos_;
@@ -128,16 +127,14 @@ class CC_SO : public DynamicCorrelationSolver {
     /// Number of spin orbitals
     size_t nso_;
     /// Number of core spin orbitals
-    size_t nc_;
+    size_t ncore_;
     /// Number of virtual spin orbitals
-    size_t nv_;
+    size_t nvirt_;
     /// Number of spacial orbitals
     size_t nmo_;
 
     std::shared_ptr<BlockedTensorFactory> BTF_;
-    TensorType tensor_type_;
-
-    bool debug_flag_ = false;
+    ambit::TensorType tensor_type_;
 
     // => Amplitudes read/write <=
 
@@ -170,6 +167,9 @@ class CC_SO : public DynamicCorrelationSolver {
     ambit::BlockedTensor T1_;
     ambit::BlockedTensor T2_;
     ambit::BlockedTensor T3_;
+    ambit::BlockedTensor DT1_;
+    ambit::BlockedTensor DT2_;
+    ambit::BlockedTensor DT3_;
 
     /// Diagonal elements of Fock matrix
     std::vector<double> Fd_;
@@ -180,7 +180,7 @@ class CC_SO : public DynamicCorrelationSolver {
     ambit::BlockedTensor Hbar3_;
 
     /// Print a summary of the options
-    void print_summary();
+    void print_options();
 
     /// Number of amplitudes will be printed in amplitude summary
     int ntamp_;
@@ -227,12 +227,13 @@ class CC_SO : public DynamicCorrelationSolver {
                             BlockedTensor& C2, BlockedTensor& C3);
 
     void rotate_hamiltonian(double& Eeff, BlockedTensor& Fnew, BlockedTensor& Vnew);
-    void compute_ucc3_amp(BlockedTensor& H1, BlockedTensor& H2, BlockedTensor& T2,
-                          BlockedTensor& T3, double& C0, BlockedTensor& C1, BlockedTensor& C2,
-                          BlockedTensor& C3);
+    //    void compute_ucc3_amp(BlockedTensor& H1, BlockedTensor& H2, BlockedTensor& T2,
+    //                          BlockedTensor& T3, double& C0, BlockedTensor& C1, BlockedTensor& C2,
+    //                          BlockedTensor& C3);
 
-    void compute_uccsd5_amp(BlockedTensor& H1, BlockedTensor& H2, BlockedTensor& T2, double& C0,
-                            BlockedTensor& C1, BlockedTensor& C2);
+    //    void compute_uccsd5_amp(BlockedTensor& H1, BlockedTensor& H2, BlockedTensor& T2, double&
+    //    C0,
+    //                            BlockedTensor& C1, BlockedTensor& C2);
 };
 
 std::unique_ptr<CC_SO> make_cc_so(RDMs rdms, std::shared_ptr<SCFInfo> scf_info,

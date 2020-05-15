@@ -960,9 +960,7 @@ def register_psi_options(options):
 
 def register_cc_so_options(forte_options):
     forte_options.add_str("CC_LEVEL", "CCSD", ["CCSD", "CCSDT", "CCSDT_1A", "CCSDT_1B",
-                                               "CCSD_TROTTER",
-                                               "LUCCSD", "QUCCSD",
-                                               "LUCCSDT", "UCC3", "VUCCSD5"],
+                                               "CCSD_TROTTER"],
                           "Coupled cluster level")
 
     forte_options.add_int("CCSD_TROTTER_LEVEL", 1, "Number of Trotter level")

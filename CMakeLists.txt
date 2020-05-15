@@ -99,13 +99,12 @@ src/ci_ex_states/excited_state_solver.cc
 src/ci_rdm/ci_rdms.cc
 src/ci_rdm/ci_rdms_dynamic.cc
 src/cc-so/cc.cc
+src/cc-so/cc_amps.cc
 src/cc-so/cc_diis.cc
 src/cc-so/ccsd.cc
 src/cc-so/ccsd_trotter.cc
 src/cc-so/ccsdt.cc
 src/cc-so/ccsdt-1.cc
-src/cc-so/ucc3.cc
-src/cc-so/vuccsd5.cc
 src/dmrg/dmrgscf.cc
 src/dmrg/dmrgsolver.cc
 src/fci/binary_graph.cc
