@@ -858,6 +858,10 @@ double MRDSRG_SO::compute_energy() {
         diis_manager_cleanup();
     }
 
+    if (not converged) {
+        throw PSIEXCEPTION("MRDSRG did not converge!");
+    }
+
     if (ldsrg2_4th_ != "NONE") {
         std::vector<double> e4th_corr = E4th_correction();
         outfile->Printf("\n");
