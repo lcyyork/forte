@@ -276,11 +276,11 @@ void CC_SO::print_options() {
 }
 
 double CC_SO::compute_energy() {
-    if (corr_level_ == "CCSD" or corr_level_ == "CCSDT" or
-        corr_level_ == "CCSDT_1A" or corr_level_ == "CCSDT_1B") {
+    if (corr_level_ == "CCSD" or corr_level_ == "CCSDT" or corr_level_ == "CCSDT_1A" or
+        corr_level_ == "CCSDT_1B") {
         DT1_ = BTF_->build(tensor_type_, "T1 Residuals", {"cv"});
         DT2_ = BTF_->build(tensor_type_, "T2 Residuals", {"ccvv"});
-    } else if(corr_level_ == "CCSD_TROTTER") {
+    } else if (corr_level_ == "CCSD_TROTTER") {
         DT1_ = BTF_->build(tensor_type_, "T1 Residuals", {"cv"});
         DT2_ = BTF_->build(tensor_type_, "T2 Residuals", {"ccvv"});
         Hbar1_ = BTF_->build(tensor_type_, "Hbar1", {"gg"});
@@ -318,14 +318,10 @@ double CC_SO::compute_energy() {
 
     // start iteration
     outfile->Printf("\n\n  ==> Start Iterations <==\n");
-    outfile->Printf("\n    "
-                    "----------------------------------------------------------"
-                    "------------------------------------------------------------");
-    outfile->Printf("\n           Cycle     Energy (a.u.)     Delta(E)  "
-                    "|Hbar1|_N  |Hbar2|_N    |T1|    |T2|    |T3|  max(T1) max(T2) max(T3) DIIS");
-    outfile->Printf("\n    "
-                    "----------------------------------------------------------"
-                    "------------------------------------------------------------");
+    outfile->Printf("\n    %s", std::string(110, '-').c_str());
+    outfile->Printf("\n      Cycle        Energy (a.u.)    Delta(E)  "
+                    "   T1_RMS     T2_RMS     T3_RMS    |T1| max(T1) max(T2) max(T3) DIIS");
+    outfile->Printf("\n    %s", std::string(110, '-').c_str());
 
     for (int cycle = 1; cycle <= maxiter_; ++cycle) {
         if (corr_level_ == "CCSD") {
@@ -348,11 +344,12 @@ double CC_SO::compute_energy() {
         // norm of non-diagonal Hbar
         double Hbar1Nnorm = DT1_.norm();
         double Hbar2Nnorm = DT2_.norm();
+        double Hbar3Nnorm = DT3_.norm();
 
-        outfile->Printf("\n      @CC %4d %20.12f %11.3e %10.3e %10.3e %7.4f "
-                        "%7.4f %7.4f %7.4f %7.4f %7.4f",
-                        cycle, Etotal, Edelta, Hbar1Nnorm, Hbar2Nnorm, T1norm_, T2norm_, T3norm_,
-                        T1max_, T2max_, T3max_);
+        outfile->Printf("\n    @CC %3d %20.12f %11.3e %10.3e %10.3e %10.3e %7.4f "
+                        "%7.4f %7.4f %7.4f",
+                        cycle, Etotal, Edelta, Hbar1Nnorm, Hbar2Nnorm, Hbar3Nnorm, T1norm_, T1max_,
+                        T2max_, T3max_);
 
         update_t2();
         update_t1();
@@ -383,9 +380,7 @@ double CC_SO::compute_energy() {
         }
     }
 
-    outfile->Printf("\n    "
-                    "----------------------------------------------------------"
-                    "----------------------------------------");
+    outfile->Printf("\n    %s", std::string(110, '-').c_str());
     outfile->Printf("\n\n\n    %s Energy Summary", corr_level_.c_str());
     outfile->Printf("\n    Correlation energy      = %25.15f", Etotal - Eref_);
     outfile->Printf("\n  * Total energy            = %25.15f\n", Etotal);
