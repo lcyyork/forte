@@ -142,41 +142,41 @@ def register_mrcino_options(options):
 def register_embedding_options(options):
     options.set_group("Embedding")
     options.add_bool(
-        "EMBEDDING", False, 
+        "EMBEDDING", False,
         "Whether to perform embedding partition and projection")
     options.add_str(
-        "EMBEDDING_CUTOFF_METHOD", "THRESHOLD", 
+        "EMBEDDING_CUTOFF_METHOD", "THRESHOLD",
         "Cut off by: threshold ,cum_threshold or num_of_orbitals.")
     options.add_double(
-        "EMBEDDING_THRESHOLD", 0.5, 
+        "EMBEDDING_THRESHOLD", 0.5,
         "Projector eigenvalue threshold for both simple and cumulative threshold")
     options.add_int(
-        "NUM_A_DOCC", 0, 
+        "NUM_A_DOCC", 0,
         "Number of occupied orbitals in A fixed to this value when embedding method is num_of_orbitals")
     options.add_int(
         "Num_A_UOCC", 0,
         "Number of virtual orbitals in A fixed to this value when embedding method is num_of_orbitals")
     options.add_str(
-        "EMBEDDING_REFERENCE", "CASSCF", 
+        "EMBEDDING_REFERENCE", "CASSCF",
         "HF for any reference without active, CASSCF for any reference with an active space.")
     options.add_bool(
-        "EMBEDDING_SEMICANONICALIZE_ACTIVE", True, 
+        "EMBEDDING_SEMICANONICALIZE_ACTIVE", True,
         "Perform semi-canonicalization on active space or not")
     options.add_bool(
-        "EMBEDDING_SEMICANONICALIZE_FROZEN", True, 
+        "EMBEDDING_SEMICANONICALIZE_FROZEN", True,
         "Perform semi-canonicalization on frozen core/virtual space or not")
     options.add_int(
-        "EMBEDDING_ADJUST_B_DOCC", 0, 
+        "EMBEDDING_ADJUST_B_DOCC", 0,
         "Adjust number of occupied orbitals between A and B, +: move to B, -: move to A")
     options.add_int(
         "EMBEDDING_ADJUST_B_UOCC", 0,
         "Adjust number of virtual orbitals between A and B, +: move to B, -: move to A")
     options.add_str("EMBEDDING_VIRTUAL_SPACE", "ASET", ["ASET", "PAO", "IAO"], "Vitual space scheme")
     options.add_double(
-        "PAO_THRESHOLD", 1e-8, 
+        "PAO_THRESHOLD", 1e-8,
         "Virtual space truncation threshold for PAO.")
     options.add_bool(
-        "PAO_FIX_VIRTUAL_NUMBER", False, 
+        "PAO_FIX_VIRTUAL_NUMBER", False,
         "Enable this option will generate PAOs equivlent to ASET virtuals, instead of using threshold")
 
 def register_mo_space_info_options(options):
@@ -372,7 +372,7 @@ def register_aci_options(options):
     options.set_group("ACI")
     options.add_double("ACI_CONVERGENCE", 1e-9,
                              "ACI Convergence threshold")
-    
+
     options.add_str("ACI_SCREEN_ALG", "AVERAGE",
                         ['AVERAGE', 'SR', 'RESTRICTED', 'CORE', 'BATCH_HASH', 'BATCH_VEC'],
                         "The screening algorithm to use")
@@ -734,6 +734,8 @@ def register_dsrg_options(options):
     options.add_bool("DSRG_READ_AMPS", False, "Read initial amplitudes from the current directory")
 
     options.add_bool("DSRG_DUMP_AMPS", False, "Dump converged amplitudes to the current directory")
+
+    options.add_bool("DSRG_BRUECKNER", False, "Rotate orbitals such that MRDSRG T1 amplitudes become zero")
 
 
 def register_dwms_options(options):
