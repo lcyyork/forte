@@ -52,7 +52,7 @@ SA_MRDSRG::SA_MRDSRG(RDMs rdms, std::shared_ptr<SCFInfo> scf_info,
 
 void SA_MRDSRG::read_options() {
     corrlv_string_ = foptions_->get_str("CORR_LEVEL");
-    std::vector<std::string> available{"LDSRG2", "LDSRG2_QC"};
+    std::vector<std::string> available{"LDSRG2", "LDSRG2_QC", "CCSD"};
     if (std::find(available.begin(), available.end(), corrlv_string_) == available.end()) {
         outfile->Printf("\n  Warning: CORR_LEVEL option %s is not implemented.",
                         corrlv_string_.c_str());
@@ -122,23 +122,18 @@ void SA_MRDSRG::print_options() {
         {"Reference relaxation", relax_ref_},
         {"Core-Virtual source type", ccvv_source_}};
 
-    auto true_false_string = [](bool x) {
-        if (x) {
-            return std::string("TRUE");
-        } else {
-            return std::string("FALSE");
-        }
-    };
+    auto true_false_str = [](bool x) { return x ? "TRUE" : "FALSE"; };
+
+    calculation_info_string.push_back({"Restart amplitudes", true_false_str(restart_amps_relax_)});
     calculation_info_string.push_back(
-        {"Restart amplitudes", true_false_string(restart_amps_relax_)});
+        {"Sequential DSRG transformation", true_false_str(sequential_Hbar_)});
     calculation_info_string.push_back(
-        {"Sequential DSRG transformation", true_false_string(sequential_Hbar_)});
+        {"Omit blocks of >= 3 virtual indices", true_false_str(nivo_)});
+    calculation_info_string.push_back({"Brueckner DSRG", true_false_str(brueckner_)});
     calculation_info_string.push_back(
-        {"Omit blocks of >= 3 virtual indices", true_false_string(nivo_)});
+        {"Read amplitudes from current dir", true_false_str(read_amps_cwd_)});
     calculation_info_string.push_back(
-        {"Read amplitudes from current dir", true_false_string(read_amps_cwd_)});
-    calculation_info_string.push_back(
-        {"Write amplitudes to current dir", true_false_string(dump_amps_cwd_)});
+        {"Write amplitudes to current dir", true_false_str(dump_amps_cwd_)});
 
     // print some information
     print_options_info("Computation Information", calculation_info_string, calculation_info_double,
@@ -222,7 +217,14 @@ double SA_MRDSRG::compute_energy() {
     double Etotal = Eref_;
 
     // compute energy
-    Etotal += compute_energy_ldsrg2();
+    if (corrlv_string_ == "CCSD") {
+        if (mo_space_info_->size("ACTIVE") != 0) {
+            throw PSIEXCEPTION("MR-CCSD not supported. Please set null active orbitals.");
+        }
+        Etotal += compute_energy_ccsd();
+    } else {
+        Etotal += compute_energy_ldsrg2();
+    }
     //    switch (corrlevelmap[corrlv_string_]) {
     //    case CORR_LV::LDSRG2: {
     //        Etotal += compute_energy_ldsrg2();
@@ -230,6 +232,10 @@ double SA_MRDSRG::compute_energy() {
     //    }
     //    default: { Etotal += compute_energy_ldsrg2_qc(); }
     //    }
+
+    if (brueckner_) {
+        brueckner_rotation();
+    }
 
     return Etotal;
 }

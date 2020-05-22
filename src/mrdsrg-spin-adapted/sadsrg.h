@@ -141,6 +141,9 @@ class SADSRG : public DynamicCorrelationSolver {
     /// Compute contributions from 3 cumulant
     bool do_cu3_;
 
+    /// Perform Brueckner DSRG
+    bool brueckner_;
+
     /// Multi-state computation if true
     bool multi_state_;
     /// Multi-state algorithm

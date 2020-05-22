@@ -74,6 +74,19 @@ def forte_driver(state_weights_map, scf_info, options, ints, mo_space_info):
                                                                            rdms, scf_info, options,
                                                                            ints, mo_space_info,
                                                                            Ua, Ub)
+        if options.get_bool("DSRG_BRUECKNER"):
+           for i in range(6):
+               as_ints = forte.make_active_space_ints(mo_space_info, ints, "ACTIVE", ["RESTRICTED_DOCC"]);
+               active_space_solver = forte.make_active_space_solver(active_space_solver_type,state_map,scf_info,mo_space_info,as_ints,options)
+               state_energies_list = active_space_solver.compute_energy()
+               rdms = active_space_solver.compute_average_rdms(state_weights_map, max_rdm_level)
+
+               semi.semicanonicalize(rdms, max_rdm_level)
+               Ua = semi.Ua_t()
+               Ub = semi.Ub_t()
+               compute_dsrg_unrelaxed_energy(correlation_solver_type,
+               rdms, scf_info, options, ints, mo_space_info, Ua, Ub)
+
         if not Heff_actv_implemented:
             return Edsrg
 

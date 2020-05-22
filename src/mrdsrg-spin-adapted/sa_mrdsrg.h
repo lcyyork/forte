@@ -191,6 +191,14 @@ class SA_MRDSRG : public SADSRG {
 
     /// Compute MR-LDSRG(2)
     double compute_energy_ldsrg2();
+
+    /// Compute SR CCSD energy
+    double compute_energy_ccsd();
+    /// Compute CCSD off-diagonal Hbar
+    void compute_hbar_ccsd_od();
+
+    /// Perform Brueckner rotation
+    void brueckner_rotation();
 };
 } // namespace forte
 
