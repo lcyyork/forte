@@ -86,7 +86,7 @@ double SA_MRDSRG::compute_energy_ccsd() {
         // compute Hbar
         local_timer t_hbar;
         timer hbar("Compute Hbar");
-        compute_hbar_ccsd_od();
+        compute_hbar_ccsd_od(F_, V_, T1_, T2_, Hbar0_, Hbar1_, Hbar2_);
         hbar.stop();
         double Edelta = Hbar0_ - Ecorr;
         Ecorr = Hbar0_;
@@ -168,145 +168,281 @@ double SA_MRDSRG::compute_energy_ccsd() {
     return Ecorr;
 }
 
-void SA_MRDSRG::compute_hbar_ccsd_od() {
+void SA_MRDSRG::compute_hbar_ccsd_od(BlockedTensor& H1, BlockedTensor& H2, BlockedTensor& T1,
+                                     BlockedTensor& T2, double& C0, BlockedTensor& C1,
+                                     BlockedTensor& C2) {
+    C0 = 0.0;
+    C1.zero();
+    C2.zero();
 
-    auto tilde_tau = BTF_->build(tensor_type_, "tilde_tau", {"ccvv"});
-    auto tau = BTF_->build(tensor_type_, "tau", {"ccvv"});
+    C0 += 2.0 * H1["c0,v0"] * T1["c0,v0"];
+    C0 += 2.0 * H2["c0,c1,v0,v1"] * T2["c0,c1,v0,v1"];
+    C0 += -1.0 * H2["c0,c1,v0,v1"] * T2["c1,c0,v0,v1"];
+    C0 += 2.0 * H2["c0,c1,v0,v1"] * T1["c0,v0"] * T1["c1,v1"];
+    C0 += -1.0 * H2["c0,c1,v0,v1"] * T1["c0,v1"] * T1["c1,v0"];
 
-    tau["ijab"] = T1_["ia"] * T1_["jb"];
+    C1["c0,v0"] += H1["c0,v0"];
+    C1["c0,v0"] += 1.0 * H1["v1,v0"] * T1["c0,v1"];
+    C1["c0,v0"] += 2.0 * H1["c1,v1"] * T2["c0,c1,v0,v1"];
+    C1["c0,v0"] += -1.0 * H1["c1,v1"] * T2["c1,c0,v0,v1"];
+    C1["c0,v0"] += -1.0 * H1["c1,c0"] * T1["c1,v0"];
+    C1["c0,v0"] += 2.0 * H2["v1,v2,v0,c1"] * T2["c0,c1,v1,v2"];
+    C1["c0,v0"] += -1.0 * H2["v1,v2,v0,c1"] * T2["c1,c0,v1,v2"];
+    C1["c0,v0"] += -1.0 * H2["v1,c0,v0,c1"] * T1["c1,v1"];
+    C1["c0,v0"] += 2.0 * H2["c0,v1,v0,c1"] * T1["c1,v1"];
+    C1["c0,v0"] += 1.0 * H2["c1,c2,v1,c0"] * T2["c1,c2,v0,v1"];
+    C1["c0,v0"] += -2.0 * H2["c1,c2,v1,c0"] * T2["c2,c1,v0,v1"];
+    C1["c0,v0"] += -1.0 * H1["c1,v1"] * T1["c0,v1"] * T1["c1,v0"];
+    C1["c0,v0"] += 2.0 * H2["v1,v2,v0,c1"] * T1["c0,v1"] * T1["c1,v2"];
+    C1["c0,v0"] += -1.0 * H2["v1,v2,v0,c1"] * T1["c0,v2"] * T1["c1,v1"];
+    C1["c0,v0"] += -2.0 * H2["c1,c2,v1,v2"] * T1["c0,v1"] * T2["c1,c2,v0,v2"];
+    C1["c0,v0"] += 1.0 * H2["c1,c2,v1,v2"] * T1["c0,v1"] * T2["c2,c1,v0,v2"];
+    C1["c0,v0"] += -2.0 * H2["c1,c2,v1,v2"] * T1["c1,v0"] * T2["c0,c2,v1,v2"];
+    C1["c0,v0"] += 1.0 * H2["c1,c2,v1,v2"] * T1["c1,v0"] * T2["c2,c0,v1,v2"];
+    C1["c0,v0"] += 4.0 * H2["c1,c2,v1,v2"] * T1["c1,v1"] * T2["c0,c2,v0,v2"];
+    C1["c0,v0"] += -2.0 * H2["c1,c2,v1,v2"] * T1["c1,v1"] * T2["c2,c0,v0,v2"];
+    C1["c0,v0"] += -2.0 * H2["c1,c2,v1,v2"] * T1["c2,v1"] * T2["c0,c1,v0,v2"];
+    C1["c0,v0"] += 1.0 * H2["c1,c2,v1,v2"] * T1["c2,v1"] * T2["c1,c0,v0,v2"];
+    C1["c0,v0"] += 1.0 * H2["c1,c2,v1,c0"] * T1["c1,v0"] * T1["c2,v1"];
+    C1["c0,v0"] += -2.0 * H2["c1,c2,v1,c0"] * T1["c1,v1"] * T1["c2,v0"];
+    C1["c0,v0"] += -2.0 * H2["c1,c2,v1,v2"] * T1["c0,v1"] * T1["c1,v0"] * T1["c2,v2"];
+    C1["c0,v0"] += 1.0 * H2["c1,c2,v1,v2"] * T1["c0,v2"] * T1["c1,v0"] * T1["c2,v1"];
 
-    tilde_tau["ijab"] = T2_["ijab"];
-    tilde_tau["ijab"] += 0.5 * tau["ijab"];
+    C2["c0,c1,v0,v1"] += H2["c0,c1,v0,v1"];
+    C2["c0,c1,v0,v1"] += 1.0 * H1["v2,v0"] * T2["c1,c0,v1,v2"];
+    C2["c0,c1,v0,v1"] += 1.0 * H1["v2,v1"] * T2["c0,c1,v0,v2"];
+    C2["c0,c1,v0,v1"] += -1.0 * H1["c2,c0"] * T2["c2,c1,v0,v1"];
+    C2["c0,c1,v0,v1"] += -1.0 * H1["c2,c1"] * T2["c0,c2,v0,v1"];
+    C2["c0,c1,v0,v1"] += 1.0 * H2["v2,v3,v0,v1"] * T2["c0,c1,v2,v3"];
+    C2["c0,c1,v0,v1"] += -1.0 * H2["v2,c0,v0,c2"] * T2["c1,c2,v1,v2"];
+    C2["c0,c1,v0,v1"] += -1.0 * H2["v2,c0,v1,c2"] * T2["c2,c1,v0,v2"];
+    C2["c0,c1,v0,v1"] += 1.0 * H2["v2,c1,v0,v1"] * T1["c0,v2"];
+    C2["c0,c1,v0,v1"] += -1.0 * H2["v2,c1,v0,c2"] * T2["c2,c0,v1,v2"];
+    C2["c0,c1,v0,v1"] += -1.0 * H2["v2,c1,v1,c2"] * T2["c0,c2,v0,v2"];
+    C2["c0,c1,v0,v1"] += 1.0 * H2["c0,v2,v0,v1"] * T1["c1,v2"];
+    C2["c0,c1,v0,v1"] += 2.0 * H2["c0,v2,v0,c2"] * T2["c1,c2,v1,v2"];
+    C2["c0,c1,v0,v1"] += -1.0 * H2["c0,v2,v0,c2"] * T2["c2,c1,v1,v2"];
+    C2["c0,c1,v0,v1"] += -1.0 * H2["c0,c1,v0,c2"] * T1["c2,v1"];
+    C2["c0,c1,v0,v1"] += 2.0 * H2["c1,v2,v1,c2"] * T2["c0,c2,v0,v2"];
+    C2["c0,c1,v0,v1"] += -1.0 * H2["c1,v2,v1,c2"] * T2["c2,c0,v0,v2"];
+    C2["c0,c1,v0,v1"] += -1.0 * H2["c1,c0,v1,c2"] * T1["c2,v0"];
+    C2["c0,c1,v0,v1"] += 1.0 * H2["c2,c3,c0,c1"] * T2["c2,c3,v0,v1"];
+    C2["c0,c1,v0,v1"] += -1.0 * H1["c2,v2"] * T1["c0,v2"] * T2["c2,c1,v0,v1"];
+    C2["c0,c1,v0,v1"] += -1.0 * H1["c2,v2"] * T1["c1,v2"] * T2["c0,c2,v0,v1"];
+    C2["c0,c1,v0,v1"] += -1.0 * H1["c2,v2"] * T1["c2,v0"] * T2["c1,c0,v1,v2"];
+    C2["c0,c1,v0,v1"] += -1.0 * H1["c2,v2"] * T1["c2,v1"] * T2["c0,c1,v0,v2"];
+    C2["c0,c1,v0,v1"] += 1.0 * H2["v2,v3,v0,v1"] * T1["c0,v2"] * T1["c1,v3"];
+    C2["c0,c1,v0,v1"] += 2.0 * H2["v2,v3,v0,c2"] * T1["c0,v2"] * T2["c1,c2,v1,v3"];
+    C2["c0,c1,v0,v1"] += -1.0 * H2["v2,v3,v0,c2"] * T1["c0,v2"] * T2["c2,c1,v1,v3"];
+    C2["c0,c1,v0,v1"] += -1.0 * H2["v2,v3,v0,c2"] * T1["c0,v3"] * T2["c1,c2,v1,v2"];
+    C2["c0,c1,v0,v1"] += -1.0 * H2["v2,v3,v0,c2"] * T1["c1,v3"] * T2["c2,c0,v1,v2"];
+    C2["c0,c1,v0,v1"] += -1.0 * H2["v2,v3,v0,c2"] * T1["c2,v1"] * T2["c0,c1,v2,v3"];
+    C2["c0,c1,v0,v1"] += -1.0 * H2["v2,v3,v0,c2"] * T1["c2,v2"] * T2["c1,c0,v1,v3"];
+    C2["c0,c1,v0,v1"] += 2.0 * H2["v2,v3,v0,c2"] * T1["c2,v3"] * T2["c1,c0,v1,v2"];
+    C2["c0,c1,v0,v1"] += -1.0 * H2["v2,v3,v1,c2"] * T1["c0,v3"] * T2["c2,c1,v0,v2"];
+    C2["c0,c1,v0,v1"] += 2.0 * H2["v2,v3,v1,c2"] * T1["c1,v2"] * T2["c0,c2,v0,v3"];
+    C2["c0,c1,v0,v1"] += -1.0 * H2["v2,v3,v1,c2"] * T1["c1,v2"] * T2["c2,c0,v0,v3"];
+    C2["c0,c1,v0,v1"] += -1.0 * H2["v2,v3,v1,c2"] * T1["c1,v3"] * T2["c0,c2,v0,v2"];
+    C2["c0,c1,v0,v1"] += -1.0 * H2["v2,v3,v1,c2"] * T1["c2,v0"] * T2["c1,c0,v2,v3"];
+    C2["c0,c1,v0,v1"] += -1.0 * H2["v2,v3,v1,c2"] * T1["c2,v2"] * T2["c0,c1,v0,v3"];
+    C2["c0,c1,v0,v1"] += 2.0 * H2["v2,v3,v1,c2"] * T1["c2,v3"] * T2["c0,c1,v0,v2"];
+    C2["c0,c1,v0,v1"] += -1.0 * H2["v2,c0,v1,c2"] * T1["c1,v2"] * T1["c2,v0"];
+    C2["c0,c1,v0,v1"] += -1.0 * H2["v2,c1,v0,c2"] * T1["c0,v2"] * T1["c2,v1"];
+    C2["c0,c1,v0,v1"] += -1.0 * H2["c0,v2,v0,c2"] * T1["c1,v2"] * T1["c2,v1"];
+    C2["c0,c1,v0,v1"] += -1.0 * H2["c1,v2,v1,c2"] * T1["c0,v2"] * T1["c2,v0"];
+    C2["c0,c1,v0,v1"] += -2.0 * H2["c2,c3,v2,v3"] * T2["c0,c1,v0,v2"] * T2["c2,c3,v1,v3"];
+    C2["c0,c1,v0,v1"] += 1.0 * H2["c2,c3,v2,v3"] * T2["c0,c1,v0,v2"] * T2["c3,c2,v1,v3"];
+    C2["c0,c1,v0,v1"] += 1.0 * H2["c2,c3,v2,v3"] * T2["c0,c1,v2,v3"] * T2["c2,c3,v0,v1"];
+    C2["c0,c1,v0,v1"] += -2.0 * H2["c2,c3,v2,v3"] * T2["c0,c2,v0,v1"] * T2["c1,c3,v2,v3"];
+    C2["c0,c1,v0,v1"] += 1.0 * H2["c2,c3,v2,v3"] * T2["c0,c2,v0,v1"] * T2["c3,c1,v2,v3"];
+    C2["c0,c1,v0,v1"] += 4.0 * H2["c2,c3,v2,v3"] * T2["c0,c2,v0,v2"] * T2["c1,c3,v1,v3"];
+    C2["c0,c1,v0,v1"] += -2.0 * H2["c2,c3,v2,v3"] * T2["c0,c2,v0,v2"] * T2["c3,c1,v1,v3"];
+    C2["c0,c1,v0,v1"] += -2.0 * H2["c2,c3,v2,v3"] * T2["c0,c3,v0,v2"] * T2["c1,c2,v1,v3"];
+    C2["c0,c1,v0,v1"] += 1.0 * H2["c2,c3,v2,v3"] * T2["c0,c3,v0,v2"] * T2["c2,c1,v1,v3"];
+    C2["c0,c1,v0,v1"] += -2.0 * H2["c2,c3,v2,v3"] * T2["c0,c3,v2,v3"] * T2["c2,c1,v0,v1"];
+    C2["c0,c1,v0,v1"] += 1.0 * H2["c2,c3,v2,v3"] * T2["c1,c0,v1,v3"] * T2["c2,c3,v0,v2"];
+    C2["c0,c1,v0,v1"] += -2.0 * H2["c2,c3,v2,v3"] * T2["c1,c0,v1,v3"] * T2["c3,c2,v0,v2"];
+    C2["c0,c1,v0,v1"] += 1.0 * H2["c2,c3,v2,v3"] * T2["c1,c2,v1,v3"] * T2["c3,c0,v0,v2"];
+    C2["c0,c1,v0,v1"] += -2.0 * H2["c2,c3,v2,v3"] * T2["c1,c3,v1,v3"] * T2["c2,c0,v0,v2"];
+    C2["c0,c1,v0,v1"] += 1.0 * H2["c2,c3,v2,v3"] * T2["c2,c0,v0,v2"] * T2["c3,c1,v1,v3"];
+    C2["c0,c1,v0,v1"] += 1.0 * H2["c2,c3,v2,v3"] * T2["c2,c0,v1,v3"] * T2["c3,c1,v0,v2"];
+    C2["c0,c1,v0,v1"] += 1.0 * H2["c2,c3,v2,v3"] * T2["c2,c1,v0,v1"] * T2["c3,c0,v2,v3"];
+    C2["c0,c1,v0,v1"] += 1.0 * H2["c2,c3,v2,c0"] * T1["c1,v2"] * T2["c3,c2,v0,v1"];
+    C2["c0,c1,v0,v1"] += 1.0 * H2["c2,c3,v2,c0"] * T1["c2,v0"] * T2["c1,c3,v1,v2"];
+    C2["c0,c1,v0,v1"] += 1.0 * H2["c2,c3,v2,c0"] * T1["c2,v1"] * T2["c3,c1,v0,v2"];
+    C2["c0,c1,v0,v1"] += -2.0 * H2["c2,c3,v2,c0"] * T1["c2,v2"] * T2["c3,c1,v0,v1"];
+    C2["c0,c1,v0,v1"] += -2.0 * H2["c2,c3,v2,c0"] * T1["c3,v0"] * T2["c1,c2,v1,v2"];
+    C2["c0,c1,v0,v1"] += 1.0 * H2["c2,c3,v2,c0"] * T1["c3,v0"] * T2["c2,c1,v1,v2"];
+    C2["c0,c1,v0,v1"] += 1.0 * H2["c2,c3,v2,c0"] * T1["c3,v2"] * T2["c2,c1,v0,v1"];
+    C2["c0,c1,v0,v1"] += 1.0 * H2["c2,c3,v2,c1"] * T1["c0,v2"] * T2["c2,c3,v0,v1"];
+    C2["c0,c1,v0,v1"] += 1.0 * H2["c2,c3,v2,c1"] * T1["c2,v0"] * T2["c3,c0,v1,v2"];
+    C2["c0,c1,v0,v1"] += 1.0 * H2["c2,c3,v2,c1"] * T1["c2,v1"] * T2["c0,c3,v0,v2"];
+    C2["c0,c1,v0,v1"] += -2.0 * H2["c2,c3,v2,c1"] * T1["c2,v2"] * T2["c0,c3,v0,v1"];
+    C2["c0,c1,v0,v1"] += -2.0 * H2["c2,c3,v2,c1"] * T1["c3,v1"] * T2["c0,c2,v0,v2"];
+    C2["c0,c1,v0,v1"] += 1.0 * H2["c2,c3,v2,c1"] * T1["c3,v1"] * T2["c2,c0,v0,v2"];
+    C2["c0,c1,v0,v1"] += 1.0 * H2["c2,c3,v2,c1"] * T1["c3,v2"] * T2["c0,c2,v0,v1"];
+    C2["c0,c1,v0,v1"] += 1.0 * H2["c2,c3,c0,c1"] * T1["c2,v0"] * T1["c3,v1"];
+    C2["c0,c1,v0,v1"] += -1.0 * H2["v2,v3,v0,c2"] * T1["c0,v2"] * T1["c1,v3"] * T1["c2,v1"];
+    C2["c0,c1,v0,v1"] += -1.0 * H2["v2,v3,v1,c2"] * T1["c0,v3"] * T1["c1,v2"] * T1["c2,v0"];
+    C2["c0,c1,v0,v1"] += 1.0 * H2["c2,c3,v2,v3"] * T1["c0,v2"] * T1["c1,v3"] * T2["c2,c3,v0,v1"];
+    C2["c0,c1,v0,v1"] += -2.0 * H2["c2,c3,v2,v3"] * T1["c0,v2"] * T1["c2,v0"] * T2["c1,c3,v1,v3"];
+    C2["c0,c1,v0,v1"] += 1.0 * H2["c2,c3,v2,v3"] * T1["c0,v2"] * T1["c2,v0"] * T2["c3,c1,v1,v3"];
+    C2["c0,c1,v0,v1"] += 1.0 * H2["c2,c3,v2,v3"] * T1["c0,v2"] * T1["c2,v3"] * T2["c3,c1,v0,v1"];
+    C2["c0,c1,v0,v1"] += -2.0 * H2["c2,c3,v2,v3"] * T1["c0,v2"] * T1["c3,v3"] * T2["c2,c1,v0,v1"];
+    C2["c0,c1,v0,v1"] += 1.0 * H2["c2,c3,v2,v3"] * T1["c0,v3"] * T1["c2,v0"] * T2["c1,c3,v1,v2"];
+    C2["c0,c1,v0,v1"] += 1.0 * H2["c2,c3,v2,v3"] * T1["c0,v3"] * T1["c2,v1"] * T2["c3,c1,v0,v2"];
+    C2["c0,c1,v0,v1"] += -2.0 * H2["c2,c3,v2,v3"] * T1["c1,v2"] * T1["c2,v1"] * T2["c0,c3,v0,v3"];
+    C2["c0,c1,v0,v1"] += 1.0 * H2["c2,c3,v2,v3"] * T1["c1,v2"] * T1["c2,v1"] * T2["c3,c0,v0,v3"];
+    C2["c0,c1,v0,v1"] += 1.0 * H2["c2,c3,v2,v3"] * T1["c1,v2"] * T1["c2,v3"] * T2["c0,c3,v0,v1"];
+    C2["c0,c1,v0,v1"] += -2.0 * H2["c2,c3,v2,v3"] * T1["c1,v2"] * T1["c3,v3"] * T2["c0,c2,v0,v1"];
+    C2["c0,c1,v0,v1"] += 1.0 * H2["c2,c3,v2,v3"] * T1["c1,v3"] * T1["c2,v0"] * T2["c3,c0,v1,v2"];
+    C2["c0,c1,v0,v1"] += 1.0 * H2["c2,c3,v2,v3"] * T1["c1,v3"] * T1["c2,v1"] * T2["c0,c3,v0,v2"];
+    C2["c0,c1,v0,v1"] += 1.0 * H2["c2,c3,v2,v3"] * T1["c2,v0"] * T1["c3,v1"] * T2["c0,c1,v2,v3"];
+    C2["c0,c1,v0,v1"] += 1.0 * H2["c2,c3,v2,v3"] * T1["c2,v0"] * T1["c3,v2"] * T2["c1,c0,v1,v3"];
+    C2["c0,c1,v0,v1"] += -2.0 * H2["c2,c3,v2,v3"] * T1["c2,v0"] * T1["c3,v3"] * T2["c1,c0,v1,v2"];
+    C2["c0,c1,v0,v1"] += 1.0 * H2["c2,c3,v2,v3"] * T1["c2,v1"] * T1["c3,v2"] * T2["c0,c1,v0,v3"];
+    C2["c0,c1,v0,v1"] += -2.0 * H2["c2,c3,v2,v3"] * T1["c2,v1"] * T1["c3,v3"] * T2["c0,c1,v0,v2"];
+    C2["c0,c1,v0,v1"] += 1.0 * H2["c2,c3,v2,c0"] * T1["c1,v2"] * T1["c2,v1"] * T1["c3,v0"];
+    C2["c0,c1,v0,v1"] += 1.0 * H2["c2,c3,v2,c1"] * T1["c0,v2"] * T1["c2,v0"] * T1["c3,v1"];
+    C2["c0,c1,v0,v1"] += 1.0 * H2["c2,c3,v2,v3"] * T1["c0,v2"] * T1["c1,v3"] * T1["c2,v0"] * T1["c3,v1"];
 
-    tau["ijab"] += T2_["ijab"];
+//    auto tilde_tau = BTF_->build(tensor_type_, "tilde_tau", {"ccvv"});
+//    auto tau = BTF_->build(tensor_type_, "tau", {"ccvv"});
 
-    // energy
-    Hbar0_ = 2.0 * F_["ia"] * T1_["ia"];
+//    tau["ijab"] = T1_["ia"] * T1_["jb"];
 
-    Hbar0_ += 2.0 * V_["ijab"] * tau["ijab"];
-    Hbar0_ -= V_["ijba"] * tau["ijab"];
+//    tilde_tau["ijab"] = T2_["ijab"];
+//    tilde_tau["ijab"] += 0.5 * tau["ijab"];
 
-    auto W1 = BTF_->build(tensor_type_, "W1", {"cc", "vv", "cv"});
+//    tau["ijab"] += T2_["ijab"];
 
-    W1["ae"] += F_["ae"];
-    for (size_t e = 0, nv = mo_space_info_->size("RESTRICTED_UOCC"); e < nv; ++e) {
-        W1.block("vv").data()[e * nv + e] = 0.0;
-    }
+//    // energy
+//    Hbar0_ = 2.0 * F_["ia"] * T1_["ia"];
 
-    W1["ae"] -= 0.5 * T1_["ma"] * F_["me"];
+//    Hbar0_ += 2.0 * V_["ijab"] * tau["ijab"];
+//    Hbar0_ -= V_["ijba"] * tau["ijab"];
 
-    W1["ae"] += 2.0 * T1_["mf"] * V_["mafe"];
-    W1["ae"] -= T1_["mf"] * V_["maef"];
+//    auto W1 = BTF_->build(tensor_type_, "W1", {"cc", "vv", "cv"});
 
-    W1["ae"] -= 2.0 * tilde_tau["mnfa"] * V_["mnfe"];
-    W1["ae"] += tilde_tau["mnaf"] * V_["mnfe"];
+//    W1["ae"] += F_["ae"];
+//    for (size_t e = 0, nv = mo_space_info_->size("RESTRICTED_UOCC"); e < nv; ++e) {
+//        W1.block("vv").data()[e * nv + e] = 0.0;
+//    }
 
-    W1["mi"] += F_["mi"];
-    for (size_t m = 0, nc = mo_space_info_->size("RESTRICTED_DOCC"); m < nc; ++m) {
-        W1.block("cc").data()[m * nc + m] = 0.0;
-    }
+//    W1["ae"] -= 0.5 * T1_["ma"] * F_["me"];
 
-    W1["mi"] += 0.5 * T1_["ie"] * F_["me"];
+//    W1["ae"] += 2.0 * T1_["mf"] * V_["mafe"];
+//    W1["ae"] -= T1_["mf"] * V_["maef"];
 
-    W1["mi"] += 2.0 * T1_["ne"] * V_["mnie"];
-    W1["mi"] -= T1_["ne"] * V_["mnei"];
+//    W1["ae"] -= 2.0 * tilde_tau["mnfa"] * V_["mnfe"];
+//    W1["ae"] += tilde_tau["mnaf"] * V_["mnfe"];
 
-    W1["mi"] += 2.0 * tilde_tau["inef"] * V_["mnef"];
-    W1["mi"] -= tilde_tau["inef"] * V_["mnfe"];
+//    W1["mi"] += F_["mi"];
+//    for (size_t m = 0, nc = mo_space_info_->size("RESTRICTED_DOCC"); m < nc; ++m) {
+//        W1.block("cc").data()[m * nc + m] = 0.0;
+//    }
 
-    W1["me"] += F_["me"];
+//    W1["mi"] += 0.5 * T1_["ie"] * F_["me"];
 
-    W1["me"] += 2.0 * T1_["nf"] * V_["mnef"];
-    W1["me"] -= T1_["nf"] * V_["mnfe"];
+//    W1["mi"] += 2.0 * T1_["ne"] * V_["mnie"];
+//    W1["mi"] -= T1_["ne"] * V_["mnei"];
 
-    auto W2 = BTF_->build(tensor_type_, "W2", {"cccc", "cvvc", "cvcv", "vvvv"});
+//    W1["mi"] += 2.0 * tilde_tau["inef"] * V_["mnef"];
+//    W1["mi"] -= tilde_tau["inef"] * V_["mnfe"];
 
-    W2["mnij"] += V_["mnij"];
-    W2["mnij"] += T1_["je"] * V_["mnie"];
-    W2["mnij"] += T1_["ie"] * V_["ejmn"];
-    W2["mnij"] += 0.5 * tau["ijef"] * V_["mnef"];
+//    W1["me"] += F_["me"];
 
-    W2["abef"] += V_["abef"];
-    W2["abef"] += T1_["mb"] * V_["amef"];
-    W2["abef"] += T1_["ma"] * V_["mbef"];
-    W2["abef"] += 0.5 * tau["mnab"] * V_["mnef"];
+//    W1["me"] += 2.0 * T1_["nf"] * V_["mnef"];
+//    W1["me"] -= T1_["nf"] * V_["mnfe"];
 
-    W2["mbej"] += V_["mbej"];
-    W2["mbej"] += T1_["jf"] * V_["mbef"];
-    W2["mbej"] -= T1_["nb"] * V_["ejmn"];
-    W2["mbej"] += T2_["njfb"] * V_["mnef"];
-    W2["mbej"] -= 0.5 * T2_["njfb"] * V_["mnfe"];
-    W2["mbej"] -= 0.5 * T2_["jnfb"] * V_["mnef"];
-    W2["mbej"] -= T1_["jf"] * T1_["nb"] * V_["mnef"];
+//    auto W2 = BTF_->build(tensor_type_, "W2", {"cccc", "cvvc", "cvcv", "vvvv"});
 
-    W2["mbje"] += V_["mbje"];
-    W2["mbje"] += T1_["jf"] * V_["femb"];
-    W2["mbje"] -= T1_["nb"] * V_["jemn"];
-    W2["mbje"] -= 0.5 * T2_["jnfb"] * V_["mnfe"];
-    W2["mbje"] -= T1_["jf"] * T1_["nb"] * V_["femn"];
+//    W2["mnij"] += V_["mnij"];
+//    W2["mnij"] += T1_["je"] * V_["mnie"];
+//    W2["mnij"] += T1_["ie"] * V_["ejmn"];
+//    W2["mnij"] += 0.5 * tau["ijef"] * V_["mnef"];
 
-    // amplitudes
-    Hbar1_["ia"] = F_["ia"];
+//    W2["abef"] += V_["abef"];
+//    W2["abef"] += T1_["mb"] * V_["amef"];
+//    W2["abef"] += T1_["ma"] * V_["mbef"];
+//    W2["abef"] += 0.5 * tau["mnab"] * V_["mnef"];
 
-    Hbar1_["ia"] += T1_["ie"] * W1["ae"];
+//    W2["mbej"] += V_["mbej"];
+//    W2["mbej"] += T1_["jf"] * V_["mbef"];
+//    W2["mbej"] -= T1_["nb"] * V_["ejmn"];
+//    W2["mbej"] += T2_["njfb"] * V_["mnef"];
+//    W2["mbej"] -= 0.5 * T2_["njfb"] * V_["mnfe"];
+//    W2["mbej"] -= 0.5 * T2_["jnfb"] * V_["mnef"];
+//    W2["mbej"] -= T1_["jf"] * T1_["nb"] * V_["mnef"];
 
-    Hbar1_["ia"] -= T1_["ma"] * W1["mi"];
+//    W2["mbje"] += V_["mbje"];
+//    W2["mbje"] += T1_["jf"] * V_["femb"];
+//    W2["mbje"] -= T1_["nb"] * V_["jemn"];
+//    W2["mbje"] -= 0.5 * T2_["jnfb"] * V_["mnfe"];
+//    W2["mbje"] -= T1_["jf"] * T1_["nb"] * V_["femn"];
 
-    Hbar1_["ia"] += 2.0 * T2_["imae"] * W1["me"];
-    Hbar1_["ia"] -= T2_["imea"] * W1["me"];
+//    // amplitudes
+//    Hbar1_["ia"] = F_["ia"];
 
-    Hbar1_["ia"] -= T1_["nf"] * V_["naif"];
-    Hbar1_["ia"] += 2.0 * T1_["nf"] * V_["anif"];
+//    Hbar1_["ia"] += T1_["ie"] * W1["ae"];
 
-    Hbar1_["ia"] += 2.0 * T2_["imef"] * V_["amef"];
-    Hbar1_["ia"] -= T2_["imfe"] * V_["amef"];
+//    Hbar1_["ia"] -= T1_["ma"] * W1["mi"];
 
-    Hbar1_["ia"] -= 2.0 * T2_["nmea"] * V_["nmei"];
-    Hbar1_["ia"] += T2_["mnea"] * V_["nmei"];
+//    Hbar1_["ia"] += 2.0 * T2_["imae"] * W1["me"];
+//    Hbar1_["ia"] -= T2_["imea"] * W1["me"];
 
-    Hbar2_["ijab"] = V_["ijab"];
+//    Hbar1_["ia"] -= T1_["nf"] * V_["naif"];
+//    Hbar1_["ia"] += 2.0 * T1_["nf"] * V_["anif"];
 
-    Hbar2_["ijab"] += T2_["ijae"] * W1["be"];
-    Hbar2_["ijab"] -= 0.5 * T2_["ijae"] * T1_["mb"] * W1["me"];
+//    Hbar1_["ia"] += 2.0 * T2_["imef"] * V_["amef"];
+//    Hbar1_["ia"] -= T2_["imfe"] * V_["amef"];
 
-    Hbar2_["ijab"] += T2_["ijeb"] * W1["ae"];
-    Hbar2_["ijab"] -= 0.5 * T2_["ijeb"] * T1_["ma"] * W1["me"];
+//    Hbar1_["ia"] -= 2.0 * T2_["nmea"] * V_["nmei"];
+//    Hbar1_["ia"] += T2_["mnea"] * V_["nmei"];
 
-    Hbar2_["ijab"] -= T2_["imab"] * W1["mj"];
-    Hbar2_["ijab"] -= 0.5 * T2_["imab"] * T1_["je"] * W1["me"];
+//    Hbar2_["ijab"] = V_["ijab"];
 
-    Hbar2_["ijab"] -= T2_["mjab"] * W1["mi"];
-    Hbar2_["ijab"] -= 0.5 * T2_["mjab"] * T1_["ie"] * W1["me"];
+//    Hbar2_["ijab"] += T2_["ijae"] * W1["be"];
+//    Hbar2_["ijab"] -= 0.5 * T2_["ijae"] * T1_["mb"] * W1["me"];
 
-    Hbar2_["ijab"] += tau["mnab"] * W2["mnij"];
+//    Hbar2_["ijab"] += T2_["ijeb"] * W1["ae"];
+//    Hbar2_["ijab"] -= 0.5 * T2_["ijeb"] * T1_["ma"] * W1["me"];
 
-    Hbar2_["ijab"] += tau["ijef"] * W2["abef"];
-//    Hbar2_["ijab"] += tau["ijef"] * V_["abef"];
-//    Hbar2_["ijab"] -= tau["ijef"] * T1_["ma"] * V_["mbef"];
-//    Hbar2_["ijab"] -= tau["ijef"] * T1_["mb"] * V_["amef"];
-//    Hbar2_["ijab"] += 0.5 * tau["ijef"] * tau["mnab"] * V_["mnef"];
+//    Hbar2_["ijab"] -= T2_["imab"] * W1["mj"];
+//    Hbar2_["ijab"] -= 0.5 * T2_["imab"] * T1_["je"] * W1["me"];
 
-    Hbar2_["ijab"] += 2.0 * T2_["imae"] * W2["mbej"];
-    Hbar2_["ijab"] -= T2_["imea"] * W2["mbej"];
-    Hbar2_["ijab"] -= T2_["imae"] * W2["mbje"];
+//    Hbar2_["ijab"] -= T2_["mjab"] * W1["mi"];
+//    Hbar2_["ijab"] -= 0.5 * T2_["mjab"] * T1_["ie"] * W1["me"];
 
-    Hbar2_["ijab"] -= T2_["imeb"] * W2["maje"];
+//    Hbar2_["ijab"] += tau["mnab"] * W2["mnij"];
 
-    Hbar2_["ijab"] -= T2_["mjae"] * W2["mbie"];
+//    Hbar2_["ijab"] += tau["ijef"] * W2["abef"];
+//    //    Hbar2_["ijab"] += tau["ijef"] * V_["abef"];
+//    //    Hbar2_["ijab"] -= tau["ijef"] * T1_["ma"] * V_["mbef"];
+//    //    Hbar2_["ijab"] -= tau["ijef"] * T1_["mb"] * V_["amef"];
+//    //    Hbar2_["ijab"] += 0.5 * tau["ijef"] * tau["mnab"] * V_["mnef"];
 
-    Hbar2_["ijab"] += 2.0 * T2_["mjeb"] * W2["maei"];
-    Hbar2_["ijab"] -= T2_["mjeb"] * W2["maie"];
-    Hbar2_["ijab"] -= T2_["jmeb"] * W2["maei"];
+//    Hbar2_["ijab"] += 2.0 * T2_["imae"] * W2["mbej"];
+//    Hbar2_["ijab"] -= T2_["imea"] * W2["mbej"];
+//    Hbar2_["ijab"] -= T2_["imae"] * W2["mbje"];
 
-    Hbar2_["ijab"] -= T1_["ie"] * T1_["ma"] * V_["ejmb"];
-    Hbar2_["ijab"] -= T1_["ie"] * T1_["mb"] * V_["ejam"];
-    Hbar2_["ijab"] -= T1_["je"] * T1_["ma"] * V_["mbie"];
-    Hbar2_["ijab"] -= T1_["je"] * T1_["mb"] * V_["amie"];
+//    Hbar2_["ijab"] -= T2_["imeb"] * W2["maje"];
 
-    Hbar2_["ijab"] += T1_["ie"] * V_["ejab"];
-    Hbar2_["ijab"] += T1_["je"] * V_["abie"];
+//    Hbar2_["ijab"] -= T2_["mjae"] * W2["mbie"];
 
-    Hbar2_["ijab"] -= T1_["ma"] * V_["mbij"];
-    Hbar2_["ijab"] -= T1_["mb"] * V_["ijam"];
+//    Hbar2_["ijab"] += 2.0 * T2_["mjeb"] * W2["maei"];
+//    Hbar2_["ijab"] -= T2_["mjeb"] * W2["maie"];
+//    Hbar2_["ijab"] -= T2_["jmeb"] * W2["maei"];
+
+//    Hbar2_["ijab"] -= T1_["ie"] * T1_["ma"] * V_["ejmb"];
+//    Hbar2_["ijab"] -= T1_["ie"] * T1_["mb"] * V_["ejam"];
+//    Hbar2_["ijab"] -= T1_["je"] * T1_["ma"] * V_["mbie"];
+//    Hbar2_["ijab"] -= T1_["je"] * T1_["mb"] * V_["amie"];
+
+//    Hbar2_["ijab"] += T1_["ie"] * V_["ejab"];
+//    Hbar2_["ijab"] += T1_["je"] * V_["abie"];
+
+//    Hbar2_["ijab"] -= T1_["ma"] * V_["mbij"];
+//    Hbar2_["ijab"] -= T1_["mb"] * V_["ijam"];
 }
 } // namespace forte

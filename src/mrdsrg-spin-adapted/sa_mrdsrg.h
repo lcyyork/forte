@@ -195,7 +195,8 @@ class SA_MRDSRG : public SADSRG {
     /// Compute SR CCSD energy
     double compute_energy_ccsd();
     /// Compute CCSD off-diagonal Hbar
-    void compute_hbar_ccsd_od();
+    void compute_hbar_ccsd_od(BlockedTensor& H1, BlockedTensor& H2, BlockedTensor& T1,
+                              BlockedTensor& T2, double& C0, BlockedTensor& C1, BlockedTensor& C2);
 
     /// Perform Brueckner rotation
     void brueckner_rotation();
