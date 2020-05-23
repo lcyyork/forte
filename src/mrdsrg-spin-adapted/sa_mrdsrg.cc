@@ -218,8 +218,11 @@ double SA_MRDSRG::compute_energy() {
 
     // compute energy
     if (corrlv_string_ == "CCSD") {
-        if (mo_space_info_->size("ACTIVE") != 0) {
-            throw PSIEXCEPTION("MR-CCSD not supported. Please set null active orbitals.");
+        size_t multiplicity = psi::Process::environment.molecule()->multiplicity();
+        if (mo_space_info_->size("ACTIVE") != (multiplicity - 1)) {
+            outfile->Printf("\n  MR-CCSD not supported!");
+            outfile->Printf("\n  Hints: please set minimal active orbitals for the given multiplicity.");
+            throw PSIEXCEPTION("MR-CCSD not supported!");
         }
         Etotal += compute_energy_ccsd();
     } else {
