@@ -73,7 +73,7 @@ void SA_MRDSRG::read_options() {
     e_conv_ = foptions_->get_double("E_CONVERGENCE");
     r_conv_ = foptions_->get_double("R_CONVERGENCE");
 
-    restart_amps_relax_ = foptions_->get_bool("DSRG_RELAX_RESTART");
+    restart_amps_ = foptions_->get_bool("DSRG_RESTART_AMPS");
 }
 
 void SA_MRDSRG::startup() {
@@ -124,16 +124,20 @@ void SA_MRDSRG::print_options() {
 
     auto true_false_str = [](bool x) { return x ? "TRUE" : "FALSE"; };
 
-    calculation_info_string.push_back({"Restart amplitudes", true_false_str(restart_amps_relax_)});
+    calculation_info_string.push_back({"Restart amplitudes", true_false_str(restart_amps_)});
     calculation_info_string.push_back(
         {"Sequential DSRG transformation", true_false_str(sequential_Hbar_)});
     calculation_info_string.push_back(
         {"Omit blocks of >= 3 virtual indices", true_false_str(nivo_)});
-    calculation_info_string.push_back({"Brueckner DSRG", true_false_str(brueckner_)});
     calculation_info_string.push_back(
         {"Read amplitudes from current dir", true_false_str(read_amps_cwd_)});
     calculation_info_string.push_back(
         {"Write amplitudes to current dir", true_false_str(dump_amps_cwd_)});
+
+    if (brueckner_) {
+        calculation_info_string.push_back({"Brueckner DSRG", true_false_str(brueckner_)});
+        calculation_info_double.push_back({"Brueckner orbitals convergence", brueckner_convergence_});
+    }
 
     // print some information
     print_options_info("Computation Information", calculation_info_string, calculation_info_double,
@@ -237,7 +241,7 @@ double SA_MRDSRG::compute_energy() {
     //    }
 
     if (brueckner_) {
-        brueckner_rotation();
+        brueckner_rotation(T1_);
     }
 
     return Etotal;

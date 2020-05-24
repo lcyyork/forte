@@ -95,7 +95,7 @@ void MRDSRG::read_options() {
         pt2_h0th_ = "FDIAG";
     }
 
-    restart_amps_relax_ = foptions_->get_bool("DSRG_RELAX_RESTART");
+    restart_amps_relax_ = foptions_->get_bool("DSRG_RESTART_AMPS");
 }
 
 void MRDSRG::startup() {

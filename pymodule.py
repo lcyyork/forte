@@ -74,25 +74,38 @@ def forte_driver(state_weights_map, scf_info, options, ints, mo_space_info):
                                                                            rdms, scf_info, options,
                                                                            ints, mo_space_info,
                                                                            Ua, Ub)
-        if options.get_bool("DSRG_BRUECKNER"):
-           for i in range(6):
-               as_ints = forte.make_active_space_ints(mo_space_info, ints, "ACTIVE", ["RESTRICTED_DOCC"]);
-               active_space_solver = forte.make_active_space_solver(active_space_solver_type,state_map,scf_info,mo_space_info,as_ints,options)
-               state_energies_list = active_space_solver.compute_energy()
-               rdms = active_space_solver.compute_average_rdms(state_weights_map, max_rdm_level)
-
-               semi.semicanonicalize(rdms, max_rdm_level)
-               Ua = semi.Ua_t()
-               Ub = semi.Ub_t()
-               compute_dsrg_unrelaxed_energy(correlation_solver_type,
-               rdms, scf_info, options, ints, mo_space_info, Ua, Ub)
-
-        if not Heff_actv_implemented:
-            return Edsrg
-
         # grab t1 and t2 file names
         file_t1 = dsrg.t1_file()
         file_t2 = dsrg.t2_file()
+
+        if options.get_bool("DSRG_BRUECKNER"):
+            brueckner_converged = False
+            brueckner_maxiter = options.get_int("DSRG_BRUECKNER_MAXITER")
+            for i in range(brueckner_maxiter):
+                as_ints = forte.make_active_space_ints(mo_space_info, ints, "ACTIVE", ["RESTRICTED_DOCC"]);
+                active_space_solver = forte.make_active_space_solver(active_space_solver_type, state_map, scf_info,
+                                                                     mo_space_info, as_ints, options)
+                state_energies_list = active_space_solver.compute_energy()
+                rdms = active_space_solver.compute_average_rdms(state_weights_map, max_rdm_level)
+
+                semi.semicanonicalize(rdms, max_rdm_level)
+                Ua = semi.Ua_t()
+                Ub = semi.Ub_t()
+                Edsrg, dsrg, Heff_actv_implemented = compute_dsrg_unrelaxed_energy(correlation_solver_type, rdms,
+                                                                                   scf_info, options, ints,
+                                                                                   mo_space_info, Ua, Ub,
+                                                                                   file_t1, file_t2)
+
+                if dsrg.is_brueckner_converged():
+                    brueckner_converged = True
+                    psi4.core.print_out("\n  DSRG Brueckner update converged.")
+                    break
+            if not brueckner_converged:
+                msg = f"DSRG Brueckner update did not converge in {brueckner_maxiter} cycles!"
+                raise psi4.p4util.PsiException(msg)
+
+        if not Heff_actv_implemented:
+            return Edsrg
 
         # dipole moment related
         do_dipole = options.get_bool("DSRG_DIPOLE")
@@ -294,12 +307,12 @@ def forte_driver(state_weights_map, scf_info, options, ints, mo_space_info):
     return return_en
 
 def compute_dsrg_unrelaxed_energy(correlation_solver_type, rdms, scf_info, options,
-                                  ints, mo_space_info, Ua, Ub):
+                                  ints, mo_space_info, Ua, Ub, file_t1="", file_t2=""):
     Heff_actv_implemented = False
 
     if correlation_solver_type == "SA-MRDSRG":
-        dsrg = forte.make_sadsrg_method(rdms, scf_info, options, ints, mo_space_info)
         Heff_actv_implemented = True
+        dsrg = forte.make_sadsrg_method(rdms, scf_info, options, ints, mo_space_info)
         dsrg.set_Uactv(Ua)
     elif correlation_solver_type == "MRDSRG_SO":
         dsrg = forte.make_dsrg_so_y(rdms, scf_info, options, ints, mo_space_info)
@@ -311,6 +324,10 @@ def compute_dsrg_unrelaxed_energy(correlation_solver_type, rdms, scf_info, optio
         Heff_actv_implemented = True
         dsrg = forte.make_dsrg_method(correlation_solver_type, rdms, scf_info, options, ints, mo_space_info)
         dsrg.set_Uactv(Ua, Ub)
+
+    if Heff_actv_implemented:
+        dsrg.set_t1_file(file_t1)
+        dsrg.set_t2_file(file_t2)
 
     Edsrg = dsrg.compute_energy()
     psi4.core.set_scalar_variable('UNRELAXED ENERGY', Edsrg)

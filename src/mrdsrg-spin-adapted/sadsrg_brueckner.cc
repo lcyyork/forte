@@ -35,17 +35,17 @@
 #include "helpers/disk_io.h"
 #include "helpers/timer.h"
 #include "helpers/printing.h"
-#include "sa_mrdsrg.h"
+#include "sadsrg.h"
 
 using namespace psi;
 
 namespace forte {
 
-void SA_MRDSRG::brueckner_rotation() {
-    // build unitary rotation matrix
-    ambit::BlockedTensor A1 = BTF_->build(tensor_type_, "A1", {"gg"});
-    A1["ia"] = T1_["ia"];
-    A1["ai"] -= T1_["ia"];
+void SADSRG::brueckner_rotation(ambit::BlockedTensor T1) {
+    // build unitary rotation matrix: exp(T1 - T1^+)
+    auto A1 = ambit::BlockedTensor::build(tensor_type_, "A1", {"gg"});
+    A1["ia"] = T1["ia"];
+    A1["ai"] -= T1["ia"];
 
     size_t ncmo = core_mos_.size() + actv_mos_.size() + virt_mos_.size();
 
@@ -68,13 +68,7 @@ void SA_MRDSRG::brueckner_rotation() {
 
     A1m->expm(3);
 
-    // semi-canonicalize orbitals
-
-    // fix orbital phase
-
-    // transform integrals
-
-    // pass Ca to wave function
+    // include frozen orbitals for U
     auto dim_all = mo_space_info_->dimension("ALL");
     auto dim_frzc = mo_space_info_->dimension("FROZEN_DOCC");
     auto U = std::make_shared<psi::Matrix>("U", dim_all, dim_all);
@@ -89,11 +83,16 @@ void SA_MRDSRG::brueckner_rotation() {
         }
     }
 
+    // fix orbital phase
+    ints_->fix_orbital_phases(U, true, true);
+
     auto Ca = ints_->Ca();
     auto Ca_new = psi::linalg::doublet(Ca, U, false, true);
-    //    Ca->copy(Ca_new);
+    Ca_new->set_name("MO coefficients (Brueckner)");
 
     // update integrals
-    ints_->update_orbitals(Ca_new, Ca_new);
+    if (not is_brueckner_converged()) {
+        ints_->update_orbitals(Ca_new, Ca_new);
+    }
 }
 } // namespace forte

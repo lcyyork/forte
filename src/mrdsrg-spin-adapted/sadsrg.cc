@@ -158,6 +158,7 @@ void SADSRG::read_options() {
     do_cu3_ = foptions_->get_str("THREEPDC") != "ZERO";
 
     brueckner_ = foptions_->get_bool("DSRG_BRUECKNER");
+    brueckner_convergence_ = foptions_->get_double("DSRG_BRUECKNER_CONVERGENCE");
 
     ntamp_ = foptions_->get_int("NTAMP");
     intruder_tamp_ = foptions_->get_double("INTRUDER_TAMP");

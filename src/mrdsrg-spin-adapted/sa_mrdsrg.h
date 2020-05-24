@@ -54,7 +54,10 @@ class SA_MRDSRG : public SADSRG {
     double compute_energy() override;
 
     /// Dump the converged amplitudes to file
-    void dump_amps_to_cwd() override;
+    virtual void dump_amps_to_cwd() override;
+
+    /// Is Brueckner orbitals converged
+    virtual bool is_brueckner_converged() override { return T1_.norm(0) < brueckner_convergence_; }
 
   protected:
     /// Start-up function called in the constructor
@@ -86,7 +89,7 @@ class SA_MRDSRG : public SADSRG {
     bool nivo_;
 
     /// Read amplitudes from previous reference relaxation step
-    bool restart_amps_relax_;
+    bool restart_amps_;
 
     /// Prefix for file name for restart
     std::string restart_file_prefix_;
@@ -197,9 +200,6 @@ class SA_MRDSRG : public SADSRG {
     /// Compute CCSD off-diagonal Hbar
     void compute_hbar_ccsd_od(BlockedTensor& H1, BlockedTensor& H2, BlockedTensor& T1,
                               BlockedTensor& T2, double& C0, BlockedTensor& C1, BlockedTensor& C2);
-
-    /// Perform Brueckner rotation
-    void brueckner_rotation();
 };
 } // namespace forte
 

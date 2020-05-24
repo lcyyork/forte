@@ -105,6 +105,9 @@ class SADSRG : public DynamicCorrelationSolver {
     /// Iterative DSRG methods should override this function
     virtual void dump_amps_to_cwd() {}
 
+    /// Brueckner orbitals converged if true
+    virtual bool is_brueckner_converged() { return true; }
+
     /// Clean up amplitudes checkpoint files
     void clean_checkpoints();
 
@@ -143,6 +146,10 @@ class SADSRG : public DynamicCorrelationSolver {
 
     /// Perform Brueckner DSRG
     bool brueckner_;
+    /// Brueckner orbitals convergence
+    double brueckner_convergence_;
+    /// Perform Brueckner rotation to the integrals
+    void brueckner_rotation(ambit::BlockedTensor T1);
 
     /// Multi-state computation if true
     bool multi_state_;

@@ -122,6 +122,11 @@ std::pair<double, std::string> to_xb(size_t nele, size_t type_size) {
     to_XB["TB"] = 1000000000000.0;
     to_XB["PB"] = 1000000000000000.0;
 
+    // empty case
+    if (nele == 0) {
+        return {0, "B"};
+    }
+
     // convert to appropriate unit
     size_t bytes = nele * type_size;
     std::pair<double, std::string> out;

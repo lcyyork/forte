@@ -728,14 +728,18 @@ def register_dsrg_options(options):
 
     options.add_int("DSRG_DIIS_MAX_VEC", 6, "Maximum size of DIIS vectors")
 
-    options.add_bool("DSRG_RELAX_RESTART", True,
-                     "Restart DSRG amplitudes from a previous reference relaxation step")
+    options.add_bool("DSRG_RESTART_AMPS", True,
+                     "Restart DSRG amplitudes from a previous reference relaxation / Brueckner update step")
 
     options.add_bool("DSRG_READ_AMPS", False, "Read initial amplitudes from the current directory")
 
     options.add_bool("DSRG_DUMP_AMPS", False, "Dump converged amplitudes to the current directory")
 
     options.add_bool("DSRG_BRUECKNER", False, "Rotate orbitals such that MRDSRG T1 amplitudes become zero")
+
+    options.add_double("DSRG_BRUECKNER_CONVERGENCE", 1.0e-6, "Threshold to consider Brueckner orbitals converged")
+
+    options.add_int("DSRG_BRUECKNER_MAXITER", 20, "The max number of iterations for Brueckner orbital update")
 
 
 def register_dwms_options(options):
