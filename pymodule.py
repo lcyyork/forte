@@ -81,6 +81,7 @@ def forte_driver(state_weights_map, scf_info, options, ints, mo_space_info):
         if options.get_bool("DSRG_BRUECKNER"):
             brueckner_converged = False
             brueckner_maxiter = options.get_int("DSRG_BRUECKNER_MAXITER")
+
             for i in range(brueckner_maxiter):
                 as_ints = forte.make_active_space_ints(mo_space_info, ints, "ACTIVE", ["RESTRICTED_DOCC"]);
                 active_space_solver = forte.make_active_space_solver(active_space_solver_type, state_map, scf_info,
@@ -100,6 +101,9 @@ def forte_driver(state_weights_map, scf_info, options, ints, mo_space_info):
                     brueckner_converged = True
                     psi4.core.print_out("\n  DSRG Brueckner update converged.")
                     break
+
+            dsrg.clean_checkpoints()
+
             if not brueckner_converged:
                 msg = f"DSRG Brueckner update did not converge in {brueckner_maxiter} cycles!"
                 raise psi4.p4util.PsiException(msg)
