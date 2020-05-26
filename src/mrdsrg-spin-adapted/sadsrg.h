@@ -106,7 +106,7 @@ class SADSRG : public DynamicCorrelationSolver {
     virtual void dump_amps_to_cwd() {}
 
     /// Brueckner orbitals converged if true
-    virtual bool is_brueckner_converged() { return true; }
+    virtual bool is_brueckner_converged() = 0;
 
     /// Clean up amplitudes checkpoint files
     void clean_checkpoints();

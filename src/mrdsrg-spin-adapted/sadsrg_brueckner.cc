@@ -42,6 +42,12 @@ using namespace psi;
 namespace forte {
 
 void SADSRG::brueckner_rotation(ambit::BlockedTensor T1) {
+    if (is_brueckner_converged()) {
+        return;
+    }
+
+    print_h2("Brueckner orbital rotation");
+
     // build unitary rotation matrix: exp(T1 - T1^+)
     auto A1 = ambit::BlockedTensor::build(tensor_type_, "A1", {"gg"});
     A1["ia"] = T1["ia"];
@@ -91,8 +97,6 @@ void SADSRG::brueckner_rotation(ambit::BlockedTensor T1) {
     Ca_new->set_name("MO coefficients (Brueckner)");
 
     // update integrals
-    if (not is_brueckner_converged()) {
-        ints_->update_orbitals(Ca_new, Ca_new);
-    }
+    ints_->update_orbitals(Ca_new, Ca_new);
 }
 } // namespace forte

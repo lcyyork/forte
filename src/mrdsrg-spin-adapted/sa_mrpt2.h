@@ -50,6 +50,9 @@ class SA_MRPT2 : public SA_DSRGPT {
     /// Compute the corr_level energy with fixed reference
     double compute_energy() override;
 
+    /// Is Brueckner orbitals converged
+    virtual bool is_brueckner_converged() override { return T1_.norm(0) < brueckner_convergence_; }
+
   protected:
     /// Start-up function called in the constructor
     void startup();
