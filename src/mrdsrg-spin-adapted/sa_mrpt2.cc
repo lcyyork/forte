@@ -219,7 +219,7 @@ void SA_MRPT2::check_memory() {
 }
 
 double SA_MRPT2::compute_energy() {
-    dsrg_time_.clear();
+    dsrg_time_.reset();
 
     // build amplitudes
     compute_t2();

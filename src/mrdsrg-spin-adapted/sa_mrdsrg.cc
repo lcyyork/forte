@@ -212,7 +212,7 @@ void SA_MRDSRG::build_ints() {
 }
 
 double SA_MRDSRG::compute_energy() {
-    dsrg_time_.clear();
+    dsrg_time_.reset();
 
     // build initial amplitudes
     T1_ = BTF_->build(tensor_type_, "T1 Amplitudes", {"hp"});
