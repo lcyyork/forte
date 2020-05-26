@@ -212,6 +212,8 @@ void SA_MRDSRG::build_ints() {
 }
 
 double SA_MRDSRG::compute_energy() {
+    dsrg_time_.clear();
+
     // build initial amplitudes
     T1_ = BTF_->build(tensor_type_, "T1 Amplitudes", {"hp"});
     T2_ = BTF_->build(tensor_type_, "T2 Amplitudes", {"hhpp"});
@@ -243,6 +245,8 @@ double SA_MRDSRG::compute_energy() {
     if (brueckner_) {
         brueckner_rotation(T1_);
     }
+
+    dsrg_time_.print_comm_time();
 
     return Etotal;
 }

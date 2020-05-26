@@ -32,9 +32,6 @@ class ProcedureDSRG:
         self.relax_convergence = float('inf')
         self.e_convergence = options.get_double("E_CONVERGENCE")
 
-        self.do_brueckner = options.get_bool("DSRG_BRUECKNER")
-        self.brueckner_maxiter = options.get_int("DSRG_BRUECKNER_MAXITER")
-
         if self.relax_ref == "NONE":
             self.relax_maxiter = 0
         elif self.relax_ref == "ONCE":
@@ -65,6 +62,12 @@ class ProcedureDSRG:
             warnings.warn("DSRG transition dipoles are disabled temporarily.", UserWarning)
         self.do_dipole = do_dipole
         self.dipoles = []
+
+        # Filter out some not implemented solver for Brueckner update
+        self.do_brueckner = options.get_bool("DSRG_BRUECKNER")
+        self.brueckner_maxiter = options.get_int("DSRG_BRUECKNER_MAXITER")
+        if self.solver_type not in ["SA-MRDSRG", "SA_MRDSRG"]:
+            raise NotImplementedError("Brueckner DSRG only available for spin-adpated implementation.")
 
         # Set up Forte objects
         self.active_space_solver = active_space_solver

@@ -101,6 +101,10 @@ void SA_MRPT3::init_amps() {
     T1_ = BTF_->build(tensor_type_, "T1 Amplitudes", {"hp"});
     T2_ = BTF_->build(tensor_type_, "T2 Amplitudes", {"hhpp"});
     S2_ = BTF_->build(tensor_type_, "S2 Amplitudes", {"hhpp"});
+
+    if (brueckner_) {
+        T1_sum_ = BTF_->build(tensor_type_, "T1 Amplitudes (1st + 2nd)", {"hp"});
+    }
     t.stop();
 }
 
@@ -134,10 +138,16 @@ void SA_MRPT3::check_memory() {
 }
 
 double SA_MRPT3::compute_energy() {
+    dsrg_time_.clear();
+
     // build amplitudes
     compute_t2_full();
     compute_t1();
     analyze_amplitudes("First-Order", T1_, T2_);
+
+    if (brueckner_) {
+        T1_sum_["ia"] = T1_["ia"];
+    }
 
     // compute energy, order matters!!!
     double Ept3_1 = compute_energy_pt3_1();
@@ -164,13 +174,18 @@ double SA_MRPT3::compute_energy() {
         outfile->Printf("\n    %-40s = %22.15f", str_dim.first.c_str(), str_dim.second);
     }
     outfile->Printf("\n\n    Notes:");
-    outfile->Printf("\n      3rd-order energy part 1: -1.0 / 12.0 * [[[H0th, "
-                    "A1st], A1st], A1st]");
+    outfile->Printf("\n      3rd-order energy part 1: -1.0 / 12.0 * [[[H0th, A1st], A1st], A1st]");
     outfile->Printf("\n      3rd-order energy part 2: 0.5 * [H1st + Hbar1st, A2nd]");
     outfile->Printf("\n      3rd-order energy part 3: 0.5 * [Hbar2nd, A1st]");
     outfile->Printf("\n      Hbar1st = H1st + [H0th, A1st]");
     outfile->Printf("\n      Hbar2nd = 0.5 * [H1st + Hbar1st, A1st] + [H0th, A2nd]");
 
+    if (brueckner_) {
+        T1_sum_["ia"] += T1_["ia"];
+        brueckner_rotation(T1_sum_);
+    }
+
+    dsrg_time_.print_comm_time();
 
     return Etotal;
 }

@@ -78,6 +78,9 @@ class SA_MRPT3 : public SA_DSRGPT {
     double compute_energy_pt3_2();
     /// 3rd-order energy contribution 0.5 * [Hbar2nd,A1st]
     double compute_energy_pt3_3();
+
+    /// Sum of 1st- and 2nd-order single excitation amplitudes
+    ambit::BlockedTensor T1_sum_;
 };
 } // namespace forte
 

@@ -219,6 +219,8 @@ void SA_MRPT2::check_memory() {
 }
 
 double SA_MRPT2::compute_energy() {
+    dsrg_time_.clear();
+
     // build amplitudes
     compute_t2();
     compute_t1();
@@ -281,6 +283,13 @@ double SA_MRPT2::compute_energy() {
     if (form_Hbar_) {
         compute_hbar();
     }
+
+    // Brueckner rotations
+    if (brueckner_) {
+        brueckner_rotation(T1_);
+    }
+
+    dsrg_time_.print_comm_time();
 
     return Etotal;
 }

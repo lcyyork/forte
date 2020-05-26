@@ -62,8 +62,6 @@ SADSRG::SADSRG(RDMs rdms, std::shared_ptr<SCFInfo> scf_info, std::shared_ptr<For
 }
 
 SADSRG::~SADSRG() {
-    dsrg_time_.print_comm_time();
-
     if (warnings_.size() != 0) {
         print_h2("DSRG Warnings");
 
