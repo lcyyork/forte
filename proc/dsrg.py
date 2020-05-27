@@ -66,7 +66,7 @@ class ProcedureDSRG:
         # Filter out some not implemented solver for Brueckner update
         self.do_brueckner = options.get_bool("DSRG_BRUECKNER")
         self.brueckner_maxiter = options.get_int("DSRG_BRUECKNER_MAXITER")
-        if self.solver_type not in ["SA-MRDSRG", "SA_MRDSRG"]:
+        if self.do_brueckner and self.solver_type not in ["SA-MRDSRG", "SA_MRDSRG"]:
             raise NotImplementedError("Brueckner DSRG only available for spin-adpated implementation.")
 
         # Set up Forte objects
