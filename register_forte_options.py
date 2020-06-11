@@ -734,6 +734,8 @@ def register_dsrg_options(options):
 
     options.add_int("DSRG_DIIS_MAX_VEC", 6, "Maximum size of DIIS vectors")
 
+    options.add_bool("DSRG_ZERO_EFFECTIVE_SINGLES", False, "Zero singles and spectator doubles")
+
     options.add_bool("DSRG_RESTART", True, "Restart DSRG amplitudes from a previous calculation")
 
     options.add_bool("DSRG_READ_AMPS", False, "Read initial amplitudes from files")

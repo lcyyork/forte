@@ -221,6 +221,16 @@ double SA_MRPT2::compute_energy() {
     // build amplitudes
     compute_t2();
     compute_t1();
+
+    if (foptions_->get_bool("DSRG_ZERO_EFFECTIVE_SINGLES")) {
+        for (const std::string& block :
+             {"caaa", "acaa", "caav", "acav", "cava", "acva", "aaav", "aava"}) {
+            T2_.block(block).zero();
+            S2_.block(block).zero();
+        }
+        T1_.zero();
+    }
+
     analyze_amplitudes("First-Order", T1_, T2_);
 
     // scale the integrals

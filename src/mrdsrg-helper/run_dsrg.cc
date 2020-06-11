@@ -86,6 +86,13 @@ std::unique_ptr<MRDSRG_SO> make_dsrg_so_y(RDMs rdms, std::shared_ptr<SCFInfo> sc
     return std::make_unique<MRDSRG_SO>(rdms, scf_info, options, ints, mo_space_info);
 }
 
+std::unique_ptr<OMRPT2_SO> make_omrpt2_so(RDMs rdms, std::shared_ptr<SCFInfo> scf_info,
+                                          std::shared_ptr<ForteOptions> options,
+                                          std::shared_ptr<ForteIntegrals> ints,
+                                          std::shared_ptr<MOSpaceInfo> mo_space_info) {
+    return std::make_unique<OMRPT2_SO>(rdms, scf_info, options, ints, mo_space_info);
+}
+
 std::unique_ptr<SOMRDSRG> make_dsrg_so_f(RDMs rdms, std::shared_ptr<SCFInfo> scf_info,
                                          std::shared_ptr<ForteOptions> options,
                                          std::shared_ptr<ForteIntegrals> ints,
