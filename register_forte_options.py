@@ -94,6 +94,8 @@ def register_driver_options(options):
 
     options.add_bool("DUMP_ORBITALS", False, "Save orbitals to file if true")
 
+    options.add_bool("DUMP_CI_VECTORS", False, "Dump CI vectors to disk")
+
 
 def register_avas_options(options):
     options.set_group("AVAS")

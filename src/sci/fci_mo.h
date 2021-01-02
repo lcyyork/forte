@@ -122,6 +122,15 @@ class FCI_MO : public ActiveSpaceMethod {
                                       std::shared_ptr<ActiveSpaceMethod> method2,
                                       int max_rdm_level) override;
 
+    /// Dump the CI vectors to disk
+    void dump_evecs(const std::string& suffix = "") override;
+
+    /// Load the CI vectors to disk
+    psi::SharedMatrix load_evecs(const std::string& suffix = "") override;
+
+    /// Compute the CI overlap between this and another <this|disk>
+    psi::SharedMatrix overlap_ci_disk(const std::string& suffix = "") override;
+
     [[deprecated]] std::vector<RDMs>
     reference(const std::vector<std::pair<size_t, size_t>>& root_list, int max_rdm_level);
 

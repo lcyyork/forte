@@ -31,6 +31,7 @@ import forte
 import json
 import warnings
 import math
+import numpy as np
 
 
 class ProcedureDSRG:
@@ -114,6 +115,12 @@ class ProcedureDSRG:
         # Compute RDMs from initial ActiveSpaceSolver
         self.rdms = active_space_solver.compute_average_rdms(state_weights_map, self.max_rdm_level)
 
+        # Dump CI vectors to file
+        self.dump_ci = options.get_bool("DUMP_CI_VECTORS") and options.get_str('ACTIVE_SPACE_SOLVER') == "CAS"
+        if self.dump_ci:
+            self.states = sorted(state_weights_map.keys())
+            active_space_solver.dump_ci_vectors(self.states, "0")
+
         # Semi-canonicalize orbitals and rotation matrices
         self.semi = forte.SemiCanonical(mo_space_info, ints, options)
         if self.do_semicanonical:
@@ -194,6 +201,12 @@ class ProcedureDSRG:
             # Solver active space using dressed integrals
             self.active_space_solver.set_active_space_integrals(ints_dressed)
             state_energies_list = self.active_space_solver.compute_energy()
+
+            # Reorder weights if needed
+            if self.dump_ci:
+                self.reorder_weights(n)
+                self.active_space_solver.dump_ci_vectors(self.states, f"{n + 1}")
+
             e_relax = forte.compute_average_state_energy(state_energies_list, self.state_weights_map)
             self.energies.append((e_dsrg, e_relax))
 
@@ -284,6 +297,67 @@ class ProcedureDSRG:
                 self.converged = True
 
         return self.converged
+
+    def reorder_weights(self, n):
+        """ Check CI overlap and reorder weights between consecutive relaxation steps. """
+        overlaps = self.active_space_solver.compute_ci_overlap_disk(self.states, f"{n}")
+
+        for i, state in enumerate(self.states):
+            twice_ms = state.twice_ms()
+            if twice_ms < 0:
+                continue
+
+            check_pass, permutation = self.check_ci_overlap(overlaps[i])
+
+            if not check_pass:
+                msg = "Relaxed states are likely wrong. Please increase the number of roots."
+                warnings.warn(f"{msg}", UserWarning)
+                psi4.core.print_out(f"\n\n  Forte Warning: {msg}")
+                psi4.core.print_out(f"\n\n  ==> Overlap of CI Vectors <{n + 1}|{n}> <==\n\n")
+                overlap.print_out()
+            else:
+                if list(permutation) == list(range(len(permutation))):
+                    continue
+
+                msg = "Weights will be permuted to ensure consistency before and after relaxation."
+                psi4.core.print_out("\n\n  Forte Warning: {msg}")
+
+                weights_old = self.state_weights_map[state]
+                weights_new = [weights_old[i] for i in permutation]
+                self.state_weights_map[state] = weights_new
+
+                psi4.core.print_out(f"\n  ==> Weights for {state} <==\n")
+                psi4.core.print_out(f"\n    Root    Old       New")
+                psi4.core.print_out(f"\n    {'-' * 24}")
+                for i, w_old in enumerate(weights_old):
+                    w_new = weights_new[i]
+                    psi4.core.print_out(f"\n    {i:4d} {w_old:9.3e} {w_new:9.3e}")
+                psi4.core.print_out(f"\n    {'-' * 24}\n")
+
+                # try to fix ms < 0
+                if twice_ms > 0:
+                    state_spin = forte.StateInfo(state.nb(), state.na(),
+                                                 state.multiplicity(),
+                                                 -state.twice_ms(),
+                                                 state.irrep(),
+                                                 state.irrep_label(),
+                                                 state.gas_min(),
+                                                 state.gas_max())
+                    if state_spin in self.state_weights_map:
+                        self.state_weights_map[state_spin] = weights_new
+
+    def check_ci_overlap(self, overlap):
+        """
+        Check the overlap matrix of two sets of CI vectors.
+        :param overlap: the overlap matrix
+        :return: pass or not, the permutation for reordering
+        """
+        s = np.abs(overlap.to_array())
+        max_values = np.max(s, axis=1)
+        permutation = np.argmax(s, axis=1)
+        check_pass = len(permutation) == len(set(permutation)) and \
+                     np.all(max_values > 0.5)
+        return check_pass, permutation
 
     def print_summary(self):
         """ Print energies and dipole moment to output file. """

@@ -84,7 +84,8 @@ void export_Localize(py::module& m);
 /// Export the ActiveSpaceMethod class
 void export_ActiveSpaceMethod(py::module& m) {
     py::class_<ActiveSpaceMethod>(m, "ActiveSpaceMethod")
-        .def("compute_energy", &ActiveSpaceMethod::compute_energy);
+        .def("compute_energy", &ActiveSpaceMethod::compute_energy)
+        .def("overlap_ci_disk", &ActiveSpaceMethod::overlap_ci_disk);
 }
 
 void export_ActiveSpaceSolver(py::module& m) {
@@ -96,6 +97,9 @@ void export_ActiveSpaceSolver(py::module& m) {
              "Solve the contracted CI eigenvalue problem using given integrals")
         .def("compute_average_rdms", &ActiveSpaceSolver::compute_average_rdms,
              "Compute the weighted average reference")
+        .def("dump_ci_vectors", &ActiveSpaceSolver::dump_ci_vectors, "Dump CI vectors to disk")
+        .def("compute_ci_overlap_disk", &ActiveSpaceSolver::compute_ci_overlap_disk,
+             "Compute the overlap between two CI vectors (same orbitals) from disk")
         .def("set_active_space_integrals", &ActiveSpaceSolver::set_active_space_integrals,
              "Set the active space integrals manually");
 

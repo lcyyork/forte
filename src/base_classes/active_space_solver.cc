@@ -154,6 +154,28 @@ std::vector<RDMs> ActiveSpaceSolver::rdms(
     return refs;
 }
 
+void ActiveSpaceSolver::dump_ci_vectors(const std::vector<StateInfo>& states,
+                                        const std::string& suffix) {
+    for (const auto& state : states) {
+        if (ms_avg_ and state.twice_ms() < 0)
+            continue;
+        state_method_map_[state]->dump_evecs(suffix);
+    }
+}
+
+std::vector<psi::SharedMatrix>
+ActiveSpaceSolver::compute_ci_overlap_disk(const std::vector<StateInfo>& states,
+                                           const std::string& suffix) {
+    std::vector<psi::SharedMatrix> out;
+    for (const auto& state : states) {
+        if (ms_avg_ and state.twice_ms() < 0)
+            out.push_back(std::make_shared<psi::Matrix>("Overlap (Empty for Ms < 0)"));
+        else
+            out.push_back(state_method_map_[state]->overlap_ci_disk(suffix));
+    }
+    return out;
+}
+
 void ActiveSpaceSolver::print_options() {
     print_h2("Summary of Active Space Solver Input");
 
@@ -413,7 +435,7 @@ make_state_weights_map(std::shared_ptr<ForteOptions> options,
     }
 
     return state_weights_map_ms_avg;
-} // namespace forte
+}
 
 RDMs ActiveSpaceSolver::compute_average_rdms(
     const std::map<StateInfo, std::vector<double>>& state_weights_map, int max_rdm_level) {

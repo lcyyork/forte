@@ -29,8 +29,9 @@
 #ifndef _active_space_solver_h_
 #define _active_space_solver_h_
 
-#include <vector>
+#include <map>
 #include <string>
+#include <vector>
 
 #include "psi4/libmints/matrix.h"
 
@@ -97,13 +98,15 @@ class ActiveSpaceSolver {
     RDMs compute_average_rdms(const std::map<StateInfo, std::vector<double>>& state_weights_map,
                               int max_rdm_level);
 
+    /// Dump the CI vectors to dick
+    void dump_ci_vectors(const std::vector<StateInfo>& states, const std::string& suffix = "");
+
+    /// Compute the overlap between the current CI vectors and those from disk (same orbitals)
+    std::vector<psi::SharedMatrix> compute_ci_overlap_disk(const std::vector<StateInfo>& states,
+                                                           const std::string& suffix);
+
     /// Print a summary of the computation information
     void print_options();
-
-    /// Return a map of StateInfo to the computed nroots of energies
-    const std::map<StateInfo, std::vector<double>>& state_energies_map() const {
-        return state_energies_map_;
-    }
 
     /// Pass a set of ActiveSpaceIntegrals to the solver (e.g. an effective Hamiltonian)
     /// @param as_ints the pointer to a set of acitve-space integrals

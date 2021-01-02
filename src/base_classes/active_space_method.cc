@@ -50,6 +50,38 @@ ActiveSpaceMethod::ActiveSpaceMethod(StateInfo state, size_t nroot,
     core_mo_ = as_ints_->restricted_docc_mo();
 }
 
+std::string ActiveSpaceMethod::file_name_evecs(const std::string& suffix) {
+    if (not solver_name_.size()) {
+        throw std::runtime_error("CI solver name has not been specified by the derived class.");
+    }
+
+    std::vector<std::string> name_vecs{solver_name_, state_.irrep_label(),
+                                       state_.multiplicity_label() + std::to_string(state_.twice_ms())};
+    if (suffix.size()) {
+        name_vecs.push_back(suffix);
+    }
+
+    std::string out = "forte";
+    for (const std::string& s : name_vecs) {
+        out += "." + s;
+    }
+    out += ".dat";
+
+    return out;
+}
+
+void ActiveSpaceMethod::dump_evecs(const std::string&) {
+    throw std::runtime_error("Method not yet implemented for the derived class.");
+}
+
+psi::SharedMatrix ActiveSpaceMethod::load_evecs(const std::string&) {
+    throw std::runtime_error("Method not yet implemented for the derived class.");
+}
+
+psi::SharedMatrix ActiveSpaceMethod::overlap_ci_disk(const std::string&) {
+    throw std::runtime_error("Method not yet implemented for the derived class.");
+}
+
 void ActiveSpaceMethod::set_active_space_integrals(std::shared_ptr<ActiveSpaceIntegrals> as_ints) {
     as_ints_ = as_ints;
 }
@@ -75,9 +107,6 @@ std::unique_ptr<ActiveSpaceMethod> make_active_space_method(
     if (type == "FCI") {
         solver = std::make_unique<FCISolver>(state, nroot, mo_space_info, as_ints);
     } else if (type == "ACI") {
-        //        solver =
-        //            std::make_unique<AdaptiveCI>(state, nroot, scf_info, options, mo_space_info,
-        //            as_ints);
         solver = std::make_unique<ExcitedStateSolver>(
             state, nroot, mo_space_info, as_ints,
             std::make_unique<AdaptiveCI>(state, nroot, scf_info, options, mo_space_info, as_ints));

@@ -33,6 +33,7 @@
 #include <unordered_set>
 
 #include "base_classes/state_info.h"
+#include "psi4/libmints/matrix.h"
 #include "psi4/libmints/vector.h"
 
 namespace forte {
@@ -131,6 +132,18 @@ class ActiveSpaceMethod {
     /// @param options the options passed in
     virtual void set_options(std::shared_ptr<ForteOptions> options) = 0;
 
+    /// File name for storing CI vectors
+    std::string file_name_evecs(const std::string& suffix = "");
+
+    /// Dump the CI vectors to disk
+    virtual void dump_evecs(const std::string& suffix = "");
+
+    /// Load the CI vectors form disk
+    virtual psi::SharedMatrix load_evecs(const std::string& suffix = "");
+
+    /// Compute the overlap between another set of CI vectors read from disk <this|disk>
+    virtual psi::SharedMatrix overlap_ci_disk(const std::string& suffix = "");
+
     // ==> Base Class Functionality (inherited by derived classes) <==
 
     /// Pass a set of ActiveSpaceIntegrals to the solver (e.g. an effective Hamiltonian)
@@ -208,6 +221,9 @@ class ActiveSpaceMethod {
 
     /// The energies (including nuclear repulsion) of all the states
     std::vector<double> energies_;
+
+    /// The derived class name for generating a file name to store CI vectors
+    std::string solver_name_ = "";
 };
 
 /**

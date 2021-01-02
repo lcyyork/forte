@@ -161,6 +161,8 @@ void FCI_MO::startup() {
     if (ipea_ != "NONE") {
         compute_orbital_extents();
     }
+
+    solver_name_ = "detci";
 }
 
 void FCI_MO::read_options() {
@@ -1905,6 +1907,47 @@ d3 FCI_MO::compute_orbital_extents() {
     }
 
     return orb_extents;
+}
+
+void FCI_MO::dump_evecs(const std::string& suffix) {
+    size_t ndet = determinant_.size();
+    size_t nroots = eigen_.size();
+
+    auto evecs = std::make_shared<psi::Matrix>("evecs", ndet, nroots);
+
+    for (size_t i = 0; i < nroots; ++i) {
+        evecs->set_column(0, i, eigen_[i].first);
+    }
+
+    evecs->save(file_name_evecs(suffix), false, false, true);
+}
+
+psi::SharedMatrix FCI_MO::load_evecs(const std::string& suffix) {
+    size_t ndet = determinant_.size();
+    size_t nroots = eigen_.size();
+
+    auto evecs = std::make_shared<psi::Matrix>("evecs", ndet, nroots);
+
+    evecs->load(file_name_evecs(suffix));
+
+    return evecs;
+}
+
+psi::SharedMatrix FCI_MO::overlap_ci_disk(const std::string& suffix) {
+    size_t nroots = eigen_.size();
+
+    auto evecs_1 = std::make_shared<psi::Matrix>("evecs", determinant_.size(), nroots);
+
+    for (size_t i = 0; i < nroots; ++i) {
+        evecs_1->set_column(0, i, eigen_[i].first);
+    }
+
+    auto evecs_2 = load_evecs(suffix);
+
+    auto s = psi::linalg::doublet(evecs_1, evecs_2, true, false);
+    s->set_name("Overlap CI " + state_.str());
+
+    return s;
 }
 
 std::vector<RDMs> FCI_MO::rdms(const std::vector<std::pair<size_t, size_t>>& root_list,
