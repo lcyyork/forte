@@ -320,7 +320,7 @@ class ProcedureDSRG:
                     continue
 
                 msg = "Weights will be permuted to ensure consistency before and after relaxation."
-                psi4.core.print_out("\n\n  Forte Warning: {msg}")
+                psi4.core.print_out(f"\n\n  Forte Warning: {msg}")
 
                 weights_old = self.state_weights_map[state]
                 weights_new = [weights_old[i] for i in permutation]
