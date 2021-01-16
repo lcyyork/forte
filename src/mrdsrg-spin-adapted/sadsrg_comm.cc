@@ -243,11 +243,15 @@ void SADSRG::H2_T1_C1(BlockedTensor& H2, BlockedTensor& T1, const double& alpha,
     C1["qp"] += 2.0 * alpha * T1["ma"] * H2["qapm"];
     C1["qp"] -= alpha * T1["ma"] * H2["aqpm"];
 
-    C1["qp"] += alpha * T1["xe"] * L1_["yx"] * H2["qepy"];
-    C1["qp"] -= 0.5 * alpha * T1["xe"] * L1_["yx"] * H2["eqpy"];
+    auto temp = ambit::BlockedTensor::build(tensor_type_, "temp_211", {"av"});
+    temp["ye"] = T1["xe"] * L1_["yx"];
+    C1["qp"] += alpha * temp["ye"] * H2["qepy"];
+    C1["qp"] -= 0.5 * alpha * temp["ye"] * H2["eqpy"];
 
-    C1["qp"] -= alpha * T1["mu"] * L1_["uv"] * H2["qvpm"];
-    C1["qp"] += 0.5 * alpha * T1["mu"] * L1_["uv"] * H2["vqpm"];
+    temp = ambit::BlockedTensor::build(tensor_type_, "temp_211", {"ca"});
+    temp["mv"] = T1["mu"] * L1_["uv"];
+    C1["qp"] -= alpha * temp["mv"] * H2["qvpm"];
+    C1["qp"] += 0.5 * alpha * temp["mv"] * H2["vqpm"];
 
     if (print_ > 2) {
         outfile->Printf("\n    Time for [H2, T1] -> C1 : %12.3f", timer.get());
