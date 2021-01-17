@@ -263,45 +263,50 @@ void SADSRG::H2_T2_C1(BlockedTensor& H2, BlockedTensor& T2, BlockedTensor& S2, c
                       BlockedTensor& C1) {
     local_timer timer;
 
-    // [Hbar2, T2] (C_2)^3 -> C1 particle contractions
+    // [Hbar2, T2] (C_2)^3 and C_4 * C_2 -> C1 particle contractions
     C1["ir"] += alpha * H2["abrm"] * S2["imab"];
 
     C1["ir"] += 0.5 * alpha * L1_["uv"] * S2["ivab"] * H2["abru"];
 
-    C1["ir"] += 0.25 * alpha * S2["ijux"] * L1_["xy"] * L1_["uv"] * H2["vyrj"];
-
     C1["ir"] -= 0.5 * alpha * L1_["uv"] * S2["imub"] * H2["vbrm"];
     C1["ir"] -= 0.5 * alpha * L1_["uv"] * S2["miub"] * H2["bvrm"];
 
-    C1["ir"] -= 0.25 * alpha * S2["iyub"] * L1_["uv"] * L1_["xy"] * H2["vbrx"];
-    C1["ir"] -= 0.25 * alpha * S2["iybu"] * L1_["uv"] * L1_["xy"] * H2["bvrx"];
+    auto temp = ambit::BlockedTensor::build(tensor_type_, "temp_221", {"aaaa"});
+    temp["uvxy"] = L2_["uvxy"];
+    temp["uvxy"] += L1_["ux"] * L1_["vy"];
+    temp["uvxy"] -= 0.5 * L1_["uy"] * L1_["vx"];
+    C1["ir"] += 0.5 * alpha * T2["ijxy"] * H2["uvrj"] * temp["xyuv"];
 
-    // [Hbar2, T2] C_4 C_2 2:2 -> C1 ir
-    C1["ir"] += 0.5 * alpha * T2["ijxy"] * L2_["xyuv"] * H2["uvrj"];
+    temp["xyuv"] = L2_["xyuv"];
+    temp["xyuv"] -= 0.5 * L1_["xv"] * L1_["yu"];
+    C1["ir"] += 0.5 * alpha * H2["aurx"] * S2["ivay"] * temp["xyuv"];
+    C1["ir"] -= 0.5 * alpha * H2["uarx"] * T2["ivay"] * temp["xyuv"];
 
-    C1["ir"] += 0.5 * alpha * H2["aurx"] * S2["ivay"] * L2_["xyuv"];
-    C1["ir"] -= 0.5 * alpha * H2["uarx"] * T2["ivay"] * L2_["xyuv"];
-    C1["ir"] -= 0.5 * alpha * H2["uarx"] * T2["ivya"] * L2_["xyvu"];
+    temp["xyvu"] = L2_["xyvu"];
+    temp["xyvu"] += L1_["xv"] * L1_["yu"];
+    C1["ir"] -= 0.5 * alpha * H2["uarx"] * T2["ivya"] * temp["xyvu"];
 
-    // [Hbar2, T2] (C_2)^3 -> C1 hole contractions
+    // [Hbar2, T2] (C_2)^3 and C_4 C_2 -> C1 hole contractions
     C1["pa"] -= alpha * H2["peij"] * S2["ijae"];
 
     C1["pa"] -= 0.5 * alpha * Eta1_["uv"] * S2["ijau"] * H2["pvij"];
 
-    C1["pa"] -= 0.25 * alpha * S2["vyab"] * Eta1_["uv"] * Eta1_["xy"] * H2["pbux"];
-
     C1["pa"] += 0.5 * alpha * Eta1_["uv"] * S2["vjae"] * H2["peuj"];
     C1["pa"] += 0.5 * alpha * Eta1_["uv"] * S2["jvae"] * H2["peju"];
 
-    C1["pa"] += 0.25 * alpha * S2["vjax"] * Eta1_["uv"] * Eta1_["xy"] * H2["pyuj"];
-    C1["pa"] += 0.25 * alpha * S2["jvax"] * Eta1_["xy"] * Eta1_["uv"] * H2["pyju"];
+    temp["xyuv"] = L2_["xyuv"];
+    temp["xyuv"] += Eta1_["xu"] * Eta1_["yv"];
+    temp["xyuv"] -= 0.5 * Eta1_["xv"] * Eta1_["yu"];
+    C1["pa"] -= 0.5 * alpha * H2["pbxy"] * T2["uvab"] * temp["xyuv"];
 
-    // [Hbar2, T2] C_4 C_2 2:2 -> C1 pa
-    C1["pa"] -= 0.5 * alpha * L2_["xyuv"] * T2["uvab"] * H2["pbxy"];
+    temp["xyuv"] = L2_["xyuv"];
+    temp["xyuv"] -= 0.5 * Eta1_["xv"] * Eta1_["yu"];
+    C1["pa"] -= 0.5 * alpha * H2["puix"] * S2["ivay"] * temp["xyuv"];
+    C1["pa"] += 0.5 * alpha * H2["puxi"] * T2["ivay"] * temp["xyuv"];
 
-    C1["pa"] -= 0.5 * alpha * H2["puix"] * S2["ivay"] * L2_["xyuv"];
-    C1["pa"] += 0.5 * alpha * H2["puxi"] * T2["ivay"] * L2_["xyuv"];
-    C1["pa"] += 0.5 * alpha * H2["puxi"] * T2["viay"] * L2_["xyvu"];
+    temp["xyvu"] = L2_["xyvu"];
+    temp["xyvu"] += Eta1_["xv"] * Eta1_["yu"];
+    C1["pa"] += 0.5 * alpha * H2["puxi"] * T2["viay"] * temp["xyvu"];
 
     // [Hbar2, T2] C_4 C_2 1:3 -> C1
     C1["jb"] += 0.5 * alpha * H2["avxy"] * S2["ujab"] * L2_["xyuv"];
