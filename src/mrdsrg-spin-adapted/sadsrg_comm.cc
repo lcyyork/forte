@@ -243,12 +243,12 @@ void SADSRG::H2_T1_C1(BlockedTensor& H2, BlockedTensor& T1, const double& alpha,
     C1["qp"] += 2.0 * alpha * T1["ma"] * H2["qapm"];
     C1["qp"] -= alpha * T1["ma"] * H2["aqpm"];
 
-    auto temp = ambit::BlockedTensor::build(tensor_type_, "temp_211", {"av"});
+    auto temp = ambit::BlockedTensor::build(tensor_type_, "temp211", {"av"});
     temp["ye"] = T1["xe"] * L1_["yx"];
     C1["qp"] += alpha * temp["ye"] * H2["qepy"];
     C1["qp"] -= 0.5 * alpha * temp["ye"] * H2["eqpy"];
 
-    temp = ambit::BlockedTensor::build(tensor_type_, "temp_211", {"ca"});
+    temp = ambit::BlockedTensor::build(tensor_type_, "temp211", {"ca"});
     temp["mv"] = T1["mu"] * L1_["uv"];
     C1["qp"] -= alpha * temp["mv"] * H2["qvpm"];
     C1["qp"] += 0.5 * alpha * temp["mv"] * H2["vqpm"];
@@ -263,7 +263,7 @@ void SADSRG::H2_T2_C1(BlockedTensor& H2, BlockedTensor& T2, BlockedTensor& S2, c
                       BlockedTensor& C1) {
     local_timer timer;
 
-    // [Hbar2, T2] (C_2)^3 and C_4 * C_2 -> C1 particle contractions
+    // [Hbar2, T2] (C_2)^3 and C_4 * C_2 2:2 -> C1 particle contractions
     C1["ir"] += alpha * H2["abrm"] * S2["imab"];
 
     C1["ir"] += 0.5 * alpha * L1_["uv"] * S2["ivab"] * H2["abru"];
@@ -271,7 +271,7 @@ void SADSRG::H2_T2_C1(BlockedTensor& H2, BlockedTensor& T2, BlockedTensor& S2, c
     C1["ir"] -= 0.5 * alpha * L1_["uv"] * S2["imub"] * H2["vbrm"];
     C1["ir"] -= 0.5 * alpha * L1_["uv"] * S2["miub"] * H2["bvrm"];
 
-    auto temp = ambit::BlockedTensor::build(tensor_type_, "temp_221", {"aaaa"});
+    auto temp = ambit::BlockedTensor::build(tensor_type_, "temp221G2", {"aaaa"});
     temp["uvxy"] = L2_["uvxy"];
     temp["uvxy"] += L1_["ux"] * L1_["vy"];
     temp["uvxy"] -= 0.5 * L1_["uy"] * L1_["vx"];
@@ -286,7 +286,7 @@ void SADSRG::H2_T2_C1(BlockedTensor& H2, BlockedTensor& T2, BlockedTensor& S2, c
     temp["xyvu"] += L1_["xv"] * L1_["yu"];
     C1["ir"] -= 0.5 * alpha * H2["uarx"] * T2["ivya"] * temp["xyvu"];
 
-    // [Hbar2, T2] (C_2)^3 and C_4 C_2 -> C1 hole contractions
+    // [Hbar2, T2] (C_2)^3 and C_4 * C_2 2:2 -> C1 hole contractions
     C1["pa"] -= alpha * H2["peij"] * S2["ijae"];
 
     C1["pa"] -= 0.5 * alpha * Eta1_["uv"] * S2["ijau"] * H2["pvij"];
@@ -558,51 +558,56 @@ void SADSRG::V_T2_C1_DF(BlockedTensor& B, BlockedTensor& T2, BlockedTensor& S2, 
                         BlockedTensor& C1) {
     local_timer timer;
 
-    // [Hbar2, T2] (C_2)^3 -> C1 particle contractions
+    // [Hbar2, T2] (C_2)^3 and C_4 * C_2 2:2 -> C1 particle contractions
     auto temp = ambit::BlockedTensor::build(tensor_type_, "DFtemp221", {"Lhp"});
 
     temp["gia"] += alpha * B["gbm"] * S2["imab"];
 
     temp["gia"] += 0.5 * alpha * L1_["uv"] * S2["ivab"] * B["gbu"];
 
-    temp["giv"] += 0.25 * alpha * S2["ijux"] * L1_["xy"] * L1_["uv"] * B["gyj"];
-
     temp["giv"] -= 0.5 * alpha * L1_["uv"] * S2["imub"] * B["gbm"];
     temp["gia"] -= 0.5 * alpha * L1_["uv"] * S2["miua"] * B["gvm"];
 
-    temp["giv"] -= 0.25 * alpha * S2["iyub"] * L1_["uv"] * L1_["xy"] * B["gbx"];
-    temp["gia"] -= 0.25 * alpha * S2["iyau"] * L1_["uv"] * L1_["xy"] * B["gvx"];
+    auto G2 = ambit::BlockedTensor::build(tensor_type_, "DFtemp221G2", {"aaaa"});
+    G2["xyuv"] = L2_["xyuv"];
+    G2["xyuv"] += L1_["xu"] * L1_["yv"];
+    G2["xyuv"] -= 0.5 * L1_["yu"] * L1_["xv"];
+    temp["giu"] += 0.5 * alpha * T2["ijxy"] * G2["xyuv"] * B["gvj"];
 
-    // [Hbar2, T2] C_4 C_2 2:2 -> C1 ir
-    temp["giu"] += 0.5 * alpha * T2["ijxy"] * L2_["xyuv"] * B["gvj"];
+    G2["xyuv"] = L2_["xyuv"];
+    G2["xyuv"] -= 0.5 * L1_["xv"] * L1_["yu"];
+    temp["gia"] += 0.5 * alpha * B["gux"] * S2["ivay"] * G2["xyuv"];
+    temp["giu"] -= 0.5 * alpha * B["gax"] * T2["ivay"] * G2["xyuv"];
 
-    temp["gia"] += 0.5 * alpha * B["gux"] * S2["ivay"] * L2_["xyuv"];
-    temp["giu"] -= 0.5 * alpha * B["gax"] * T2["ivay"] * L2_["xyuv"];
-    temp["giu"] -= 0.5 * alpha * B["gax"] * T2["ivya"] * L2_["xyvu"];
+    G2["xyvu"] = L2_["xyvu"];
+    G2["xyvu"] += L1_["xv"] * L1_["yu"];
+    temp["giu"] -= 0.5 * alpha * B["gax"] * T2["ivya"] * G2["xyvu"];
 
     C1["ir"] += temp["gia"] * B["gar"];
 
-    // [Hbar2, T2] (C_2)^3 -> C1 hole contractions
+    // [Hbar2, T2] (C_2)^3 and C_4 * C_2 2:2 -> C1 hole contractions
     temp.zero();
 
     temp["gia"] -= alpha * B["gej"] * S2["ijae"];
 
     temp["gia"] -= 0.5 * alpha * Eta1_["uv"] * S2["ijau"] * B["gvj"];
 
-    temp["gua"] -= 0.25 * alpha * S2["vyab"] * Eta1_["uv"] * Eta1_["xy"] * B["gbx"];
-
     temp["gua"] += 0.5 * alpha * Eta1_["uv"] * S2["vjae"] * B["gej"];
     temp["gia"] += 0.5 * alpha * Eta1_["uv"] * S2["ivae"] * B["geu"];
 
-    temp["gua"] += 0.25 * alpha * S2["vjax"] * Eta1_["uv"] * Eta1_["xy"] * B["gyj"];
-    temp["gia"] += 0.25 * alpha * S2["ivax"] * Eta1_["xy"] * Eta1_["uv"] * B["gyu"];
+    G2["xyuv"] = L2_["xyuv"];
+    G2["xyuv"] += Eta1_["xu"] * Eta1_["yv"];
+    G2["xyuv"] -= 0.5 * Eta1_["xv"] * Eta1_["yu"];
+    temp["gxa"] -= 0.5 * alpha * G2["xyuv"] * T2["uvab"] * B["gby"];
 
-    // [Hbar2, T2] C_4 C_2 2:2 -> C1 pa
-    temp["gxa"] -= 0.5 * alpha * L2_["xyuv"] * T2["uvab"] * B["gby"];
+    G2["xyuv"] = L2_["xyuv"];
+    G2["xyuv"] -= 0.5 * Eta1_["xv"] * Eta1_["yu"];
+    temp["gia"] -= 0.5 * alpha * B["gux"] * S2["ivay"] * G2["xyuv"];
+    temp["gxa"] += 0.5 * alpha * B["gui"] * T2["ivay"] * G2["xyuv"];
 
-    temp["gia"] -= 0.5 * alpha * B["gux"] * S2["ivay"] * L2_["xyuv"];
-    temp["gxa"] += 0.5 * alpha * B["gui"] * T2["ivay"] * L2_["xyuv"];
-    temp["gxa"] += 0.5 * alpha * B["gui"] * T2["viay"] * L2_["xyvu"];
+    G2["xyvu"] = L2_["xyvu"];
+    G2["xyvu"] += Eta1_["xv"] * Eta1_["yu"];
+    temp["gxa"] += 0.5 * alpha * B["gui"] * T2["viay"] * G2["xyvu"];
 
     C1["pa"] += temp["gia"] * B["gpi"];
 
