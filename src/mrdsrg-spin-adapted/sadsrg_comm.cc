@@ -374,40 +374,98 @@ void SADSRG::H2_T2_C2(BlockedTensor& H2, BlockedTensor& T2, BlockedTensor& S2, c
     C2["qpba"] -= 0.5 * alpha * Eta1_["xy"] * T2["yjab"] * H2["pqxj"];
 
     // hole-particle contractions
-    std::vector<std::string> blocks;
+    std::unordered_set<std::string> qjsb, jqbs, jqsb, qjbs;
     for (const std::string& block : C2.block_labels()) {
-        if (block.substr(1, 1) == virt_label_ or block.substr(3, 1) == core_label_)
-            continue;
-        else
-            blocks.push_back(block);
+        if (block.substr(1, 1) != virt_label_ and block.substr(3, 1) != core_label_) {
+            qjsb.insert(block);
+        }
+        if (block.substr(0, 1) != virt_label_ and block.substr(2, 1) != core_label_) {
+            jqbs.insert(block);
+        }
+        if (block.substr(0, 1) != virt_label_ and block.substr(3, 1) != core_label_) {
+            jqsb.insert(block);
+        }
+        if (block.substr(1, 1) != virt_label_ and block.substr(2, 1) != core_label_) {
+            qjbs.insert(block);
+        }
     }
 
-    auto temp = ambit::BlockedTensor::build(tensor_type_, "temp", blocks);
-    temp["qjsb"] += alpha * H2["aqms"] * S2["mjab"];
-    temp["qjsb"] -= alpha * H2["aqsm"] * T2["mjab"];
-    temp["qjsb"] += 0.5 * alpha * L1_["xy"] * S2["yjab"] * H2["aqxs"];
-    temp["qjsb"] -= 0.5 * alpha * L1_["xy"] * T2["yjab"] * H2["aqsx"];
-    temp["qjsb"] -= 0.5 * alpha * L1_["xy"] * S2["ijxb"] * H2["yqis"];
-    temp["qjsb"] += 0.5 * alpha * L1_["xy"] * T2["ijxb"] * H2["yqsi"];
+    auto pqrs_in_qpsr = [&](const std::unordered_set<std::string>& pqrs,
+                            const std::unordered_set<std::string>& qpsr) {
+        if (pqrs.size() > qpsr.size())
+            return false;
 
-    C2["qjsb"] += temp["qjsb"];
-    C2["jqbs"] += temp["qjsb"];
+        return std::all_of(pqrs.begin(), pqrs.end(), [&](const std::string& block) {
+            auto s0 = block.substr(0, 1);
+            auto s1 = block.substr(1, 1);
+            auto s2 = block.substr(2, 1);
+            auto s3 = block.substr(3, 1);
+            return qpsr.find(s1 + s0 + s3 + s2) != qpsr.end();
+        });
+    };
 
-    blocks.clear();
-    for (const std::string& block : C2.block_labels()) {
-        if (block.substr(0, 1) == virt_label_ or block.substr(3, 1) == core_label_)
-            continue;
-        else
-            blocks.push_back(block);
+    // jqbs and qjsb
+    auto compute_qjsb = [&](BlockedTensor& H2, BlockedTensor& T2, BlockedTensor& S2,
+                            const double& alpha, BlockedTensor& C2, const std::string& indices) {
+        C2[indices] += alpha * H2["aqms"] * S2["mjab"];
+        C2[indices] -= alpha * H2["aqsm"] * T2["mjab"];
+        C2[indices] += 0.5 * alpha * L1_["xy"] * S2["yjab"] * H2["aqxs"];
+        C2[indices] -= 0.5 * alpha * L1_["xy"] * T2["yjab"] * H2["aqsx"];
+        C2[indices] -= 0.5 * alpha * L1_["xy"] * S2["ijxb"] * H2["yqis"];
+        C2[indices] += 0.5 * alpha * L1_["xy"] * T2["ijxb"] * H2["yqsi"];
+    };
+
+    // decide which one to compute or both for qjsb and jqbs
+    if (pqrs_in_qpsr(jqbs, qjsb)) { // qjsb contains jqbs
+        std::vector<std::string> blocks(qjsb.begin(), qjsb.end());
+        auto temp = ambit::BlockedTensor::build(tensor_type_, "temp", blocks);
+
+        compute_qjsb(H2, T2, S2, alpha, temp, "qjsb");
+        C2["qjsb"] += temp["qjsb"];
+        C2["jqbs"] += temp["qjsb"];
+    } else {
+        if (pqrs_in_qpsr(qjsb, jqbs)) { // jqbs contains qjsb
+            std::vector<std::string> blocks(jqbs.begin(), jqbs.end());
+            auto temp = ambit::BlockedTensor::build(tensor_type_, "temp", blocks);
+
+            compute_qjsb(H2, T2, S2, alpha, temp, "jqbs");
+            C2["jqbs"] += temp["jqbs"];
+            C2["qjsb"] += temp["jqbs"];
+        } else {
+            compute_qjsb(H2, T2, S2, alpha, C2, "qjsb");
+            compute_qjsb(H2, T2, S2, alpha, C2, "jqbs");
+        }
     }
 
-    temp = ambit::BlockedTensor::build(tensor_type_, "temp", blocks);
-    temp["jqsb"] -= alpha * H2["aqsm"] * T2["mjba"];
-    temp["jqsb"] -= 0.5 * alpha * L1_["xy"] * T2["yjba"] * H2["aqsx"];
-    temp["jqsb"] += 0.5 * alpha * L1_["xy"] * T2["ijbx"] * H2["yqsi"];
+    // jqsb and qjbs
+    auto compute_jqsb = [&](BlockedTensor& H2, BlockedTensor& T2, const double& alpha,
+                            BlockedTensor& C2, const std::string& indices) {
+        C2[indices] -= alpha * H2["aqsm"] * T2["mjba"];
+        C2[indices] -= 0.5 * alpha * L1_["xy"] * T2["yjba"] * H2["aqsx"];
+        C2[indices] += 0.5 * alpha * L1_["xy"] * T2["ijbx"] * H2["yqsi"];
+    };
 
-    C2["jqsb"] += temp["jqsb"];
-    C2["qjbs"] += temp["jqsb"];
+    // decide which one to compute or both for jqsb and qjbs
+    if (pqrs_in_qpsr(qjbs, jqsb)) { // jqsb contains qjbs
+        std::vector<std::string> blocks(jqsb.begin(), jqsb.end());
+        auto temp = ambit::BlockedTensor::build(tensor_type_, "temp", blocks);
+
+        compute_jqsb(H2, T2, alpha, temp, "jqsb");
+        C2["jqsb"] += temp["jqsb"];
+        C2["qjbs"] += temp["jqsb"];
+    } else {
+        if (pqrs_in_qpsr(jqsb, qjbs)) { // qjbs contains jqsb
+            std::vector<std::string> blocks(qjbs.begin(), qjbs.end());
+            auto temp = ambit::BlockedTensor::build(tensor_type_, "temp", blocks);
+
+            compute_jqsb(H2, T2, alpha, temp, "qjbs");
+            C2["qjbs"] += temp["qjbs"];
+            C2["jqsb"] += temp["qjbs"];
+        } else {
+            compute_jqsb(H2, T2, alpha, C2, "jqsb");
+            compute_jqsb(H2, T2, alpha, C2, "qjbs");
+        }
+    }
 
     if (print_ > 2) {
         outfile->Printf("\n    Time for [H2, T2] -> C2 : %12.3f", timer.get());
