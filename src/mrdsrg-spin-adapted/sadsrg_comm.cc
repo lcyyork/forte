@@ -274,6 +274,8 @@ void SADSRG::H2_T2_C1(BlockedTensor& H2, BlockedTensor& T2, BlockedTensor& S2, c
     auto temp = ambit::BlockedTensor::build(tensor_type_, "temp221G2", {"aaaa"});
     temp["uvxy"] = L2_["uvxy"];
     temp["uvxy"] += L1_["ux"] * L1_["vy"];
+    C1["ir"] -= 0.5 * alpha * H2["uarx"] * T2["ivya"] * temp["xyvu"];
+
     temp["uvxy"] -= 0.5 * L1_["uy"] * L1_["vx"];
     C1["ir"] += 0.5 * alpha * T2["ijxy"] * H2["uvrj"] * temp["xyuv"];
 
@@ -281,10 +283,6 @@ void SADSRG::H2_T2_C1(BlockedTensor& H2, BlockedTensor& T2, BlockedTensor& S2, c
     temp["xyuv"] -= 0.5 * L1_["xv"] * L1_["yu"];
     C1["ir"] += 0.5 * alpha * H2["aurx"] * S2["ivay"] * temp["xyuv"];
     C1["ir"] -= 0.5 * alpha * H2["uarx"] * T2["ivay"] * temp["xyuv"];
-
-    temp["xyvu"] = L2_["xyvu"];
-    temp["xyvu"] += L1_["xv"] * L1_["yu"];
-    C1["ir"] -= 0.5 * alpha * H2["uarx"] * T2["ivya"] * temp["xyvu"];
 
     // [Hbar2, T2] (C_2)^3 and C_4 * C_2 2:2 -> C1 hole contractions
     C1["pa"] -= alpha * H2["peij"] * S2["ijae"];
@@ -296,6 +294,8 @@ void SADSRG::H2_T2_C1(BlockedTensor& H2, BlockedTensor& T2, BlockedTensor& S2, c
 
     temp["xyuv"] = L2_["xyuv"];
     temp["xyuv"] += Eta1_["xu"] * Eta1_["yv"];
+    C1["pa"] += 0.5 * alpha * H2["puxi"] * T2["viay"] * temp["xyvu"];
+
     temp["xyuv"] -= 0.5 * Eta1_["xv"] * Eta1_["yu"];
     C1["pa"] -= 0.5 * alpha * H2["pbxy"] * T2["uvab"] * temp["xyuv"];
 
@@ -303,10 +303,6 @@ void SADSRG::H2_T2_C1(BlockedTensor& H2, BlockedTensor& T2, BlockedTensor& S2, c
     temp["xyuv"] -= 0.5 * Eta1_["xv"] * Eta1_["yu"];
     C1["pa"] -= 0.5 * alpha * H2["puix"] * S2["ivay"] * temp["xyuv"];
     C1["pa"] += 0.5 * alpha * H2["puxi"] * T2["ivay"] * temp["xyuv"];
-
-    temp["xyvu"] = L2_["xyvu"];
-    temp["xyvu"] += Eta1_["xv"] * Eta1_["yu"];
-    C1["pa"] += 0.5 * alpha * H2["puxi"] * T2["viay"] * temp["xyvu"];
 
     // [Hbar2, T2] C_4 C_2 1:3 -> C1
     C1["jb"] += 0.5 * alpha * H2["avxy"] * S2["ujab"] * L2_["xyuv"];
@@ -571,17 +567,15 @@ void SADSRG::V_T2_C1_DF(BlockedTensor& B, BlockedTensor& T2, BlockedTensor& S2, 
     auto G2 = ambit::BlockedTensor::build(tensor_type_, "DFtemp221G2", {"aaaa"});
     G2["xyuv"] = L2_["xyuv"];
     G2["xyuv"] += L1_["xu"] * L1_["yv"];
-    G2["xyuv"] -= 0.5 * L1_["yu"] * L1_["xv"];
+    temp["giu"] -= 0.5 * alpha * B["gax"] * T2["ivya"] * G2["xyvu"];
+
+    G2["xyuv"] -= 0.5 * L1_["xv"] * L1_["yu"];
     temp["giu"] += 0.5 * alpha * T2["ijxy"] * G2["xyuv"] * B["gvj"];
 
     G2["xyuv"] = L2_["xyuv"];
     G2["xyuv"] -= 0.5 * L1_["xv"] * L1_["yu"];
     temp["gia"] += 0.5 * alpha * B["gux"] * S2["ivay"] * G2["xyuv"];
     temp["giu"] -= 0.5 * alpha * B["gax"] * T2["ivay"] * G2["xyuv"];
-
-    G2["xyvu"] = L2_["xyvu"];
-    G2["xyvu"] += L1_["xv"] * L1_["yu"];
-    temp["giu"] -= 0.5 * alpha * B["gax"] * T2["ivya"] * G2["xyvu"];
 
     C1["ir"] += temp["gia"] * B["gar"];
 
@@ -597,6 +591,8 @@ void SADSRG::V_T2_C1_DF(BlockedTensor& B, BlockedTensor& T2, BlockedTensor& S2, 
 
     G2["xyuv"] = L2_["xyuv"];
     G2["xyuv"] += Eta1_["xu"] * Eta1_["yv"];
+    temp["gxa"] += 0.5 * alpha * B["gui"] * T2["viay"] * G2["xyvu"];
+
     G2["xyuv"] -= 0.5 * Eta1_["xv"] * Eta1_["yu"];
     temp["gxa"] -= 0.5 * alpha * G2["xyuv"] * T2["uvab"] * B["gby"];
 
@@ -604,10 +600,6 @@ void SADSRG::V_T2_C1_DF(BlockedTensor& B, BlockedTensor& T2, BlockedTensor& S2, 
     G2["xyuv"] -= 0.5 * Eta1_["xv"] * Eta1_["yu"];
     temp["gia"] -= 0.5 * alpha * B["gux"] * S2["ivay"] * G2["xyuv"];
     temp["gxa"] += 0.5 * alpha * B["gui"] * T2["ivay"] * G2["xyuv"];
-
-    G2["xyvu"] = L2_["xyvu"];
-    G2["xyvu"] += Eta1_["xv"] * Eta1_["yu"];
-    temp["gxa"] += 0.5 * alpha * B["gui"] * T2["viay"] * G2["xyvu"];
 
     C1["pa"] += temp["gia"] * B["gpi"];
 
@@ -652,51 +644,59 @@ void SADSRG::V_T2_C2_DF(BlockedTensor& B, BlockedTensor& T2, BlockedTensor& S2, 
     local_timer timer;
 
     // particle-particle contractions
-    // TODO: need to investigate why using "r" fails when C2 does not contain all "rs"
-    C2["ijes"] += batched("e", alpha * B["gae"] * B["gbs"] * T2["ijab"]);
-    C2["ijus"] += batched("u", alpha * B["gau"] * B["gbs"] * T2["ijab"]);
-    C2["ijms"] += batched("m", alpha * B["gam"] * B["gbs"] * T2["ijab"]);
+    C2["ijrs"] += batched("r", alpha * B["gar"] * B["gbs"] * T2["ijab"]);
 
-    std::vector<std::string> C2blocks;
-    for (const std::string& block : C2.block_labels()) {
-        if (block[0] == virt_label_[0] or block[1] == virt_label_[0])
-            continue;
-        C2blocks.push_back(block);
-    }
+    C2["ijrs"] -= batched("r", 0.5 * alpha * B["gyr"] * B["gbs"] * L1_["xy"] * T2["ijxb"]);
+    C2["ijrs"] -= batched("s", 0.5 * alpha * B["gys"] * B["gbr"] * L1_["xy"] * T2["jixb"]);
 
-    auto temp = ambit::BlockedTensor::build(tensor_type_, "DFtemp222", C2blocks);
-    temp["ijes"] += batched("e", L1_["xy"] * T2["ijxb"] * B["gye"] * B["gbs"]);
-    temp["ijks"] += L1_["xy"] * T2["ijxb"] * B["gyk"] * B["gbs"];
+//    std::vector<std::string> C2blocks;
+//    for (const std::string& block : C2.block_labels()) {
+//        if (block[0] == virt_label_[0] or block[1] == virt_label_[0])
+//            continue;
+//        C2blocks.push_back(block);
+//    }
 
-    C2["ijrs"] -= 0.5 * alpha * temp["ijrs"];
-    C2["jisr"] -= 0.5 * alpha * temp["ijrs"];
+//    auto temp = ambit::BlockedTensor::build(tensor_type_, "DFtemp222", C2blocks);
+//    temp["ijrs"] += batched("r", L1_["xy"] * T2["ijxb"] * B["gyr"] * B["gbs"]);
+
+//    C2["ijrs"] -= 0.5 * alpha * temp["ijrs"];
+//    C2["jisr"] -= 0.5 * alpha * temp["ijrs"];
 
     // hole-hole contractions
-    std::vector<std::string> Vblocks;
-    for (const std::string& block : C2.block_labels()) {
-        if (block[2] == core_label_[0] or block[3] == core_label_[0])
-            continue;
-        std::string s = block.substr(0, 2) + "hh";
-        if (std::find(Vblocks.begin(), Vblocks.end(), s) == Vblocks.end())
-            Vblocks.push_back(s);
-    }
+    C2["pqab"] += batched("p", alpha * B["gpi"] * B["gqj"] * T2["ijab"]);
 
-    temp = ambit::BlockedTensor::build(tensor_type_, "DFtemp222", Vblocks);
-    temp["pqij"] = B["gpi"] * B["gqj"];
+    C2["pqab"] -= batched("p", 0.5 * alpha * B["gpx"] * B["gqj"] * Eta1_["xy"] * T2["yjab"]);
+    C2["pqab"] -= batched("q", 0.5 * alpha * B["gqx"] * B["gpj"] * Eta1_["xy"] * T2["yjba"]);
 
-    C2["pqab"] += alpha * temp["pqij"] * T2["ijab"];
+//    std::vector<std::string> Vblocks;
+//    for (const std::string& block : C2.block_labels()) {
+//        if (block[2] == core_label_[0] or block[3] == core_label_[0])
+//            continue;
+//        std::string s = block.substr(0, 2) + "hh";
+//        if (std::find(Vblocks.begin(), Vblocks.end(), s) == Vblocks.end())
+//            Vblocks.push_back(s);
+//    }
 
-    C2["pqab"] -= 0.5 * alpha * Eta1_["xy"] * T2["yjab"] * temp["pqxj"];
-    C2["qpba"] -= 0.5 * alpha * Eta1_["xy"] * T2["yjab"] * temp["pqxj"];
+//    temp = ambit::BlockedTensor::build(tensor_type_, "DFtemp222", Vblocks);
+//    temp["pqij"] = B["gpi"] * B["gqj"];
+
+//    C2["pqab"] += alpha * temp["pqij"] * T2["ijab"];
+
+//    C2["pqab"] -= 0.5 * alpha * Eta1_["xy"] * T2["yjab"] * temp["pqxj"];
+//    C2["qpba"] -= 0.5 * alpha * Eta1_["xy"] * T2["yjab"] * temp["pqxj"];
 
     // hole-particle contractions
-    temp = ambit::BlockedTensor::build(tensor_type_, "DFtemp222", {"Lhp"});
+    auto temp = ambit::BlockedTensor::build(tensor_type_, "DFtemp222", {"Lhp"});
     temp["gjb"] += alpha * B["gam"] * S2["mjab"];
     temp["gjb"] += 0.5 * alpha * L1_["xy"] * S2["yjab"] * B["gax"];
     temp["gjb"] -= 0.5 * alpha * L1_["xy"] * S2["ijxb"] * B["gyi"];
 
     C2["qjsb"] += temp["gjb"] * B["gqs"];
     C2["jqbs"] += temp["gjb"] * B["gqs"];
+
+    for(const std::string& block: temp.block_labels()) {
+        temp.block(block).reset();
+    }
 
     // exchange like terms
     V_T2_C2_DF_PH_X(B, T2, alpha, C2);
@@ -709,76 +709,91 @@ void SADSRG::V_T2_C2_DF(BlockedTensor& B, BlockedTensor& T2, BlockedTensor& S2, 
 
 void SADSRG::V_T2_C2_DF_PH_X(BlockedTensor& B, BlockedTensor& T2, const double& alpha,
                              BlockedTensor& C2) {
+    C2["qjsb"] -= batched("q", alpha * B["gas"] * B["gqm"] * T2["mjab"]);
+    C2["qjsb"] -= batched("q", 0.5 * alpha * L1_["xy"] * T2["yjab"] * B["gas"] * B["gqx"]);
+    C2["qjsb"] += batched("q", 0.5 * alpha * L1_["xy"] * T2["ijxb"] * B["gys"] * B["gqi"]);
 
-    std::vector<std::string> qjsb_small, qjsb_large, jqsb_small, jqsb_large;
+    C2["jqbs"] -= batched("q", alpha * B["gas"] * B["gqm"] * T2["mjab"]);
+    C2["jqbs"] -= batched("q", 0.5 * alpha * L1_["xy"] * T2["yjab"] * B["gas"] * B["gqx"]);
+    C2["jqbs"] += batched("q", 0.5 * alpha * L1_["xy"] * T2["ijxb"] * B["gys"] * B["gqi"]);
 
-    for (const std::string& block : C2.block_labels()) {
-        auto j = block.substr(1, 1);
-        auto b = block.substr(3, 1);
+    C2["jqsb"] -= batched("q", alpha * B["gas"] * B["gqm"] * T2["mjba"]);
+    C2["jqsb"] -= batched("q", 0.5 * alpha * L1_["xy"] * T2["yjba"] * B["gas"] * B["gqx"]);
+    C2["jqsb"] += batched("q", 0.5 * alpha * L1_["xy"] * T2["ijbx"] * B["gys"] * B["gqi"]);
 
-        if (j != virt_label_ and b != core_label_) {
-            if (std::count(block.begin(), block.end(), 'v') > 2) {
-                qjsb_large.push_back(block);
-            } else {
-                qjsb_small.push_back(block);
-            }
-        }
+    C2["qjbs"] -= batched("q", alpha * B["gas"] * B["gqm"] * T2["mjba"]);
+    C2["qjbs"] -= batched("q", 0.5 * alpha * L1_["xy"] * T2["yjba"] * B["gas"] * B["gqx"]);
+    C2["qjbs"] += batched("q", 0.5 * alpha * L1_["xy"] * T2["ijbx"] * B["gys"] * B["gqi"]);
 
-        j = block.substr(0, 1);
-        if (j != virt_label_ and b != core_label_) {
-            if (std::count(block.begin(), block.end(), 'v') > 2) {
-                jqsb_large.push_back(block);
-            } else {
-                jqsb_small.push_back(block);
-            }
-        }
-    }
+//    std::vector<std::string> qjsb_small, qjsb_large, jqsb_small, jqsb_large;
 
-    auto temp = ambit::BlockedTensor::build(tensor_type_, "DFtemp222PHX", qjsb_small);
-    temp["qjsb"] -= alpha * B["gas"] * B["gqm"] * T2["mjab"];
-    temp["qjsb"] -= 0.5 * alpha * L1_["xy"] * T2["yjab"] * B["gas"] * B["gqx"];
-    temp["qjsb"] += 0.5 * alpha * L1_["xy"] * T2["ijxb"] * B["gys"] * B["gqi"];
+//    for (const std::string& block : C2.block_labels()) {
+//        auto j = block.substr(1, 1);
+//        auto b = block.substr(3, 1);
 
-    C2["qjsb"] += temp["qjsb"];
-    C2["jqbs"] += temp["qjsb"];
+//        if (j != virt_label_ and b != core_label_) {
+//            if (std::count(block.begin(), block.end(), 'v') > 2) {
+//                qjsb_large.push_back(block);
+//            } else {
+//                qjsb_small.push_back(block);
+//            }
+//        }
 
-    temp = ambit::BlockedTensor::build(tensor_type_, "DFtemp222PHX", jqsb_small);
-    temp["jqsb"] -= alpha * B["gas"] * B["gqm"] * T2["mjba"];
-    temp["jqsb"] -= 0.5 * alpha * L1_["xy"] * T2["yjba"] * B["gas"] * B["gqx"];
-    temp["jqsb"] += 0.5 * alpha * L1_["xy"] * T2["ijbx"] * B["gys"] * B["gqi"];
+//        j = block.substr(0, 1);
+//        if (j != virt_label_ and b != core_label_) {
+//            if (std::count(block.begin(), block.end(), 'v') > 2) {
+//                jqsb_large.push_back(block);
+//            } else {
+//                jqsb_small.push_back(block);
+//            }
+//        }
+//    }
 
-    C2["jqsb"] += temp["jqsb"];
-    C2["qjbs"] += temp["jqsb"];
+//    auto temp = ambit::BlockedTensor::build(tensor_type_, "DFtemp222PHX", qjsb_small);
+//    temp["qjsb"] -= alpha * B["gas"] * B["gqm"] * T2["mjab"];
+//    temp["qjsb"] -= 0.5 * alpha * L1_["xy"] * T2["yjab"] * B["gas"] * B["gqx"];
+//    temp["qjsb"] += 0.5 * alpha * L1_["xy"] * T2["ijxb"] * B["gys"] * B["gqi"];
 
-    if (qjsb_large.size() != 0) {
-        C2["e,j,f,v0"] -= batched("e", alpha * B["g,a,f"] * B["g,e,m"] * T2["m,j,a,v0"]);
-        C2["j,e,v0,f"] -= batched("e", alpha * B["g,a,f"] * B["g,e,m"] * T2["m,j,a,v0"]);
+//    C2["qjsb"] += temp["qjsb"];
+//    C2["jqbs"] += temp["qjsb"];
 
-        temp = ambit::BlockedTensor::build(tensor_type_, "DFtemp222PHX", {"ahpv"});
-        temp["xjae"] = L1_["xy"] * T2["yjae"];
-        C2["e,j,f,v0"] -= batched("e", 0.5 * alpha * temp["x,j,a,v0"] * B["g,a,f"] * B["g,e,x"]);
-        C2["j,e,v0,f"] -= batched("e", 0.5 * alpha * temp["x,j,a,v0"] * B["g,a,f"] * B["g,e,x"]);
+//    temp = ambit::BlockedTensor::build(tensor_type_, "DFtemp222PHX", jqsb_small);
+//    temp["jqsb"] -= alpha * B["gas"] * B["gqm"] * T2["mjba"];
+//    temp["jqsb"] -= 0.5 * alpha * L1_["xy"] * T2["yjba"] * B["gas"] * B["gqx"];
+//    temp["jqsb"] += 0.5 * alpha * L1_["xy"] * T2["ijbx"] * B["gys"] * B["gqi"];
 
-        temp = ambit::BlockedTensor::build(tensor_type_, "DFtemp222PHX", {"hhav"});
-        temp["ijye"] = L1_["xy"] * T2["ijxe"];
-        C2["e,j,f,v0"] += batched("e", 0.5 * alpha * temp["i,j,y,v0"] * B["g,y,f"] * B["g,e,i"]);
-        C2["j,e,v0,f"] += batched("e", 0.5 * alpha * temp["i,j,y,v0"] * B["g,y,f"] * B["g,e,i"]);
-    }
+//    C2["jqsb"] += temp["jqsb"];
+//    C2["qjbs"] += temp["jqsb"];
 
-    if (jqsb_large.size() != 0) {
-        C2["j,e,f,v0"] -= batched("e", alpha * B["g,a,f"] * B["g,e,m"] * T2["m,j,v0,a"]);
-        C2["e,j,v0,f"] -= batched("e", alpha * B["g,a,f"] * B["g,e,m"] * T2["m,j,v0,a"]);
+//    if (qjsb_large.size() != 0) {
+//        C2["e,j,f,v0"] -= batched("e", alpha * B["g,a,f"] * B["g,e,m"] * T2["m,j,a,v0"]);
+//        C2["j,e,v0,f"] -= batched("e", alpha * B["g,a,f"] * B["g,e,m"] * T2["m,j,a,v0"]);
 
-        temp = ambit::BlockedTensor::build(tensor_type_, "DFtemp222PHX", {"ahvp"});
-        temp["xjea"] = L1_["xy"] * T2["yjea"];
-        C2["j,e,f,v0"] -= batched("e", 0.5 * alpha * temp["x,j,v0,a"] * B["g,a,f"] * B["g,e,x"]);
-        C2["e,j,v0,f"] -= batched("e", 0.5 * alpha * temp["x,j,v0,a"] * B["g,a,f"] * B["g,e,x"]);
+//        temp = ambit::BlockedTensor::build(tensor_type_, "DFtemp222PHX", {"ahpv"});
+//        temp["xjae"] = L1_["xy"] * T2["yjae"];
+//        C2["e,j,f,v0"] -= batched("e", 0.5 * alpha * temp["x,j,a,v0"] * B["g,a,f"] * B["g,e,x"]);
+//        C2["j,e,v0,f"] -= batched("e", 0.5 * alpha * temp["x,j,a,v0"] * B["g,a,f"] * B["g,e,x"]);
 
-        temp = ambit::BlockedTensor::build(tensor_type_, "DFtemp222PHX", {"hhva"});
-        temp["ijey"] = L1_["xy"] * T2["ijex"];
-        C2["j,e,f,v0"] += batched("e", 0.5 * alpha * temp["i,j,v0,y"] * B["g,y,f"] * B["g,e,i"]);
-        C2["e,j,v0,f"] += batched("e", 0.5 * alpha * temp["i,j,v0,y"] * B["g,y,f"] * B["g,e,i"]);
-    }
+//        temp = ambit::BlockedTensor::build(tensor_type_, "DFtemp222PHX", {"hhav"});
+//        temp["ijye"] = L1_["xy"] * T2["ijxe"];
+//        C2["e,j,f,v0"] += batched("e", 0.5 * alpha * temp["i,j,y,v0"] * B["g,y,f"] * B["g,e,i"]);
+//        C2["j,e,v0,f"] += batched("e", 0.5 * alpha * temp["i,j,y,v0"] * B["g,y,f"] * B["g,e,i"]);
+//    }
+
+//    if (jqsb_large.size() != 0) {
+//        C2["j,e,f,v0"] -= batched("e", alpha * B["g,a,f"] * B["g,e,m"] * T2["m,j,v0,a"]);
+//        C2["e,j,v0,f"] -= batched("e", alpha * B["g,a,f"] * B["g,e,m"] * T2["m,j,v0,a"]);
+
+//        temp = ambit::BlockedTensor::build(tensor_type_, "DFtemp222PHX", {"ahvp"});
+//        temp["xjea"] = L1_["xy"] * T2["yjea"];
+//        C2["j,e,f,v0"] -= batched("e", 0.5 * alpha * temp["x,j,v0,a"] * B["g,a,f"] * B["g,e,x"]);
+//        C2["e,j,v0,f"] -= batched("e", 0.5 * alpha * temp["x,j,v0,a"] * B["g,a,f"] * B["g,e,x"]);
+
+//        temp = ambit::BlockedTensor::build(tensor_type_, "DFtemp222PHX", {"hhva"});
+//        temp["ijey"] = L1_["xy"] * T2["ijex"];
+//        C2["j,e,f,v0"] += batched("e", 0.5 * alpha * temp["i,j,v0,y"] * B["g,y,f"] * B["g,e,i"]);
+//        C2["e,j,v0,f"] += batched("e", 0.5 * alpha * temp["i,j,v0,y"] * B["g,y,f"] * B["g,e,i"]);
+//    }
 }
 
 void SADSRG::H_A_Ca(BlockedTensor& H1, BlockedTensor& H2, BlockedTensor& T1, BlockedTensor& T2,
