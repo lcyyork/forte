@@ -334,6 +334,20 @@ class SADSRG : public DynamicCorrelationSolver {
     void H2_T2_C2(BlockedTensor& H2, BlockedTensor& T2, BlockedTensor& S2, const double& alpha,
                   BlockedTensor& C2);
 
+    /// Compute two-body term of commutator [H2, T2], hole-hole contraction
+    void H2_T2_C2_HH(BlockedTensor& H2, BlockedTensor& T2, const double& alpha, BlockedTensor& C2);
+
+    /// Compute two-body term of commutator [H2, T2], particle-particle contraction
+    void H2_T2_C2_PP(BlockedTensor& H2, BlockedTensor& T2, const double& alpha, BlockedTensor& C2);
+    /// Compute two-body term of commutator [H2, T2], particle-particle contraction
+    void H2_T2_C2_PPsmall(BlockedTensor& H2, BlockedTensor& T2, const double& alpha, BlockedTensor& C2);
+
+    /// Compute two-body term of commutator [H2, T2], particle-hole contraction part 1
+    void H2_T2_C2_PH1(BlockedTensor& H2, BlockedTensor& T2, BlockedTensor& S2, const double& alpha,
+                      BlockedTensor& C2);
+    /// Compute two-body term of commutator [H2, T2], particle-hole contraction part 2
+    void H2_T2_C2_PH2(BlockedTensor& H2, BlockedTensor& T2, const double& alpha, BlockedTensor& C2);
+
     /// Compute zero-body term of commutator [V, T1], V is constructed from B (DF/CD)
     void V_T1_C0_DF(BlockedTensor& B, BlockedTensor& T1, const double& alpha, double& C0);
     /// Compute zero-body term of commutator [V, T2], V is constructed from B (DF/CD)
