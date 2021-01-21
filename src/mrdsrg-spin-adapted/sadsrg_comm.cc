@@ -358,7 +358,8 @@ void SADSRG::H2_T2_C2(BlockedTensor& H2, BlockedTensor& T2, BlockedTensor& S2, c
                       BlockedTensor& C2) {
     local_timer timer;
 
-    // test symmetry of C2: cavc exists <=> accv exists
+    // H2, T2, and C2 should have the 2-fold symmetry: pqrs = qpsr,
+    // which must also apply to blocks, e.g., cavc exists <=> accv exists.
     std::unordered_set<std::string> C2blocks;
     for (const auto& block : C2.block_labels()) {
         C2blocks.insert(block);
@@ -428,6 +429,8 @@ void SADSRG::H2_T2_C2_PP(BlockedTensor& H2, BlockedTensor& T2, const double& alp
         size_t size;
         std::tie(size, block) = size_block;
 
+//        large_blocks[block.substr(0, 1)].push_back(block.substr(1, 3));
+
         std::vector<std::string> intermediate_blocks;
         for (const auto& xb : xb_blocks) {
             intermediate_blocks.push_back(block.substr(0, 2) + xb);
@@ -456,6 +459,7 @@ void SADSRG::H2_T2_C2_PP(BlockedTensor& H2, BlockedTensor& T2, const double& alp
 
     // loop over batches of blocks that fit in memory
     for (const auto& blocks : block_batches) {
+//        outfile->Printf("\n small PP here");
         auto temp = BlockedTensor::build(tensor_type_, "temp222PP", blocks);
         temp["ijrs"] = 0.5 * alpha * L1_["xy"] * T2["ijxb"] * H2["ybrs"];
         C2["ijrs"] -= temp["ijrs"];
@@ -484,48 +488,15 @@ void SADSRG::H2_T2_C2_PP(BlockedTensor& H2, BlockedTensor& T2, const double& alp
         auto T2sub = BlockedTensor::build(tensor_type_, "T2sub222PP", t2_blocks[block0]);
         auto temp = BlockedTensor::build(tensor_type_, "temp222PP_L", block_pair.second);
 
-        auto i_size = block0 == core_label_ ? core_mos_.size() : actv_mos_.size();
-
-        for (size_t i = 0; i < i_size; ++i) {
+        for (size_t i = 0, i_size = label_to_spacemo_[block0[0]].size(); i < i_size; ++i) {
             // T2 slice
-            for (const auto& t2_jab : t2_blocks[block0]) {
-                auto& T2_data = T2.block(block0 + t2_jab).data();
-                auto& T2sub_data = T2sub.block(t2_jab).data();
-
-                auto chunk_size = T2sub_data.size();
-                auto begin = T2_data.begin() + i * chunk_size;
-                std::copy(begin, begin + chunk_size, T2sub_data.begin());
-            }
+            fill_slice3_from_tensor4(T2, T2sub, block0, i, t2_blocks[block0]);
 
             // contraction
             temp["jrs"] = 0.5 * alpha * L1_["xy"] * T2sub["jxb"] * H2["ybrs"];
 
             // fill in C2
-            for (const auto& block123 : block_pair.second) {
-                auto j_size = label_to_spacemo_[block123[0]].size();
-                auto r_size = label_to_spacemo_[block123[1]].size();
-                auto s_size = label_to_spacemo_[block123[2]].size();
-
-                auto rs_size = r_size * s_size;
-                auto jrs_size = j_size * rs_size;
-
-                auto temp_block = temp.block(block123);
-                auto& C2_data = C2.block(block0 + block123).data();
-
-                // C2["ijrs"] -= temp["ijrs"];
-                auto C2_data_begin = C2_data.begin() + i * jrs_size;
-                std::transform(C2_data_begin, C2_data_begin + jrs_size, temp_block.data().begin(),
-                               C2_data_begin, [](auto c, auto t) { return c - t; });
-
-                // C2["jisr"] -= temp["ijrs"];
-                auto block_swap =
-                    block123.substr(0, 1) + block0 + block123.substr(2, 1) + block123.substr(1, 1);
-                auto isr_size = i_size * rs_size;
-                auto& C2s_data = C2.block(block_swap).data();
-                temp_block.citerate([&](const std::vector<size_t>& id, const double& value) {
-                    C2s_data[id[0] * isr_size + i * rs_size + id[2] * r_size + id[1]] -= value;
-                });
-            }
+            axpy_slice3_to_tensor4_with_sym(C2, temp, -1.0, block0, i, block_pair.second);
         }
     }
 }
@@ -571,6 +542,8 @@ void SADSRG::H2_T2_C2_HH(BlockedTensor& H2, BlockedTensor& T2, const double& alp
         size_t size;
         std::tie(size, block) = size_block;
 
+//        large_blocks[block.substr(0, 1)].push_back(block.substr(1, 3));
+
         std::vector<std::string> intermediate_blocks; // Eta1_["xy"] * T2["yjab"]
         for (const auto& xj : xj_blocks) {
             intermediate_blocks.push_back(block.substr(2, 2) + xj);
@@ -599,6 +572,7 @@ void SADSRG::H2_T2_C2_HH(BlockedTensor& H2, BlockedTensor& T2, const double& alp
 
     // loop over batches of blocks that fit in memory
     for (const auto& blocks : block_batches) {
+//        outfile->Printf("\n small HH here");
         auto temp = BlockedTensor::build(tensor_type_, "temp222HH", blocks);
         temp["pqab"] = 0.5 * alpha * Eta1_["xy"] * T2["yjab"] * H2["pqxj"];
         C2["pqab"] -= temp["pqab"];
@@ -627,76 +601,43 @@ void SADSRG::H2_T2_C2_HH(BlockedTensor& H2, BlockedTensor& T2, const double& alp
         auto H2sub = BlockedTensor::build(tensor_type_, "H2sub222HH", h2_blocks[block0]);
         auto temp = BlockedTensor::build(tensor_type_, "temp222HH_L", block_pair.second);
 
-        auto p_size = label_to_spacemo_[block0[0]].size();
-
-        for (size_t p = 0; p < p_size; ++p) {
+        for (size_t p = 0, p_size = label_to_spacemo_[block0[0]].size(); p < p_size; ++p) {
             // H2 slice
-            for (const auto& h2_qxj : h2_blocks[block0]) {
-                auto& H2_data = H2.block(block0 + h2_qxj).data();
-                auto& H2sub_data = H2sub.block(h2_qxj).data();
-
-                auto chunk_size = H2sub_data.size();
-                auto begin = H2_data.begin() + p * chunk_size;
-                std::copy(begin, begin + chunk_size, H2sub_data.begin());
-            }
+            fill_slice3_from_tensor4(H2, H2sub, block0, p, h2_blocks[block0]);
 
             // contraction
             temp["qab"] = 0.5 * alpha * H2sub["qxj"] * Eta1_["xy"] * T2["yjab"];
 
             // fill in C2
-            for (const auto& block123 : block_pair.second) {
-                auto q_size = label_to_spacemo_[block123[0]].size();
-                auto a_size = label_to_spacemo_[block123[1]].size();
-                auto b_size = label_to_spacemo_[block123[2]].size();
-
-                auto ab_size = a_size * b_size;
-                auto qab_size = q_size * ab_size;
-
-                auto temp_block = temp.block(block123);
-                auto& C2_data = C2.block(block0 + block123).data();
-
-                // C2["pqab"] -= temp["pqab"];
-                auto C2_data_begin = C2_data.begin() + p * qab_size;
-                std::transform(C2_data_begin, C2_data_begin + qab_size, temp_block.data().begin(),
-                               C2_data_begin, [](auto c, auto t) { return c - t; });
-
-                // C2["qpba"] -= temp["pqab"];
-                auto block_swap =
-                    block123.substr(0, 1) + block0 + block123.substr(2, 1) + block123.substr(1, 1);
-                auto pba_size = p_size * ab_size;
-                auto& C2s_data = C2.block(block_swap).data();
-                temp_block.citerate([&](const std::vector<size_t>& id, const double& value) {
-                    C2s_data[id[0] * pba_size + p * ab_size + id[2] * a_size + id[1]] -= value;
-                });
-            }
+            axpy_slice3_to_tensor4_with_sym(C2, temp, -1.0, block0, p, block_pair.second);
         }
     }
 }
 
 void SADSRG::H2_T2_C2_PH(BlockedTensor& H2, BlockedTensor& T2, BlockedTensor& S2,
                          const double& alpha, BlockedTensor& C2) {
-//    auto C2copy = BlockedTensor::build(tensor_type_, "C2 copy", {"gggg"});
-//    C2copy["pqrs"] = C2["pqrs"];
-//    auto temp = BlockedTensor::build(tensor_type_, "temp222HP", {"gggg"});
-//    temp["jqbs"] += alpha * H2["aqms"] * S2["jmba"];
-//    temp["jqbs"] += 0.5 * alpha * L1_["xy"] * S2["jyba"] * H2["aqxs"];
-//    temp["jqbs"] -= 0.5 * alpha * L1_["xy"] * S2["jibx"] * H2["yqis"];
-//    C2copy["qjsb"] += temp["jqbs"];
-//    C2copy["jqbs"] += temp["jqbs"];
+    //    auto C2copy = BlockedTensor::build(tensor_type_, "C2 copy", {"gggg"});
+    //    C2copy["pqrs"] = C2["pqrs"];
+    //    auto temp = BlockedTensor::build(tensor_type_, "temp222HP", {"gggg"});
+    //    temp["jqbs"] += alpha * H2["aqms"] * S2["jmba"];
+    //    temp["jqbs"] += 0.5 * alpha * L1_["xy"] * S2["jyba"] * H2["aqxs"];
+    //    temp["jqbs"] -= 0.5 * alpha * L1_["xy"] * S2["jibx"] * H2["yqis"];
+    //    C2copy["qjsb"] += temp["jqbs"];
+    //    C2copy["jqbs"] += temp["jqbs"];
 
-//    temp.zero();
-//    temp["qjsb"] -= alpha * H2["qams"] * T2["mjab"];
-//    temp["qjsb"] -= 0.5 * alpha * L1_["xy"] * T2["yjab"] * H2["qaxs"];
-//    temp["qjsb"] += 0.5 * alpha * L1_["xy"] * T2["ijxb"] * H2["qyis"];
-//    C2copy["qjsb"] += temp["qjsb"];
-//    C2copy["jqbs"] += temp["qjsb"];
+    //    temp.zero();
+    //    temp["qjsb"] -= alpha * H2["qams"] * T2["mjab"];
+    //    temp["qjsb"] -= 0.5 * alpha * L1_["xy"] * T2["yjab"] * H2["qaxs"];
+    //    temp["qjsb"] += 0.5 * alpha * L1_["xy"] * T2["ijxb"] * H2["qyis"];
+    //    C2copy["qjsb"] += temp["qjsb"];
+    //    C2copy["jqbs"] += temp["qjsb"];
 
-//    temp.zero();
-//    temp["qjbs"] -= alpha * H2["qams"] * T2["mjba"];
-//    temp["qjbs"] -= 0.5 * alpha * L1_["xy"] * T2["yjba"] * H2["qaxs"];
-//    temp["qjbs"] += 0.5 * alpha * L1_["xy"] * T2["ijbx"] * H2["qyis"];
-//    C2copy["qjbs"] += temp["qjbs"];
-//    C2copy["jqsb"] += temp["qjbs"];
+    //    temp.zero();
+    //    temp["qjbs"] -= alpha * H2["qams"] * T2["mjba"];
+    //    temp["qjbs"] -= 0.5 * alpha * L1_["xy"] * T2["yjba"] * H2["qaxs"];
+    //    temp["qjbs"] += 0.5 * alpha * L1_["xy"] * T2["ijbx"] * H2["qyis"];
+    //    C2copy["qjbs"] += temp["qjbs"];
+    //    C2copy["jqsb"] += temp["qjbs"];
 
     /// C2 must have the permutation symmetry, e.g., cvav exists <=> vcva exists
     /* we want to store two intermediates to prevent repeated computation for the following
@@ -769,6 +710,12 @@ void SADSRG::H2_T2_C2_PH(BlockedTensor& H2, BlockedTensor& T2, BlockedTensor& S2
         std::tie(size, block) = size_block;
         auto jb = block.substr(0, 1) + block.substr(2, 1);
 
+//        jqbs_large[block.substr(0, 1)].push_back(block.substr(1, 3));
+//        jqbs_b.insert(block.substr(2, 1));
+//        qjsb_large.insert(block.substr(1, 1) + block.substr(0, 1) + block.substr(3, 1) +
+//                          block.substr(2, 1));
+//        qjsb_s.insert(block.substr(3, 1));
+
         // size for L1_["xy"] * T2["yjab"] or L1_["xy"] * T2["ijxb"]
         std::vector<std::string> jyba_blocks, jibx_blocks;
         for (const auto& ya : ya_blocks) {
@@ -785,8 +732,8 @@ void SADSRG::H2_T2_C2_PH(BlockedTensor& H2, BlockedTensor& T2, BlockedTensor& S2
         if (size + intermediate_size > available_memory) {
             jqbs_large[block.substr(0, 1)].push_back(block.substr(1, 3));
             jqbs_b.insert(block.substr(2, 1));
-            qjsb_large.insert(block.substr(1, 1) + block.substr(0, 1) + block.substr(3, 1)
-                              + block.substr(2, 1));
+            qjsb_large.insert(block.substr(1, 1) + block.substr(0, 1) + block.substr(3, 1) +
+                              block.substr(2, 1));
             qjsb_s.insert(block.substr(3, 1));
             continue;
         }
@@ -806,6 +753,7 @@ void SADSRG::H2_T2_C2_PH(BlockedTensor& H2, BlockedTensor& T2, BlockedTensor& S2
 
     // loop over batches of blocks that fit in memory
     for (const auto& blocks : block_batches) {
+//        outfile->Printf("\n small HP1 here");
         auto temp = BlockedTensor::build(tensor_type_, "temp222HP", blocks);
         temp["jqbs"] += alpha * H2["aqms"] * S2["jmba"];
         temp["jqbs"] -= alpha * H2["aqsm"] * T2["jmba"];
@@ -851,6 +799,9 @@ void SADSRG::H2_T2_C2_PH(BlockedTensor& H2, BlockedTensor& T2, BlockedTensor& S2
         std::tie(size, block) = size_block;
         auto jb = block.substr(1, 1) + block.substr(2, 1);
 
+//        qjbs_large.insert(block);
+//        qjbs_s.insert(block.substr(3, 1));
+
         // size for L1_["xy"] * T2["yjba"] or L1_["xy"] * T2["ijxb"]
         std::vector<std::string> yjab_blocks, ijxb_blocks;
         for (const auto& ya : ya_blocks) {
@@ -885,6 +836,7 @@ void SADSRG::H2_T2_C2_PH(BlockedTensor& H2, BlockedTensor& T2, BlockedTensor& S2
 
     // loop over batches of blocks that fit in memory
     for (const auto& blocks : block_batches) {
+//        outfile->Printf("\n small HP2 here");
         auto temp = BlockedTensor::build(tensor_type_, "temp222HP", blocks);
         temp["qjbs"] -= alpha * H2["aqsm"] * T2["mjba"];
         temp["qjbs"] -= 0.5 * alpha * L1_["xy"] * T2["yjba"] * H2["aqsx"];
@@ -914,18 +866,9 @@ void SADSRG::H2_T2_C2_PH(BlockedTensor& H2, BlockedTensor& T2, BlockedTensor& S2
         auto S2sub = BlockedTensor::build(tensor_type_, "S2sub222HP", s2_blocks[block0]);
         auto temp = BlockedTensor::build(tensor_type_, "temp222HP_L", block_pair.second);
 
-        auto j_size = label_to_spacemo_[block0[0]].size();
-
-        for (size_t j = 0; j < j_size; ++j) {
+        for (size_t j = 0, j_size = label_to_spacemo_[block0[0]].size(); j < j_size; ++j) {
             // S2 slice
-            for (const auto& s2_iba : s2_blocks[block0]) {
-                auto& S2_data = S2.block(block0 + s2_iba).data();
-                auto& S2sub_data = S2sub.block(s2_iba).data();
-
-                auto chunk_size = S2sub_data.size();
-                auto begin = S2_data.begin() + j * chunk_size;
-                std::copy(begin, begin + chunk_size, S2sub_data.begin());
-            }
+            fill_slice3_from_tensor4(S2, S2sub, block0, j, s2_blocks[block0]);
 
             // contraction
             temp.zero();
@@ -934,31 +877,7 @@ void SADSRG::H2_T2_C2_PH(BlockedTensor& H2, BlockedTensor& T2, BlockedTensor& S2
             temp["qbs"] -= 0.5 * alpha * L1_["xy"] * S2sub["ibx"] * H2["yqis"];
 
             // fill in C2
-            for (const auto& block123 : block_pair.second) {
-                auto q_size = label_to_spacemo_[block123[0]].size();
-                auto b_size = label_to_spacemo_[block123[1]].size();
-                auto s_size = label_to_spacemo_[block123[2]].size();
-
-                auto bs_size = b_size * s_size;
-                auto qbs_size = q_size * bs_size;
-
-                auto temp_block = temp.block(block123);
-                auto& C2_data = C2.block(block0 + block123).data();
-
-                // C2["jqbs"] += temp["jqbs"];
-                auto C2_data_begin = C2_data.begin() + j * qbs_size;
-                std::transform(C2_data_begin, C2_data_begin + qbs_size, temp_block.data().begin(),
-                               C2_data_begin, [](auto c, auto t) { return c + t; });
-
-                // C2["qjsb"] += temp["jqbs"];
-                auto block_swap =
-                    block123.substr(0, 1) + block0 + block123.substr(2, 1) + block123.substr(1, 1);
-                auto jsb_size = j_size * bs_size;
-                auto& C2s_data = C2.block(block_swap).data();
-                temp_block.citerate([&](const std::vector<size_t>& id, const double& value) {
-                    C2s_data[id[0] * jsb_size + j * bs_size + id[2] * b_size + id[1]] += value;
-                });
-            }
+            axpy_slice3_to_tensor4_with_sym(C2, temp, 1.0, block0, j, block_pair.second);
         }
     }
 
@@ -1013,18 +932,9 @@ void SADSRG::H2_T2_C2_PH(BlockedTensor& H2, BlockedTensor& T2, BlockedTensor& S2
             tensor_type_, "temp222HP_L",
             std::vector<std::string>(block_pair.second.begin(), block_pair.second.end()));
 
-        auto q_size = label_to_spacemo_[block0[0]].size();
-
-        for (size_t q = 0; q < q_size; ++q) {
+        for (size_t q = 0, q_size = label_to_spacemo_[block0[0]].size(); q < q_size; ++q) {
             // H2 slice
-            for (const auto& h2_ais : h2_blocks[block0]) {
-                auto& H2_data = H2.block(block0 + h2_ais).data();
-                auto& H2sub_data = H2sub.block(h2_ais).data();
-
-                auto chunk_size = H2sub_data.size();
-                auto begin = H2_data.begin() + q * chunk_size;
-                std::copy(begin, begin + chunk_size, H2sub_data.begin());
-            }
+            fill_slice3_from_tensor4(H2, H2sub, block0, q, h2_blocks[block0]);
 
             // contraction
             X2sub["ays"] = H2sub["axs"] * L1_["xy"];
@@ -1040,31 +950,7 @@ void SADSRG::H2_T2_C2_PH(BlockedTensor& H2, BlockedTensor& T2, BlockedTensor& S2
             temp["jbs"] += 0.5 * alpha * T2["ijbx"] * Y2sub["xis"];
 
             // fill in C2
-            for (const auto& block123 : block_pair.second) {
-                auto j_size = label_to_spacemo_[block123[0]].size();
-                auto r_size = label_to_spacemo_[block123[1]].size();
-                auto s_size = label_to_spacemo_[block123[2]].size();
-
-                auto rs_size = r_size * s_size;
-                auto jrs_size = j_size * rs_size;
-
-                // C2["qjsb"] += temp["qjsb"];
-                auto temp_block = temp.block(block123);
-                auto& C2_data = C2.block(block0 + block123).data();
-
-                auto C2_data_begin = C2_data.begin() + q * jrs_size;
-                std::transform(C2_data_begin, C2_data_begin + jrs_size, temp_block.data().begin(),
-                               C2_data_begin, [](auto c, auto t) { return c + t; });
-
-                // C2["jqbs"] += temp["qjsb"];
-                auto block_swap =
-                    block123.substr(0, 1) + block0 + block123.substr(2, 1) + block123.substr(1, 1);
-                auto qsr_size = q_size * rs_size;
-                auto& C2s_data = C2.block(block_swap).data();
-                temp_block.citerate([&](const std::vector<size_t>& id, const double& value) {
-                    C2s_data[id[0] * qsr_size + q * rs_size + id[2] * r_size + id[1]] += value;
-                });
-            }
+            axpy_slice3_to_tensor4_with_sym(C2, temp, 1.0, block0, q, block_pair.second);
         }
     }
 
@@ -1095,18 +981,9 @@ void SADSRG::H2_T2_C2_PH(BlockedTensor& H2, BlockedTensor& T2, BlockedTensor& S2
             tensor_type_, "temp222HP_L",
             std::vector<std::string>(block_pair.second.begin(), block_pair.second.end()));
 
-        auto q_size = label_to_spacemo_[block0[0]].size();
-
-        for (size_t q = 0; q < q_size; ++q) {
+        for (size_t q = 0, q_size = label_to_spacemo_[block0[0]].size(); q < q_size; ++q) {
             // H2 slice
-            for (const auto& h2_ais : h2_blocks[block0]) {
-                auto& H2_data = H2.block(block0 + h2_ais).data();
-                auto& H2sub_data = H2sub.block(h2_ais).data();
-
-                auto chunk_size = H2sub_data.size();
-                auto begin = H2_data.begin() + q * chunk_size;
-                std::copy(begin, begin + chunk_size, H2sub_data.begin());
-            }
+            fill_slice3_from_tensor4(H2, H2sub, block0, q, h2_blocks[block0]);
 
             // contraction
             temp.zero();
@@ -1115,31 +992,7 @@ void SADSRG::H2_T2_C2_PH(BlockedTensor& H2, BlockedTensor& T2, BlockedTensor& S2
             temp["jsb"] += 0.5 * alpha * T2["ijxb"] * H2sub["yis"] * L1_["xy"];
 
             // fill in C2
-            for (const auto& block123 : block_pair.second) {
-                auto j_size = label_to_spacemo_[block123[0]].size();
-                auto s_size = label_to_spacemo_[block123[1]].size();
-                auto b_size = label_to_spacemo_[block123[2]].size();
-
-                auto sb_size = s_size * b_size;
-                auto jsb_size = j_size * sb_size;
-
-                // C2["qjsb"] += temp["qjsb"];
-                auto temp_block = temp.block(block123);
-                auto& C2_data = C2.block(block0 + block123).data();
-
-                auto C2_data_begin = C2_data.begin() + q * jsb_size;
-                std::transform(C2_data_begin, C2_data_begin + jsb_size, temp_block.data().begin(),
-                               C2_data_begin, [](auto c, auto t) { return c + t; });
-
-                // C2["jqbs"] += temp["qjsb"];
-                auto block_swap =
-                    block123.substr(0, 1) + block0 + block123.substr(2, 1) + block123.substr(1, 1);
-                auto qbs_size = q_size * sb_size;
-                auto& C2s_data = C2.block(block_swap).data();
-                temp_block.citerate([&](const std::vector<size_t>& id, const double& value) {
-                    C2s_data[id[0] * qbs_size + q * sb_size + id[2] * s_size + id[1]] += value;
-                });
-            }
+            axpy_slice3_to_tensor4_with_sym(C2, temp, 1.0, block0, q, block_pair.second);
         }
     }
 
@@ -1170,18 +1023,9 @@ void SADSRG::H2_T2_C2_PH(BlockedTensor& H2, BlockedTensor& T2, BlockedTensor& S2
             tensor_type_, "temp222HP_L",
             std::vector<std::string>(block_pair.second.begin(), block_pair.second.end()));
 
-        auto q_size = label_to_spacemo_[block0[0]].size();
-
-        for (size_t q = 0; q < q_size; ++q) {
+        for (size_t q = 0, q_size = label_to_spacemo_[block0[0]].size(); q < q_size; ++q) {
             // H2 slice
-            for (const auto& h2_ais : h2_blocks[block0]) {
-                auto& H2_data = H2.block(block0 + h2_ais).data();
-                auto& H2sub_data = H2sub.block(h2_ais).data();
-
-                auto chunk_size = H2sub_data.size();
-                auto begin = H2_data.begin() + q * chunk_size;
-                std::copy(begin, begin + chunk_size, H2sub_data.begin());
-            }
+            fill_slice3_from_tensor4(H2, H2sub, block0, q, h2_blocks[block0]);
 
             // contraction
             temp.zero();
@@ -1190,31 +1034,7 @@ void SADSRG::H2_T2_C2_PH(BlockedTensor& H2, BlockedTensor& T2, BlockedTensor& S2
             temp["jbs"] += 0.5 * alpha * H2sub["yis"] * L1_["xy"] * T2["ijbx"];
 
             // fill in C2
-            for (const auto& block123 : block_pair.second) {
-                auto j_size = label_to_spacemo_[block123[0]].size();
-                auto b_size = label_to_spacemo_[block123[1]].size();
-                auto s_size = label_to_spacemo_[block123[2]].size();
-
-                auto bs_size = b_size * s_size;
-                auto jbs_size = j_size * bs_size;
-
-                // C2["qjbs"] += temp["qjbs"];
-                auto temp_block = temp.block(block123);
-                auto& C2_data = C2.block(block0 + block123).data();
-
-                auto C2_data_begin = C2_data.begin() + q * jbs_size;
-                std::transform(C2_data_begin, C2_data_begin + jbs_size, temp_block.data().begin(),
-                               C2_data_begin, [](auto c, auto t) { return c + t; });
-
-                // C2["jqsb"] += temp["qjbs"];
-                auto block_swap =
-                    block123.substr(0, 1) + block0 + block123.substr(2, 1) + block123.substr(1, 1);
-                auto qsb_size = q_size * bs_size;
-                auto& C2s_data = C2.block(block_swap).data();
-                temp_block.citerate([&](const std::vector<size_t>& id, const double& value) {
-                    C2s_data[id[0] * qsb_size + q * bs_size + id[2] * b_size + id[1]] += value;
-                });
-            }
+            axpy_slice3_to_tensor4_with_sym(C2, temp, 1.0, block0, q, block_pair.second);
         }
     }
 }

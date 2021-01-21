@@ -390,10 +390,7 @@ class SADSRG : public DynamicCorrelationSolver {
     void H_T_C2a_smallS(BlockedTensor& H1, BlockedTensor& H2, BlockedTensor& T1, BlockedTensor& T2,
                         BlockedTensor& S2, BlockedTensor& C2);
 
-    // ==> miscellaneous <==
-
-    /// Diagonalize the diagonal blocks of the Fock matrix
-    std::vector<double> diagonalize_Fock_diagblocks(BlockedTensor& U);
+    // ==> printing functions <==
 
     /// Print the summary of 2- and 3-body density cumulant
     void print_cumulant_summary();
@@ -427,10 +424,62 @@ class SADSRG : public DynamicCorrelationSolver {
     /// Print t2 intruder analysis
     void print_t2_intruder(const std::vector<std::pair<std::vector<size_t>, double>>& list);
 
+    // ==> miscellaneous <==
+
+    /// Diagonalize the diagonal blocks of the Fock matrix
+    std::vector<double> diagonalize_Fock_diagblocks(BlockedTensor& U);
+
     /// Comparison function used to sort pair<vector, double>
     static bool sort_pair_second_descend(const std::pair<std::vector<size_t>, double>& left,
                                          const std::pair<std::vector<size_t>, double>& right) {
         return std::fabs(left.second) > std::fabs(right.second);
+    }
+
+    /// Fill in a 3-index slice (Tsub["qrs"]) of a 4-index tensor (T["pqrs"]) for given index p
+    template<class B>
+    void fill_slice3_from_tensor4(BlockedTensor& T, BlockedTensor& Tsub, const std::string& block_p,
+                                  size_t p, const B& blocks_qrs) {
+        for (const auto& block_qrs : blocks_qrs) {
+            auto& T_data = T.block(block_p + block_qrs).data();
+            auto& Tsub_data = Tsub.block(block_qrs).data();
+
+            auto chunk_size = Tsub_data.size();
+            auto begin = T_data.begin() + p * chunk_size;
+            std::copy(begin, begin + chunk_size, Tsub_data.begin());
+        }
+    }
+
+    /// Add a 3-index slice (O["qrs"]) of index p to a 4-index tensor (C["pqrs"] and C["qpsr"])
+    /// i.e., for given p, C["pqrs"] += factor * S["qrs"]; C["qpsr"] += factor * S["qrs"];
+    template<class B>
+    void axpy_slice3_to_tensor4_with_sym(BlockedTensor& C, BlockedTensor& S, const double factor,
+                                         const std::string& block_p, size_t p,
+                                         const B& blocks_qrs) {
+        size_t p_size = label_to_spacemo_[block_p[0]].size();
+
+        for (const auto& block_qrs : blocks_qrs) {
+            auto q_size = label_to_spacemo_[block_qrs[0]].size();
+            auto r_size = label_to_spacemo_[block_qrs[1]].size();
+            auto s_size = label_to_spacemo_[block_qrs[2]].size();
+
+            auto rs_size = r_size * s_size;
+            auto qrs_size = q_size * rs_size;
+            auto psr_size = p_size * rs_size;
+
+            // C["pqrs"] += factor * S["qrs"] for given index p
+            auto& Cpqrs_data = C.block(block_p + block_qrs).data();
+            auto Cdata_begin = Cpqrs_data.begin() + p * qrs_size;
+            std::transform(Cdata_begin, Cdata_begin + qrs_size, S.block(block_qrs).data().begin(),
+                           Cdata_begin, [&factor](auto c, auto t) { return c + factor * t; });
+
+            // C["qpsr"] += factor * S["qrs"] for given index p
+            auto block_qpsr = block_qrs.substr(0, 1) + block_p;
+            block_qpsr += block_qrs.substr(2, 1) + block_qrs.substr(1, 1);
+            auto& Cqpsr_data = C.block(block_qpsr).data();
+            S.block(block_qrs).citerate([&](const std::vector<size_t>& id, const double& value) {
+                Cqpsr_data[id[0] * psr_size + p * rs_size + id[2] * r_size + id[1]] += factor * value;
+            });
+        }
     }
 };
 } // namespace forte
