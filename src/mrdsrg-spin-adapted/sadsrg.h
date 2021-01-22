@@ -339,18 +339,10 @@ class SADSRG : public DynamicCorrelationSolver {
 
     /// Compute two-body term of commutator [H2, T2], particle-particle contraction
     void H2_T2_C2_PP(BlockedTensor& H2, BlockedTensor& T2, const double& alpha, BlockedTensor& C2);
-    /// Compute two-body term of commutator [H2, T2], particle-particle contraction
-    void H2_T2_C2_PPsmall(BlockedTensor& H2, BlockedTensor& T2, const double& alpha,
-                          BlockedTensor& C2);
 
     /// Compute two-body term of commutator [H2, T2], particle-hole contraction
     void H2_T2_C2_PH(BlockedTensor& H2, BlockedTensor& T2, BlockedTensor& S2, const double& alpha,
                      BlockedTensor& C2);
-    /// Compute two-body term of commutator [H2, T2], particle-hole contraction part 1
-    void H2_T2_C2_PH1(BlockedTensor& H2, BlockedTensor& T2, BlockedTensor& S2, const double& alpha,
-                      BlockedTensor& C2);
-    /// Compute two-body term of commutator [H2, T2], particle-hole contraction part 2
-    void H2_T2_C2_PH2(BlockedTensor& H2, BlockedTensor& T2, const double& alpha, BlockedTensor& C2);
 
     /// Compute zero-body term of commutator [V, T1], V is constructed from B (DF/CD)
     void V_T1_C0_DF(BlockedTensor& B, BlockedTensor& T1, const double& alpha, double& C0);
@@ -435,8 +427,58 @@ class SADSRG : public DynamicCorrelationSolver {
         return std::fabs(left.second) > std::fabs(right.second);
     }
 
+    /// Separate a vector of block labels to vectors of small blocks that fit in memory
+    std::vector<std::vector<std::string>>
+    separate_blocks(const std::vector<std::string>& blocks, std::vector<std::string>& large_blocks,
+                    const std::function<size_t(std::string)> func_Ttemp) {
+        // sort the blocks according to the number of element
+        std::vector<std::string> blocks_sorted(blocks);
+        std::sort(blocks_sorted.begin(), blocks_sorted.end(),
+                  [&](const std::string& b1, const std::string& b2) {
+                      return dsrg_mem_.compute_n_elements(b1) < dsrg_mem_.compute_n_elements(b2);
+                  });
+
+        // separate blocks to small blocks that fit in memory
+        // put the large block that does not fit in memory in large_blocks
+        large_blocks.clear();
+        std::vector<std::vector<std::string>> block_batches;
+        std::vector<std::string> current_blocks;
+
+        size_t cumulative_memory = 0;
+        size_t available_memory = dsrg_mem_.available() / sizeof(double);
+
+        for (const auto& block : blocks_sorted) {
+            auto size = dsrg_mem_.compute_n_elements(block);
+            auto intermediate_size = func_Ttemp(block);
+
+            // a single block that does not fit in memory
+            if (size + intermediate_size > available_memory) {
+                large_blocks.push_back(block);
+                continue;
+            }
+
+            // this block fit in memory
+            // but adding it to current_blocks make current_blocks out of memory
+            if (cumulative_memory + size + intermediate_size > available_memory) {
+                block_batches.push_back(current_blocks);
+                current_blocks.clear();
+                cumulative_memory = 0;
+            }
+
+            // add to current_blocks
+            cumulative_memory += size;
+            current_blocks.push_back(block);
+        }
+
+        if (current_blocks.size()) {
+            block_batches.push_back(current_blocks);
+        }
+
+        return block_batches;
+    }
+
     /// Fill in a 3-index slice (Tsub["qrs"]) of a 4-index tensor (T["pqrs"]) for given index p
-    template<class B>
+    template <class B>
     void fill_slice3_from_tensor4(BlockedTensor& T, BlockedTensor& Tsub, const std::string& block_p,
                                   size_t p, const B& blocks_qrs) {
         for (const auto& block_qrs : blocks_qrs) {
@@ -451,7 +493,7 @@ class SADSRG : public DynamicCorrelationSolver {
 
     /// Add a 3-index slice (O["qrs"]) of index p to a 4-index tensor (C["pqrs"] and C["qpsr"])
     /// i.e., for given p, C["pqrs"] += factor * S["qrs"]; C["qpsr"] += factor * S["qrs"];
-    template<class B>
+    template <class B>
     void axpy_slice3_to_tensor4_with_sym(BlockedTensor& C, BlockedTensor& S, const double factor,
                                          const std::string& block_p, size_t p,
                                          const B& blocks_qrs) {
@@ -477,7 +519,8 @@ class SADSRG : public DynamicCorrelationSolver {
             block_qpsr += block_qrs.substr(2, 1) + block_qrs.substr(1, 1);
             auto& Cqpsr_data = C.block(block_qpsr).data();
             S.block(block_qrs).citerate([&](const std::vector<size_t>& id, const double& value) {
-                Cqpsr_data[id[0] * psr_size + p * rs_size + id[2] * r_size + id[1]] += factor * value;
+                Cqpsr_data[id[0] * psr_size + p * rs_size + id[2] * r_size + id[1]] +=
+                    factor * value;
             });
         }
     }
