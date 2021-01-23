@@ -336,10 +336,8 @@ class SADSRG : public DynamicCorrelationSolver {
 
     /// Compute two-body term of commutator [H2, T2], hole-hole contraction
     void H2_T2_C2_HH(BlockedTensor& H2, BlockedTensor& T2, const double& alpha, BlockedTensor& C2);
-
     /// Compute two-body term of commutator [H2, T2], particle-particle contraction
     void H2_T2_C2_PP(BlockedTensor& H2, BlockedTensor& T2, const double& alpha, BlockedTensor& C2);
-
     /// Compute two-body term of commutator [H2, T2], particle-hole contraction
     void H2_T2_C2_PH(BlockedTensor& H2, BlockedTensor& T2, BlockedTensor& S2, const double& alpha,
                      BlockedTensor& C2);
@@ -364,6 +362,16 @@ class SADSRG : public DynamicCorrelationSolver {
     /// Compute two-body term of commutator [V, T2], exchange of particle-hole contraction
     void V_T2_C2_DF_PH_X(BlockedTensor& B, BlockedTensor& T2, const double& alpha,
                          BlockedTensor& C2);
+
+    /// Compute two-body term of commutator [V, T2], hole-hole contraction
+    void H2_T2_C2_HH_DF(BlockedTensor& B, BlockedTensor& T2, const double& alpha,
+                        BlockedTensor& C2);
+    /// Compute two-body term of commutator [V, T2], particle-particle contraction
+    void H2_T2_C2_PP_DF(BlockedTensor& B, BlockedTensor& T2, const double& alpha,
+                        BlockedTensor& C2);
+    /// Compute two-body term of commutator [V, T2], particle-hole contraction
+    void H2_T2_C2_PH_DF(BlockedTensor& B, BlockedTensor& T2, BlockedTensor& S2, const double& alpha,
+                        BlockedTensor& C2);
 
     /// Compute the active part of commutator C1 + C2 = alpha * [H1 + H2, A1 + A2]
     void H_A_Ca(BlockedTensor& H1, BlockedTensor& H2, BlockedTensor& T1, BlockedTensor& T2,
