@@ -389,9 +389,10 @@ void SADSRG::H2_T2_C2_PP(BlockedTensor& H2, BlockedTensor& T2, const double& alp
                          BlockedTensor& C2) {
     C2["ijrs"] += alpha * H2["abrs"] * T2["ijab"];
 
-    // we want to store an intermediate to prevent repeated computation for the following
+    // We want to store an intermediate to prevent repeated computation for the following:
     // C2["ijrs"] -= 0.5 * alpha * L1_["xy"] * T2["ijxb"] * H2["ybrs"];
     // C2["jisr"] -= 0.5 * alpha * L1_["xy"] * T2["ijxb"] * H2["ybrs"];
+    // Minimal memory requirement: hgg + 2 * hap
 
     // separate C2 into small blocks that fit in memory
 
@@ -479,9 +480,11 @@ void SADSRG::H2_T2_C2_HH(BlockedTensor& H2, BlockedTensor& T2, const double& alp
                          BlockedTensor& C2) {
     C2["pqab"] += alpha * H2["pqij"] * T2["ijab"];
 
-    // we want to store an intermediate to prevent repeated computation for the following
+    // We want to store an intermediate to prevent repeated computation for the following:
     // C2["pqab"] -= 0.5 * alpha * Eta1_["xy"] * T2["yjab"] * H2["pqxj"];
     // C2["qpba"] -= 0.5 * alpha * Eta1_["xy"] * T2["yjab"] * H2["pqxj"];
+    // Largest implicit intermediate: Eta1_["xy"] * T2["yjab"] of size acvv
+    // Minimal memory requirement: gpp + 2 * gah
 
     // separate C2 into small blocks that fit in memory
 
@@ -567,7 +570,8 @@ void SADSRG::H2_T2_C2_HH(BlockedTensor& H2, BlockedTensor& T2, const double& alp
 
 void SADSRG::H2_T2_C2_PH(BlockedTensor& H2, BlockedTensor& T2, BlockedTensor& S2,
                          const double& alpha, BlockedTensor& C2) {
-    /* we want to store two intermediates to prevent repeated computation for the following
+    /* We want to store two intermediates to prevent repeated computation for the following:
+     *
      * temp["qjsb"] += alpha * H2["aqms"] * S2["mjab"];
      * temp["qjsb"] -= alpha * H2["aqsm"] * T2["mjab"];
      * temp["qjsb"] += 0.5 * alpha * L1_["xy"] * S2["yjab"] * H2["aqxs"];
@@ -582,6 +586,8 @@ void SADSRG::H2_T2_C2_PH(BlockedTensor& H2, BlockedTensor& T2, BlockedTensor& S2
      * temp["qjbs"] += 0.5 * alpha * L1_["xy"] * T2["ijbx"] * H2["yqsi"];
      * C2["qjbs"] += temp["qjbs"];
      * C2["jqsb"] += temp["qjbs"];
+     *
+     * Minimal memory requirement: gpg + 2 * hpp, hpp + 2 * hpg
      */
 
     // separate C2_qjsb and C2_qjbs into small blocks that fit in memory
@@ -603,7 +609,7 @@ void SADSRG::H2_T2_C2_PH(BlockedTensor& H2, BlockedTensor& T2, BlockedTensor& S2
         }
     }
 
-    // 2. figure out the blocks for intermediate
+    // 2. figure out the blocks for 4-index intermediate if not batching
     // for C2_qjsb: Y2["xjab"] = L1_["xy"] * T2["yjab"]
     // for C2_qjbs: Y2["xjba"] = L1_["xy"] * T2["yjba"]
     std::unordered_map<std::string, std::vector<std::string>> blocks_xjab_jb_to_xa;
@@ -753,130 +759,89 @@ void SADSRG::H2_T2_C2_PH(BlockedTensor& H2, BlockedTensor& T2, BlockedTensor& S2
                                           large_blocks_sb.begin());
     large_blocks_sb.resize(it_diff_sb - large_blocks_sb.begin());
 
-    // blocks that are in common
-
-    // 1. classify C2 large blocks based on index q
-    std::unordered_map<std::string, std::vector<std::string>> C2big_q_to_jcb;
-    std::unordered_set<std::string> C2blocks_qs;
-    for (const auto& block : large_blocks_common) {
-        auto q = block.substr(0, 1);
-        C2big_q_to_jcb[q].push_back(block.substr(1, 3));
-        C2blocks_qs.insert(q + block.substr(2, 1));
-        C2blocks_qs.insert(q + block.substr(3, 1));
-    }
-
-    // 2. classify H2 large blocks based on index q
-    auto form_H2_q_to_ais = [&]() {
-        std::unordered_map<std::string, std::vector<std::string>> q_to_ais;
-        for (const auto& block : H2.block_labels()) {
-            auto q = block.substr(0, 1);
-            if (C2blocks_qs.find(q + block.substr(3, 1)) != C2blocks_qs.end() and
-                block.substr(1, 1) != core_label_ and block.substr(2, 1) != virt_label_) {
-                q_to_ais[q].push_back(block.substr(1, 3));
+    // function to compute T2 related terms
+    auto compute_222ph_t2 =
+        [&](const std::vector<std::string>& large_blocks, size_t pos_s,
+            const std::function<void(BlockedTensor&, BlockedTensor&, BlockedTensor&)>& func) {
+            // 1. classify C2 large blocks based on index q
+            std::unordered_map<std::string, std::vector<std::string>> C2big_q_to_jsb;
+            std::unordered_set<std::string> C2blocks_qs;
+            for (const auto& block : large_blocks) {
+                auto q = block.substr(0, 1);
+                auto s = block.substr(pos_s, 1);
+                C2big_q_to_jsb[q].push_back(block.substr(1, 3));
+                C2blocks_qs.insert(q + s);
             }
-        }
-        return q_to_ais;
-    };
-    auto H2_q_to_ais = form_H2_q_to_ais();
 
-    // 3. batching
-    for (const auto& block_pair : C2big_q_to_jcb) {
-        const auto& block_q = block_pair.first;
+            // 2. classify H2 large blocks based on index q
+            std::unordered_map<std::string, std::vector<std::string>> H2_q_to_ais;
+            for (const auto& block : H2.block_labels()) {
+                auto q = block.substr(0, 1);
+                if (C2blocks_qs.find(q + block.substr(3, 1)) != C2blocks_qs.end() and
+                    block.substr(1, 1) != core_label_ and block.substr(2, 1) != virt_label_) {
+                    H2_q_to_ais[q].push_back(block.substr(1, 3));
+                }
+            }
 
-        auto H2sub = BlockedTensor::build(tensor_type_, "H2sub222HP", H2_q_to_ais[block_q]);
-        auto X2sub = BlockedTensor::build(tensor_type_, "X2sub222HP", H2_q_to_ais[block_q]);
-        auto temp = BlockedTensor::build(tensor_type_, "temp222HP_L", block_pair.second);
+            // 3. batching
+            for (const auto& block_pair : C2big_q_to_jsb) {
+                const auto& block_q = block_pair.first;
 
-        for (size_t q = 0, q_size = label_to_spacemo_[block_q[0]].size(); q < q_size; ++q) {
-            // H2 slice
-            fill_slice3_from_tensor4(H2, H2sub, block_q, q, H2_q_to_ais[block_q]);
+                auto H2sub = BlockedTensor::build(tensor_type_, "H2sub222HP", H2_q_to_ais[block_q]);
+                auto X2sub = BlockedTensor::build(tensor_type_, "X2sub222HP", H2_q_to_ais[block_q]);
+                auto C2sub = BlockedTensor::build(tensor_type_, "temp222HP_L", block_pair.second);
 
-            // contraction
-            temp["jsb"] = -alpha * H2sub["ams"] * T2["mjab"];
-            temp["jbs"] -= alpha * H2sub["ams"] * T2["mjba"];
+                for (size_t q = 0, q_size = label_to_spacemo_[block_q[0]].size(); q < q_size; ++q) {
+                    // H2 slice
+                    fill_slice3_from_tensor4(H2, H2sub, block_q, q, H2_q_to_ais[block_q]);
 
-            X2sub["ays"] = H2sub["axs"] * L1_["xy"];
-            temp["jsb"] -= 0.5 * alpha * T2["yjab"] * X2sub["ays"];
-            temp["jbs"] -= 0.5 * alpha * T2["yjba"] * X2sub["ays"];
+                    // contraction
+                    func(H2sub, X2sub, C2sub);
 
-            X2sub["xis"] = H2sub["yis"] * L1_["xy"];
-            temp["jsb"] += 0.5 * alpha * T2["ijxb"] * X2sub["xis"];
-            temp["jbs"] += 0.5 * alpha * T2["ijbx"] * X2sub["xis"];
+                    // fill in C2
+                    axpy_slice3_to_tensor4_with_sym(C2, C2sub, 1.0, block_q, q, block_pair.second);
+                }
+            }
+        };
 
-            // fill in C2
-            axpy_slice3_to_tensor4_with_sym(C2, temp, 1.0, block_q, q, block_pair.second);
-        }
-    }
+    // blocks that are in common
+    compute_222ph_t2(large_blocks_common, 2,
+                     [&](BlockedTensor& H2sub, BlockedTensor& X2sub, BlockedTensor& C2sub) {
+        C2sub["jsb"] = -alpha * H2sub["ams"] * T2["mjab"];
+        C2sub["jbs"] -= alpha * H2sub["ams"] * T2["mjba"];
+
+        X2sub["ays"] = H2sub["axs"] * L1_["xy"];
+        C2sub["jsb"] -= 0.5 * alpha * T2["yjab"] * X2sub["ays"];
+        C2sub["jbs"] -= 0.5 * alpha * T2["yjba"] * X2sub["ays"];
+
+        X2sub["xis"] = H2sub["yis"] * L1_["xy"];
+        C2sub["jsb"] += 0.5 * alpha * T2["ijxb"] * X2sub["xis"];
+        C2sub["jbs"] += 0.5 * alpha * T2["ijbx"] * X2sub["xis"];
+    });
 
     // blocks that are unique in qjsb
+    compute_222ph_t2(large_blocks_sb, 2,
+                     [&](BlockedTensor& H2sub, BlockedTensor& X2sub, BlockedTensor& C2sub) {
+        C2sub["jsb"] = -alpha * H2sub["ams"] * T2["mjab"];
 
-    // 1. classify C2_qjsb large blocks based on index q
-    std::unordered_map<std::string, std::vector<std::string>> C2big_q_to_jsb;
-    C2blocks_qs.clear();
-    for (const auto& block : large_blocks_sb) {
-        auto q = block.substr(0, 1);
-        C2big_q_to_jsb[q].push_back(block.substr(1, 3));
-        C2blocks_qs.insert(q + block.substr(2, 1));
-    }
+        X2sub["ays"] = H2sub["axs"] * L1_["xy"];
+        C2sub["jsb"] -= 0.5 * alpha * T2["yjab"] * X2sub["ays"];
 
-    // 2. classify H2 large blocks based on index q
-    H2_q_to_ais = form_H2_q_to_ais();
-
-    // 3. batching
-    for (const auto& block_pair : C2big_q_to_jsb) {
-        const auto& block_q = block_pair.first;
-
-        auto H2sub = BlockedTensor::build(tensor_type_, "H2sub222HP", H2_q_to_ais[block_q]);
-        auto temp = BlockedTensor::build(tensor_type_, "temp222HP_L", block_pair.second);
-
-        for (size_t q = 0, q_size = label_to_spacemo_[block_q[0]].size(); q < q_size; ++q) {
-            // H2 slice
-            fill_slice3_from_tensor4(H2, H2sub, block_q, q, H2_q_to_ais[block_q]);
-
-            // contraction
-            temp["jsb"] = -1.0 * alpha * H2sub["ams"] * T2["mjab"];
-            temp["jsb"] -= 0.5 * alpha * T2["yjab"] * H2sub["axs"] * L1_["xy"];
-            temp["jsb"] += 0.5 * alpha * T2["ijxb"] * H2sub["yis"] * L1_["xy"];
-
-            // fill in C2
-            axpy_slice3_to_tensor4_with_sym(C2, temp, 1.0, block_q, q, block_pair.second);
-        }
-    }
+        X2sub["xis"] = H2sub["yis"] * L1_["xy"];
+        C2sub["jsb"] += 0.5 * alpha * T2["ijxb"] * X2sub["xis"];
+    });
 
     // blocks that are unique in qjbs
+    compute_222ph_t2(large_blocks_bs, 3,
+                     [&](BlockedTensor& H2sub, BlockedTensor& X2sub, BlockedTensor& C2sub) {
+        C2sub["jbs"] = -alpha * H2sub["ams"] * T2["mjba"];
 
-    // 1. classify C2_qjbs large blocks based on index q
-    std::unordered_map<std::string, std::vector<std::string>> C2big_q_to_jbs;
-    C2blocks_qs.clear();
-    for (const auto& block : large_blocks_bs) {
-        auto q = block.substr(0, 1);
-        C2big_q_to_jbs[q].push_back(block.substr(1, 3));
-        C2blocks_qs.insert(q + block.substr(3, 1));
-    }
+        X2sub["ays"] = H2sub["axs"] * L1_["xy"];
+        C2sub["jbs"] -= 0.5 * alpha * T2["yjba"] * X2sub["ays"];
 
-    // 2. classify H2 large blocks based on index q
-    H2_q_to_ais = form_H2_q_to_ais();
-
-    // 3. batching
-    for (const auto& block_pair : C2big_q_to_jbs) {
-        const auto& block_q = block_pair.first;
-
-        auto H2sub = BlockedTensor::build(tensor_type_, "H2sub222HP", H2_q_to_ais[block_q]);
-        auto temp = BlockedTensor::build(tensor_type_, "temp222HP_L", block_pair.second);
-
-        for (size_t q = 0, q_size = label_to_spacemo_[block_q[0]].size(); q < q_size; ++q) {
-            // H2 slice
-            fill_slice3_from_tensor4(H2, H2sub, block_q, q, H2_q_to_ais[block_q]);
-
-            // contraction
-            temp["jbs"] = -1.0 * alpha * H2sub["ams"] * T2["mjba"];
-            temp["jbs"] -= 0.5 * alpha * H2sub["axs"] * L1_["xy"] * T2["yjba"];
-            temp["jbs"] += 0.5 * alpha * H2sub["yis"] * L1_["xy"] * T2["ijbx"];
-
-            // fill in C2
-            axpy_slice3_to_tensor4_with_sym(C2, temp, 1.0, block_q, q, block_pair.second);
-        }
-    }
+        X2sub["xis"] = H2sub["yis"] * L1_["xy"];
+        C2sub["jbs"] += 0.5 * alpha * T2["ijbx"] * X2sub["xis"];
+    });
 }
 
 void SADSRG::V_T1_C0_DF(BlockedTensor& B, BlockedTensor& T1, const double& alpha, double& C0) {
@@ -1082,15 +1047,22 @@ void SADSRG::V_T2_C2_PP_DF(BlockedTensor& B, BlockedTensor& T2, const double& al
                            BlockedTensor& C2) {
     C2["ijrs"] += batched("r", alpha * B["gar"] * B["gbs"] * T2["ijab"]);
 
+    // C2["ijrs"] += 0.5 * alpha * B["gyr"] * L1_["xy"] * B["gbs"] * T2["ijxb"]
+    // C2["jisr"] += 0.5 * alpha * B["gyr"] * L1_["xy"] * B["gbs"] * T2["ijxb"]
+
+    // We explicitly build the intermediate Btemp["gxr"] = B["gyr"] * L1_["xy"] of size Lag
+    // The largest implicit intermediate comes from Btemp["gxk"] * B["gbs"] of size ahpp
+
     // separate C2 into small blocks that fit in memory
 
     // 1. filter out irrelavent C2 blocks
     std::vector<std::string> C2blocks;
-    std::unordered_set<std::string> C2blocks_ij;
+    std::unordered_set<std::string> C2blocks_ij, C2blocks_r;
     for (const std::string& block : C2.block_labels()) {
         if (block.substr(0, 1) != virt_label_ and block.substr(1, 1) != virt_label_) {
             C2blocks.push_back(block);
             C2blocks_ij.insert(block.substr(0, 2));
+            C2blocks_r.insert(block.substr(2, 1));
         }
     }
 
@@ -1106,19 +1078,28 @@ void SADSRG::V_T2_C2_PP_DF(BlockedTensor& B, BlockedTensor& T2, const double& al
     // 3. separate C2 into vectors of blocks, where each vector fits in memory
     std::vector<std::string> large_blocks;
     auto block_batches = separate_blocks(C2blocks, large_blocks, [&](const std::string& block) {
-        // the intermediate when building C2["ijrs"]: V2["(r)ybs"] = B["gy(r)"] * B["gbs"]
-        auto s = block.substr(3, 1);
+        // the intermediate when building C2["ijks"]: V2["ykbs"] = B["gyk"] * B["gbs"]
+        auto ks = block.substr(2, 1) == virt_label_ ? block.substr(3, 1) : block.substr(2, 2);
         const auto& blocks_b = T2blocks_ij_to_b[block.substr(0, 2)];
         return std::accumulate(blocks_b.begin(), blocks_b.end(), 0,
                                [&](size_t x, const std::string& b) {
-                                   return x + dsrg_mem_.compute_n_elements(s + b + "a");
+                                   return x + dsrg_mem_.compute_n_elements(ks + b + "a");
                                });
     });
+
+    // build intermediate Bxr["gxr"] = B["gyr"] * L1_["xy"];
+    std::vector<std::string> Bblocks_gxr;
+    for (const auto& r : C2blocks_r) {
+        Bblocks_gxr.push_back("La" + r);
+    }
+    auto Btemp = BlockedTensor::build(tensor_type_, "Bxr", Bblocks_gxr);
+    Btemp["gxr"] = B["gyr"] * L1_["xy"];
 
     // loop over batches of blocks that fit in memory
     for (const auto& blocks : block_batches) {
         auto temp = BlockedTensor::build(tensor_type_, "temp222PP", blocks);
-        temp["ijrs"] = batched("r", 0.5 * alpha * B["gyr"] * B["gbs"] * L1_["xy"] * T2["ijxb"]);
+        temp["ijes"] = batched("e", 0.5 * alpha * Btemp["gxe"] * B["gbs"] * T2["ijxb"]);
+        temp["ijks"] = 0.5 * alpha * Btemp["gxk"] * B["gbs"] * T2["ijxb"];
         C2["ijrs"] -= temp["ijrs"];
         C2["jisr"] -= temp["ijrs"];
     }
@@ -1137,18 +1118,19 @@ void SADSRG::V_T2_C2_PP_DF(BlockedTensor& B, BlockedTensor& T2, const double& al
     for (const auto& block_pair : C2big_r_to_ijs) {
         const auto& block_r = block_pair.first;
 
-        auto& Bdata = B.block("La" + block_r).data();
+        auto& Btemp_data = Btemp.block("La" + block_r).data();
         auto Bsub = BlockedTensor::build(tensor_type_, "Bsub222PPDF", {"La"});
-        auto temp = BlockedTensor::build(tensor_type_, "temp222PPDF", block_pair.second);
+        auto Csub = BlockedTensor::build(tensor_type_, "temp222PPDF", block_pair.second);
 
         for (size_t r = 0, r_size = label_to_spacemo_[block_r[0]].size(); r < r_size; ++r) {
             // B slice
+            size_t rx_size = r_size * actv_size;
             Bsub.block("La").iterate([&](const std::vector<size_t> idx, double& value) {
-                value = Bdata[idx[0] * r_size * actv_size + idx[1] * r_size + r];
+                value = Btemp_data[idx[0] * rx_size + idx[1] * r_size + r];
             });
 
             // contraction
-            temp["ijs"] = 0.5 * alpha * L1_["xy"] * Bsub["gy"] * B["gbs"] * T2["ijxb"];
+            Csub["ijs"] = 0.5 * alpha * Bsub["gx"] * B["gbs"] * T2["ijxb"];
 
             // add to C2
             for (const auto& block_ijs : block_pair.second) {
@@ -1165,7 +1147,7 @@ void SADSRG::V_T2_C2_PP_DF(BlockedTensor& B, BlockedTensor& T2, const double& al
                 // C2["ij(r)s"] -= temp["ijs"];
                 auto jrs_size = j_size * rs_size;
                 auto& Cijrs_data = C2.block(block_i + block_j + block_r + block_s).data();
-                temp.block(block_ijs).citerate([&](const std::vector<size_t>& id,
+                Csub.block(block_ijs).citerate([&](const std::vector<size_t>& id,
                                                    const double& value) {
                     Cijrs_data[id[0] * jrs_size + id[1] * rs_size + r * s_size + id[2]] -= value;
                 });
@@ -1173,7 +1155,7 @@ void SADSRG::V_T2_C2_PP_DF(BlockedTensor& B, BlockedTensor& T2, const double& al
                 // C2["jis(r)"] -= temp["ijs"];
                 auto irs_size = i_size * rs_size;
                 auto& Cjisr_data = C2.block(block_j + block_i + block_s + block_r).data();
-                temp.block(block_ijs).citerate([&](const std::vector<size_t>& id,
+                Csub.block(block_ijs).citerate([&](const std::vector<size_t>& id,
                                                    const double& value) {
                     Cjisr_data[id[1] * irs_size + id[0] * rs_size + id[2] * r_size + r] -= value;
                 });
@@ -1184,7 +1166,10 @@ void SADSRG::V_T2_C2_PP_DF(BlockedTensor& B, BlockedTensor& T2, const double& al
 
 void SADSRG::V_T2_C2_HH_DF(BlockedTensor& B, BlockedTensor& T2, const double& alpha,
                            BlockedTensor& C2) {
-    C2["pqab"] += batched("p", alpha * B["gpi"] * B["gqj"] * T2["ijab"]);
+    timer_on("C2[pqab] += batched(p, alpha * B[gpi] * B[gqj] * T2[ijab];");
+    C2["pqab"] += alpha * B["gpi"] * B["gqj"] * T2["ijab"];
+    //    C2["pqab"] += batched("p", alpha * B["gpi"] * B["gqj"] * T2["ijab"]);
+    timer_off("C2[pqab] += batched(p, alpha * B[gpi] * B[gqj] * T2[ijab];");
 
     // separate C2 into small blocks that fit in memory
 

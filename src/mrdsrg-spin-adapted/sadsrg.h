@@ -442,7 +442,7 @@ class SADSRG : public DynamicCorrelationSolver {
     /// Separate a vector of block labels to vectors of small blocks that fit in memory
     std::vector<std::vector<std::string>>
     separate_blocks(const std::vector<std::string>& blocks, std::vector<std::string>& large_blocks,
-                    const std::function<size_t(std::string)> func_Ttemp) {
+                    const std::function<size_t(std::string)>& func_Ttemp) {
         // sort the blocks according to the number of element
         std::vector<std::string> blocks_sorted(blocks);
         std::sort(blocks_sorted.begin(), blocks_sorted.end(),
