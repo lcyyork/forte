@@ -361,15 +361,13 @@ class SADSRG : public DynamicCorrelationSolver {
                     BlockedTensor& C2);
 
     /// Compute two-body term of commutator [V, T2], hole-hole contraction
-    void V_T2_C2_HH_DF(BlockedTensor& B, BlockedTensor& T2, const double& alpha,
-                        BlockedTensor& C2);
+    void V_T2_C2_HH_DF(BlockedTensor& B, BlockedTensor& T2, const double& alpha, BlockedTensor& C2);
     /// Compute two-body term of commutator [V, T2], particle-particle contraction
-    void V_T2_C2_PP_DF(BlockedTensor& B, BlockedTensor& T2, const double& alpha,
-                        BlockedTensor& C2);
+    void V_T2_C2_PP_DF(BlockedTensor& B, BlockedTensor& T2, const double& alpha, BlockedTensor& C2);
 
     /// Compute two-body term of commutator [V, T2], particle-hole contraction
     void V_T2_C2_PH_DF(BlockedTensor& B, BlockedTensor& T2, BlockedTensor& S2, const double& alpha,
-                        BlockedTensor& C2);
+                       BlockedTensor& C2);
     /// Compute two-body term of commutator [V, T2], particle-hole contraction S2 related
     void V_T2_C2_PH_DF_J(BlockedTensor& B, BlockedTensor& S2, const double& alpha,
                          BlockedTensor& C2);
@@ -506,34 +504,54 @@ class SADSRG : public DynamicCorrelationSolver {
     /// Add a 3-index slice (O["qrs"]) of index p to a 4-index tensor (C["pqrs"] and C["qpsr"])
     /// i.e., for given p, C["pqrs"] += factor * S["qrs"]; C["qpsr"] += factor * S["qrs"];
     template <class B>
-    void axpy_slice3_to_tensor4_with_sym(BlockedTensor& C, BlockedTensor& S, const double factor,
-                                         const std::string& block_p, size_t p,
-                                         const B& blocks_qrs) {
+    void axpy_slice3_to_tensor4(BlockedTensor& C, BlockedTensor& S, const double factor,
+                                const std::string& block_p, size_t p, const B& blocks_qrs,
+                                bool with_sym = true) {
         size_t p_size = label_to_spacemo_[block_p[0]].size();
 
-        for (const auto& block_qrs : blocks_qrs) {
-            auto q_size = label_to_spacemo_[block_qrs[0]].size();
-            auto r_size = label_to_spacemo_[block_qrs[1]].size();
-            auto s_size = label_to_spacemo_[block_qrs[2]].size();
+        if (with_sym) {
+            for (const auto& block_qrs : blocks_qrs) {
+                auto q_size = label_to_spacemo_[block_qrs[0]].size();
+                auto r_size = label_to_spacemo_[block_qrs[1]].size();
+                auto s_size = label_to_spacemo_[block_qrs[2]].size();
 
-            auto rs_size = r_size * s_size;
-            auto qrs_size = q_size * rs_size;
-            auto psr_size = p_size * rs_size;
+                auto rs_size = r_size * s_size;
+                auto qrs_size = q_size * rs_size;
+                auto psr_size = p_size * rs_size;
 
-            // C["pqrs"] += factor * S["qrs"] for given index p
-            auto& Cpqrs_data = C.block(block_p + block_qrs).data();
-            auto Cdata_begin = Cpqrs_data.begin() + p * qrs_size;
-            std::transform(Cdata_begin, Cdata_begin + qrs_size, S.block(block_qrs).data().begin(),
-                           Cdata_begin, [&factor](auto c, auto t) { return c + factor * t; });
+                // C["pqrs"] += factor * S["qrs"] for given index p
+                auto& Cpqrs_data = C.block(block_p + block_qrs).data();
+                auto Cdata_begin = Cpqrs_data.begin() + p * qrs_size;
+                std::transform(Cdata_begin, Cdata_begin + qrs_size,
+                               S.block(block_qrs).data().begin(), Cdata_begin,
+                               [&factor](auto c, auto t) { return c + factor * t; });
 
-            // C["qpsr"] += factor * S["qrs"] for given index p
-            auto block_qpsr = block_qrs.substr(0, 1) + block_p;
-            block_qpsr += block_qrs.substr(2, 1) + block_qrs.substr(1, 1);
-            auto& Cqpsr_data = C.block(block_qpsr).data();
-            S.block(block_qrs).citerate([&](const std::vector<size_t>& id, const double& value) {
-                Cqpsr_data[id[0] * psr_size + p * rs_size + id[2] * r_size + id[1]] +=
-                    factor * value;
-            });
+                // C["qpsr"] += factor * S["qrs"] for given index p
+                auto block_qpsr = block_qrs.substr(0, 1) + block_p;
+                block_qpsr += block_qrs.substr(2, 1) + block_qrs.substr(1, 1);
+                auto& Cqpsr_data = C.block(block_qpsr).data();
+                S.block(block_qrs).citerate(
+                    [&](const std::vector<size_t>& id, const double& value) {
+                        Cqpsr_data[id[0] * psr_size + p * rs_size + id[2] * r_size + id[1]] +=
+                            factor * value;
+                    });
+            }
+        } else {
+            for (const auto& block_qrs : blocks_qrs) {
+                auto q_size = label_to_spacemo_[block_qrs[0]].size();
+                auto r_size = label_to_spacemo_[block_qrs[1]].size();
+                auto s_size = label_to_spacemo_[block_qrs[2]].size();
+
+                auto rs_size = r_size * s_size;
+                auto qrs_size = q_size * rs_size;
+
+                // C["pqrs"] += factor * S["qrs"] for given index p
+                auto& Cpqrs_data = C.block(block_p + block_qrs).data();
+                auto Cdata_begin = Cpqrs_data.begin() + p * qrs_size;
+                std::transform(Cdata_begin, Cdata_begin + qrs_size,
+                               S.block(block_qrs).data().begin(), Cdata_begin,
+                               [&factor](auto c, auto t) { return c + factor * t; });
+            }
         }
     }
 };
