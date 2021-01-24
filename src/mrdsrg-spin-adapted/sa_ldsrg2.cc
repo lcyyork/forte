@@ -55,7 +55,7 @@ double SA_MRDSRG::compute_energy_ldsrg2() {
     }
 
     std::string indent(4, ' ');
-    std::string dash(105, '-');
+    std::string dash(104, '-');
     std::string title;
 
     title += indent + "              Energy (a.u.)           Non-Diagonal Norm        Amplitude "
@@ -63,7 +63,7 @@ double SA_MRDSRG::compute_energy_ldsrg2() {
     title += indent + "       ---------------------------  ---------------------  "
                       "---------------------  -----------------\n";
     title += indent + "Iter.        Corr.         Delta       Hbar1      Hbar2        T1         "
-                      "T2        Hbar     Amp.    DIIS\n";
+                      "T2        Hbar     Amp.   DIIS\n";
     title += indent + dash;
 
     outfile->Printf("\n%s", title.c_str());
@@ -118,7 +118,7 @@ double SA_MRDSRG::compute_energy_ldsrg2() {
         od.stop();
 
         // printing
-        outfile->Printf("\n    %4d   %16.12f %10.3e  %10.3e %10.3e  %10.3e %10.3e  %8.3f %8.3f",
+        outfile->Printf("\n    %4d   %16.12f %10.3e  %10.3e %10.3e  %10.3e %10.3e  %8.2e %8.2e",
                         cycle, Ecorr, Edelta, Hbar1od, Hbar2od, T1rms_, T2rms_, time_hbar,
                         time_amp);
 

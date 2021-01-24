@@ -178,9 +178,9 @@ void SA_MRDSRG::check_memory() {
     }
 
     // intermediates used in actual commutator computation
-    size_t mem_comm = dsrg_mem_.compute_memory({"hhpp", "ahpp", "hhhp"}) * 2;
-    if ((!eri_df_) and (!nivo_)) {
-        mem_comm = std::max(mem_comm, dsrg_mem_.compute_memory({"ppph"}));
+    size_t mem_comm = dsrg_mem_.compute_memory({"ggg"}) * 3; // generous estimate for minimal
+    if (eri_df_) {
+        mem_comm = dsrg_mem_.compute_memory({"Lhp", "ggg"});
     }
     dsrg_mem_.add_entry("Local intermediates for commutators", mem_comm, false);
 

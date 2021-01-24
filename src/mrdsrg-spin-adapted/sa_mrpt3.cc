@@ -97,7 +97,6 @@ void SA_MRPT3::build_ints() {
     print_done(t.stop());
 }
 
-
 void SA_MRPT3::init_amps() {
     timer t("Initialize T1 and T2");
     print_contents("Allocating amplitudes");
@@ -130,7 +129,11 @@ void SA_MRPT3::check_memory() {
     }
     dsrg_mem_.add_entry("Local intermediates (energy part 2)", local2, false);
 
-    auto local_comm = dsrg_mem_.compute_memory({"pphh"});
+    auto local_comm = dsrg_mem_.compute_memory({"ggg"}) * 3;
+    if (eri_df_) {
+        local_comm = std::max(dsrg_mem_.compute_memory({"Lhp", "Lg", "ghp"}),
+                              dsrg_mem_.compute_memory({"Lh", "gpp", "ghh"}));
+    }
     dsrg_mem_.add_entry("Local intermediates for commutators", local_comm, false);
 
     dsrg_mem_.print("DSRG-MRPT3");
