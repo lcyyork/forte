@@ -1052,10 +1052,22 @@ void SADSRG::V_T1_C2_DF(BlockedTensor& B, BlockedTensor& T1, const double& alpha
                         BlockedTensor& C2) {
     timer t("V_T1_C2_DF");
 
-    C2["irpq"] += alpha * T1["ia"] * B["gap"] * B["grq"];
-    C2["riqp"] += alpha * T1["ia"] * B["gap"] * B["grq"];
-    C2["rsaq"] -= alpha * T1["ia"] * B["gri"] * B["gsq"];
-    C2["srqa"] -= alpha * T1["ia"] * B["gri"] * B["gsq"];
+    auto temp = ambit::BlockedTensor::build(tensor_type_, "DFtemp212", {"Lhp"});
+    temp["gib"] = T1["ia"] * B["gab"];
+    C2["irbq"] += alpha * temp["gib"] * B["grq"];
+    C2["riqb"] += alpha * temp["gib"] * B["grq"];
+
+    temp["gja"] = T1["ia"] * B["gji"];
+    C2["jsaq"] -= alpha * temp["gja"] * B["gsq"];
+    C2["sjqa"] -= alpha * temp["gja"] * B["gsq"];
+
+    temp = ambit::BlockedTensor::build(tensor_type_, "DFtemp212", {"Lhc"});
+    temp["gim"] = T1["ia"] * B["gam"];
+    C2["irmq"] += alpha * temp["gim"] * B["grq"];
+    C2["riqm"] += alpha * temp["gim"] * B["grq"];
+
+    C2["esaq"] -= batched("e", alpha * T1["ia"] * B["gei"] * B["gsq"]);
+    C2["seqa"] -= batched("e", alpha * T1["ia"] * B["gei"] * B["gsq"]);
 
     auto elapsed_time = t.stop();
     dsrg_time_.add("212", elapsed_time);
