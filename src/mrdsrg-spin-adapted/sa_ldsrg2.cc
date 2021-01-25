@@ -48,7 +48,7 @@ double SA_MRDSRG::compute_energy_ldsrg2() {
     outfile->Printf("\n    Reference:");
     outfile->Printf("\n      J. Chem. Phys. 2016, 144, 164114.\n");
 
-    timer ldsrg2("Energy LDSRG(2)");
+    timer t_ldsrg2("Energy LDSRG(2)");
 
     if (!do_cu3_) {
         outfile->Printf("\n    Skip 3-cumulant contributions in [O2, T2].");
@@ -90,8 +90,7 @@ double SA_MRDSRG::compute_energy_ldsrg2() {
         DT2_["ijab"] -= T2_["ijba"];
 
         // compute Hbar
-        local_timer t_hbar;
-        timer hbar("Compute Hbar");
+        timer t_hbar("Compute Hbar");
         if (corrlv_string_ == "LDSRG2_QC") {
             compute_hbar_qc();
         } else {
@@ -101,28 +100,27 @@ double SA_MRDSRG::compute_energy_ldsrg2() {
                 compute_hbar();
             }
         }
-        hbar.stop();
+        double time_hbar = t_hbar.stop();
         double Edelta = Hbar0_ - Ecorr;
         Ecorr = Hbar0_;
-        double time_hbar = t_hbar.get();
 
-        timer od("Off-diagonal Hbar");
         // compute norms of off-diagonal Hbar
+        timer t_od("Off-diagonal Hbar");
         double Hbar1od = Hbar_od_norm(1, blocks1);
         double Hbar2od = Hbar_od_norm(2, blocks2);
+        t_od.stop();
 
         // update amplitudes
-        local_timer t_amp;
+        timer t_amp("Update amplitudes");
         update_t();
-        double time_amp = t_amp.get();
-        od.stop();
+        double time_amp = t_amp.stop();
 
         // printing
         outfile->Printf("\n    %4d   %16.12f %10.3e  %10.3e %10.3e  %10.3e %10.3e  %8.2e %8.2e",
                         cycle, Ecorr, Edelta, Hbar1od, Hbar2od, T1rms_, T2rms_, time_hbar,
                         time_amp);
 
-        timer diis("DIIS");
+        timer t_diis("DIIS");
         // DIIS amplitudes
         if (diis_start_ > 0 and cycle >= diis_start_) {
             diis_manager_add_entry();
@@ -134,7 +132,7 @@ double SA_MRDSRG::compute_energy_ldsrg2() {
                 outfile->Printf("/E");
             }
         }
-        diis.stop();
+        t_diis.stop();
 
         // test convergence
         double rms = T1rms_ > T2rms_ ? T1rms_ : T2rms_;
@@ -157,7 +155,6 @@ double SA_MRDSRG::compute_energy_ldsrg2() {
         diis_manager_cleanup();
     }
 
-    timer final("Summary LDSRG(2)");
     // print summary
     outfile->Printf("\n    %s", dash.c_str());
     outfile->Printf("\n\n  ==> MR-LDSRG(2)%s Energy Summary <==\n", level.c_str());
@@ -180,7 +177,6 @@ double SA_MRDSRG::compute_energy_ldsrg2() {
         clean_checkpoints(); // clean amplitudes in scratch directory
         throw psi::PSIEXCEPTION("The MR-LDSRG(2) computation does not converge.");
     }
-    final.stop();
 
     Hbar0_ = Ecorr;
     return Ecorr;
@@ -302,7 +298,7 @@ void SA_MRDSRG::compute_hbar_sequential() {
         outfile->Printf("\n\n  ==> Computing the DSRG Transformed Hamiltonian <==\n");
     }
 
-    timer rotation("Hbar T1 rotation");
+    timer t_rotation("Hbar T1 rotation");
 
     ambit::BlockedTensor A1;
     A1 = BTF_->build(tensor_type_, "A1 Amplitudes", {"gg"}, true);
@@ -382,14 +378,14 @@ void SA_MRDSRG::compute_hbar_sequential() {
 
     Hbar0_ += Efrzc_ + Enuc_ - Eref_;
 
-    rotation.stop();
+    t_rotation.stop();
 
     ////////////////////////////////////////////////////////////////////////////////////
 
     // iteration variables
     bool converged = false;
 
-    timer comm("Hbar T2 commutator");
+    timer t_comm("Hbar T2 commutator");
 
     // temporary Hamiltonian used in every iteration
     O1_["pq"] = Hbar1_["pq"];

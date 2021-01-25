@@ -30,6 +30,7 @@
 
 #include "psi4/libpsi4util/PsiOutStream.h"
 
+#include "helpers/timer.h"
 #include "sadsrg.h"
 
 using namespace psi;
@@ -53,6 +54,7 @@ void SADSRG::internal_amps_T2(BlockedTensor& T2) {
 }
 
 void SADSRG::analyze_amplitudes(std::string name, BlockedTensor& T1, BlockedTensor& T2) {
+    timer t("Analyze amplitudes");
     if (!name.empty())
         name += " ";
     outfile->Printf("\n\n  ==> %sExcitation Amplitudes Summary <==\n", name.c_str());
@@ -76,6 +78,8 @@ void SADSRG::analyze_amplitudes(std::string name, BlockedTensor& T1, BlockedTens
 }
 
 std::vector<std::pair<std::vector<size_t>, double>> SADSRG::check_t2(BlockedTensor& T2) {
+    timer t("Check largest T2 amplitudes");
+
     size_t nonzero = 0;
     T2.citerate([&](const std::vector<size_t>&, const std::vector<SpinType>&, const double& value) {
         if (std::fabs(value) > 1.0e-15) {
@@ -143,6 +147,8 @@ std::vector<std::pair<std::vector<size_t>, double>> SADSRG::check_t2(BlockedTens
 }
 
 std::vector<std::pair<std::vector<size_t>, double>> SADSRG::check_t1(BlockedTensor& T1) {
+    timer t("Check largest T1 amplitudes");
+
     size_t nonzero = 0;
     T1.citerate([&](const std::vector<size_t>&, const std::vector<SpinType>&, const double& value) {
         if (std::fabs(value) > 1.0e-15) {

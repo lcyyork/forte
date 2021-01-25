@@ -39,7 +39,7 @@ using namespace psi;
 namespace forte {
 
 double SADSRG::H1_T1_C0(BlockedTensor& H1, BlockedTensor& T1, const double& alpha, double& C0) {
-    local_timer timer;
+    timer t("H1_T1_C0");
 
     double E = 0.0;
     E += 2.0 * H1["am"] * T1["ma"];
@@ -53,15 +53,16 @@ double SADSRG::H1_T1_C0(BlockedTensor& H1, BlockedTensor& T1, const double& alph
     E *= alpha;
     C0 += E;
 
+    auto elapsed_time = t.stop();
+    dsrg_time_.add("110", elapsed_time);
     if (print_ > 2) {
-        outfile->Printf("\n    Time for [H1, T1] -> C0 : %12.3f", timer.get());
+        outfile->Printf("\n    Time for [H1, T1] -> C0 : %12.3f", elapsed_time);
     }
-    dsrg_time_.add("110", timer.get());
     return E;
 }
 
 double SADSRG::H1_T2_C0(BlockedTensor& H1, BlockedTensor& T2, const double& alpha, double& C0) {
-    local_timer timer;
+    timer t("H1_T2_C0");
 
     double E = 0.0;
     auto temp = ambit::BlockedTensor::build(tensor_type_, "Temp120", {"aaaa"});
@@ -73,15 +74,16 @@ double SADSRG::H1_T2_C0(BlockedTensor& H1, BlockedTensor& T2, const double& alph
     E *= alpha;
     C0 += E;
 
+    auto elapsed_time = t.stop();
+    dsrg_time_.add("120", elapsed_time);
     if (print_ > 2) {
-        outfile->Printf("\n    Time for [H1, T2] -> C0 : %12.3f", timer.get());
+        outfile->Printf("\n    Time for [H1, T2] -> C0 : %12.3f", elapsed_time);
     }
-    dsrg_time_.add("120", timer.get());
     return E;
 }
 
 double SADSRG::H2_T1_C0(BlockedTensor& H2, BlockedTensor& T1, const double& alpha, double& C0) {
-    local_timer timer;
+    timer t("H2_T1_C0");
 
     double E = 0.0;
 
@@ -94,16 +96,17 @@ double SADSRG::H2_T1_C0(BlockedTensor& H2, BlockedTensor& T1, const double& alph
     E *= alpha;
     C0 += E;
 
+    auto elapsed_time = t.stop();
+    dsrg_time_.add("210", elapsed_time);
     if (print_ > 2) {
-        outfile->Printf("\n    Time for [H2, T1] -> C0 : %12.3f", timer.get());
+        outfile->Printf("\n    Time for [H2, T1] -> C0 : %12.3f", elapsed_time);
     }
-    dsrg_time_.add("210", timer.get());
     return E;
 }
 
 std::vector<double> SADSRG::H2_T2_C0(BlockedTensor& H2, BlockedTensor& T2, BlockedTensor& S2,
                                      const double& alpha, double& C0) {
-    local_timer timer;
+    timer t("H2_T2_C0");
 
     std::vector<double> Eout{0.0, 0.0, 0.0};
     double E = 0.0;
@@ -132,15 +135,18 @@ std::vector<double> SADSRG::H2_T2_C0(BlockedTensor& H2, BlockedTensor& T2, Block
     E *= alpha;
     C0 += E;
 
+    auto elapsed_time = t.stop();
+    dsrg_time_.add("220", elapsed_time);
     if (print_ > 2) {
-        outfile->Printf("\n    Time for [H2, T2] -> C0 : %12.3f", timer.get());
+        outfile->Printf("\n    Time for [H2, T2] -> C0 : %12.3f", elapsed_time);
     }
-    dsrg_time_.add("220", timer.get());
     return Eout;
 }
 
 std::vector<double> SADSRG::H2_T2_C0_T2small(BlockedTensor& H2, BlockedTensor& T2,
                                              BlockedTensor& S2) {
+    timer t("H2_T2_C0_T2small");
+
     /**
      * Note the following blocks should be available in memory.
      * H2: vvaa, aacc, avca, avac, vaaa, aaca
@@ -209,20 +215,21 @@ std::vector<double> SADSRG::H2_T2_C0_T2small(BlockedTensor& H2, BlockedTensor& T
 
 void SADSRG::H1_T1_C1(BlockedTensor& H1, BlockedTensor& T1, const double& alpha,
                       BlockedTensor& C1) {
-    local_timer timer;
+    timer t("H1_T1_C1");
 
     C1["ip"] += alpha * H1["ap"] * T1["ia"];
     C1["qa"] -= alpha * H1["qi"] * T1["ia"];
 
+    auto elapsed_time = t.stop();
+    dsrg_time_.add("111", elapsed_time);
     if (print_ > 2) {
-        outfile->Printf("\n    Time for [H1, T1] -> C1 : %12.3f", timer.get());
+        outfile->Printf("\n    Time for [H1, T1] -> C1 : %12.3f", elapsed_time);
     }
-    dsrg_time_.add("111", timer.get());
 }
 
 void SADSRG::H1_T2_C1(BlockedTensor& H1, BlockedTensor& T2, const double& alpha,
                       BlockedTensor& C1) {
-    local_timer timer;
+    timer t("H1_T2_C1");
 
     C1["ia"] += 2.0 * alpha * H1["bm"] * T2["imab"];
     C1["ia"] -= alpha * H1["bm"] * T2["miab"];
@@ -233,15 +240,16 @@ void SADSRG::H1_T2_C1(BlockedTensor& H1, BlockedTensor& T2, const double& alpha,
     C1["ia"] -= alpha * H1["vj"] * T2["ijau"] * L1_["uv"];
     C1["ia"] += 0.5 * alpha * H1["vj"] * T2["jiau"] * L1_["uv"];
 
+    auto elapsed_time = t.stop();
+    dsrg_time_.add("121", elapsed_time);
     if (print_ > 2) {
-        outfile->Printf("\n    Time for [H1, T2] -> C1 : %12.3f", timer.get());
+        outfile->Printf("\n    Time for [H1, T2] -> C1 : %12.3f", elapsed_time);
     }
-    dsrg_time_.add("121", timer.get());
 }
 
 void SADSRG::H2_T1_C1(BlockedTensor& H2, BlockedTensor& T1, const double& alpha,
                       BlockedTensor& C1) {
-    local_timer timer;
+    timer t("H2_T1_C1");
 
     C1["qp"] += 2.0 * alpha * T1["ma"] * H2["qapm"];
     C1["qp"] -= alpha * T1["ma"] * H2["aqpm"];
@@ -256,15 +264,16 @@ void SADSRG::H2_T1_C1(BlockedTensor& H2, BlockedTensor& T1, const double& alpha,
     C1["qp"] -= alpha * temp["mv"] * H2["qvpm"];
     C1["qp"] += 0.5 * alpha * temp["mv"] * H2["vqpm"];
 
+    auto elapsed_time = t.stop();
+    dsrg_time_.add("211", elapsed_time);
     if (print_ > 2) {
-        outfile->Printf("\n    Time for [H2, T1] -> C1 : %12.3f", timer.get());
+        outfile->Printf("\n    Time for [H2, T1] -> C1 : %12.3f", elapsed_time);
     }
-    dsrg_time_.add("211", timer.get());
 }
 
 void SADSRG::H2_T2_C1(BlockedTensor& H2, BlockedTensor& T2, BlockedTensor& S2, const double& alpha,
                       BlockedTensor& C1) {
-    local_timer timer;
+    timer t("H2_T2_C1");
 
     // [Hbar2, T2] (C_2)^3 and C_4 * C_2 2:2 -> C1 particle contractions
     C1["ir"] += alpha * H2["abrm"] * S2["imab"];
@@ -318,15 +327,16 @@ void SADSRG::H2_T2_C1(BlockedTensor& H2, BlockedTensor& T2, BlockedTensor& S2, c
     C1["qs"] -= alpha * H2["uqms"] * T2["mvxy"] * L2_["xyuv"];
     C1["qs"] += 0.5 * alpha * H2["uqsm"] * T2["mvxy"] * L2_["xyuv"];
 
+    auto elapsed_time = t.stop();
+    dsrg_time_.add("221", elapsed_time);
     if (print_ > 2) {
-        outfile->Printf("\n    Time for [H2, T2] -> C1 : %12.3f", timer.get());
+        outfile->Printf("\n    Time for [H2, T2] -> C1 : %12.3f", elapsed_time);
     }
-    dsrg_time_.add("221", timer.get());
 }
 
 void SADSRG::H1_T2_C2(BlockedTensor& H1, BlockedTensor& T2, const double& alpha,
                       BlockedTensor& C2) {
-    local_timer timer;
+    timer t("H1_T2_C2");
 
     C2["ijpb"] += alpha * T2["ijab"] * H1["ap"];
     C2["jibp"] += alpha * T2["ijab"] * H1["ap"];
@@ -334,15 +344,16 @@ void SADSRG::H1_T2_C2(BlockedTensor& H1, BlockedTensor& T2, const double& alpha,
     C2["qjab"] -= alpha * T2["ijab"] * H1["qi"];
     C2["jqba"] -= alpha * T2["ijab"] * H1["qi"];
 
+    auto elapsed_time = t.stop();
+    dsrg_time_.add("122", elapsed_time);
     if (print_ > 2) {
-        outfile->Printf("\n    Time for [H1, T2] -> C2 : %12.3f", timer.get());
+        outfile->Printf("\n    Time for [H1, T2] -> C2 : %12.3f", elapsed_time);
     }
-    dsrg_time_.add("122", timer.get());
 }
 
 void SADSRG::H2_T1_C2(BlockedTensor& H2, BlockedTensor& T1, const double& alpha,
                       BlockedTensor& C2) {
-    local_timer timer;
+    timer t("H2_T1_C2");
 
     C2["irpq"] += alpha * T1["ia"] * H2["arpq"];
     C2["riqp"] += alpha * T1["ia"] * H2["arpq"];
@@ -350,15 +361,16 @@ void SADSRG::H2_T1_C2(BlockedTensor& H2, BlockedTensor& T1, const double& alpha,
     C2["rsaq"] -= alpha * T1["ia"] * H2["rsiq"];
     C2["srqa"] -= alpha * T1["ia"] * H2["rsiq"];
 
+    auto elapsed_time = t.stop();
+    dsrg_time_.add("212", elapsed_time);
     if (print_ > 2) {
-        outfile->Printf("\n    Time for [H2, T1] -> C2 : %12.3f", timer.get());
+        outfile->Printf("\n    Time for [H2, T1] -> C2 : %12.3f", elapsed_time);
     }
-    dsrg_time_.add("212", timer.get());
 }
 
 void SADSRG::H2_T2_C2(BlockedTensor& H2, BlockedTensor& T2, BlockedTensor& S2, const double& alpha,
                       BlockedTensor& C2) {
-    local_timer timer;
+    timer t("H2_T2_C2");
 
     // H2, T2, and C2 should have the 2-fold symmetry: pqrs = qpsr,
     // which must also apply to blocks, e.g., cavc exists <=> accv exists.
@@ -379,17 +391,20 @@ void SADSRG::H2_T2_C2(BlockedTensor& H2, BlockedTensor& T2, BlockedTensor& S2, c
     H2_T2_C2_HH(H2, T2, alpha, C2);     // hole-hole contractions
     H2_T2_C2_PH(H2, T2, S2, alpha, C2); // hole-particle contractions
 
+    auto elapsed_time = t.stop();
+    dsrg_time_.add("222", elapsed_time);
     if (print_ > 2) {
-        outfile->Printf("\n    Time for [H2, T2] -> C2 : %12.3f", timer.get());
+        outfile->Printf("\n    Time for [H2, T2] -> C2 : %12.3f", elapsed_time);
     }
-    dsrg_time_.add("222", timer.get());
 }
 
 void SADSRG::H2_T2_C2_PP(BlockedTensor& H2, BlockedTensor& T2, const double& alpha,
                          BlockedTensor& C2) {
-    timer_on("H2_T2_C2_PP");
+    timer t("H2_T2_C2_PP");
 
+    timer t0("Direct C2[ijrs]: LCCD");
     C2["ijrs"] += alpha * H2["abrs"] * T2["ijab"];
+    t0.stop();
 
     // We want to store an intermediate to prevent repeated computation for the following:
     // C2["ijrs"] -= 0.5 * alpha * L1_["xy"] * T2["ijxb"] * H2["ybrs"];
@@ -430,12 +445,14 @@ void SADSRG::H2_T2_C2_PP(BlockedTensor& H2, BlockedTensor& T2, const double& alp
     });
 
     // loop over batches of blocks that fit in memory
+    timer t2("Direct C2[ijrs]: L1 related");
     for (const auto& blocks : block_batches) {
         auto temp = BlockedTensor::build(tensor_type_, "temp222PP", blocks);
         temp["ijrs"] = 0.5 * alpha * L1_["xy"] * T2["ijxb"] * H2["ybrs"];
         C2["ijrs"] -= temp["ijrs"];
         C2["jisr"] -= temp["ijrs"];
     }
+    t2.stop();
 
     if (large_blocks.size() == 0)
         return;
@@ -459,6 +476,8 @@ void SADSRG::H2_T2_C2_PP(BlockedTensor& H2, BlockedTensor& T2, const double& alp
     }
 
     // 3. batching
+    timer t4("Batching C2[ijrs]: L1 related");
+
     for (const auto& block_pair : C2big_i_to_jrs) {
         const auto& block_i = block_pair.first;
 
@@ -476,15 +495,16 @@ void SADSRG::H2_T2_C2_PP(BlockedTensor& H2, BlockedTensor& T2, const double& alp
             axpy_slice3_to_tensor4(C2, temp, -1.0, block_i, i, block_pair.second);
         }
     }
-
-    timer_off("H2_T2_C2_PP");
+    t4.stop();
 }
 
 void SADSRG::H2_T2_C2_HH(BlockedTensor& H2, BlockedTensor& T2, const double& alpha,
                          BlockedTensor& C2) {
-    timer_on("H2_T2_C2_HH");
+    timer t("H2_T2_C2_HH");
 
+    timer t0("Direct C2[pqab]: LCCD");
     C2["pqab"] += alpha * H2["pqij"] * T2["ijab"];
+    t0.stop();
 
     // We want to store an intermediate to prevent repeated computation for the following:
     // C2["pqab"] -= 0.5 * alpha * Eta1_["xy"] * T2["yjab"] * H2["pqxj"];
@@ -527,12 +547,14 @@ void SADSRG::H2_T2_C2_HH(BlockedTensor& H2, BlockedTensor& T2, const double& alp
     });
 
     // loop over batches of blocks that fit in memory
+    timer t2("Direct C2[pqab]: L1 related");
     for (const auto& blocks : block_batches) {
         auto temp = BlockedTensor::build(tensor_type_, "temp222HH", blocks);
         temp["pqab"] = 0.5 * alpha * Eta1_["xy"] * T2["yjab"] * H2["pqxj"];
         C2["pqab"] -= temp["pqab"];
         C2["qpba"] -= temp["pqab"];
     }
+    t2.stop();
 
     if (large_blocks.size() == 0)
         return;
@@ -555,6 +577,8 @@ void SADSRG::H2_T2_C2_HH(BlockedTensor& H2, BlockedTensor& T2, const double& alp
     }
 
     // 3. batching
+    timer t4("Batching C2[ijrs]: L1 related");
+
     for (const auto& block_pair : C2big_p_to_qab) {
         const auto& block_p = block_pair.first;
 
@@ -572,13 +596,12 @@ void SADSRG::H2_T2_C2_HH(BlockedTensor& H2, BlockedTensor& T2, const double& alp
             axpy_slice3_to_tensor4(C2, temp, -1.0, block_p, p, block_pair.second);
         }
     }
-
-    timer_off("H2_T2_C2_HH");
+    t4.stop();
 }
 
 void SADSRG::H2_T2_C2_PH(BlockedTensor& H2, BlockedTensor& T2, BlockedTensor& S2,
                          const double& alpha, BlockedTensor& C2) {
-    timer_on("H2_T2_C2_PH");
+    timer t("H2_T2_C2_PH");
 
     /* We want to store two intermediates to prevent repeated computation for the following:
      *
@@ -668,6 +691,7 @@ void SADSRG::H2_T2_C2_PH(BlockedTensor& H2, BlockedTensor& T2, BlockedTensor& S2
         });
 
     // loop over batches of blocks that fit in memory
+    timer t1("Direct C2[qjsb] and C2[qjbs]");
     for (const auto& blocks : block_batches_qjsb) {
         auto temp = BlockedTensor::build(tensor_type_, "temp222HP", blocks);
         temp["qjsb"] += alpha * H2["aqms"] * S2["mjab"];
@@ -688,8 +712,9 @@ void SADSRG::H2_T2_C2_PH(BlockedTensor& H2, BlockedTensor& T2, BlockedTensor& S2
         C2["qjbs"] += temp["qjbs"];
         C2["jqsb"] += temp["qjbs"];
     }
+    t1.stop();
 
-    if (large_blocks_qjbs.size() == 0 and large_blocks_qjsb.size())
+    if (large_blocks_qjbs.size() == 0 and large_blocks_qjsb.size() == 0)
         return;
 
     /* For super large blocks, we consider S2- and T2-related terms differently.
@@ -720,6 +745,8 @@ void SADSRG::H2_T2_C2_PH(BlockedTensor& H2, BlockedTensor& T2, BlockedTensor& S2
     }
 
     // 3. batching
+    timer t3("Batching C2[jqbs]: S2");
+
     for (const auto& block_pair : C2big_j_to_qbs) {
         const auto& block_j = block_pair.first;
 
@@ -739,6 +766,7 @@ void SADSRG::H2_T2_C2_PH(BlockedTensor& H2, BlockedTensor& T2, BlockedTensor& S2
             axpy_slice3_to_tensor4(C2, temp, 1.0, block_j, j, block_pair.second);
         }
     }
+    t3.stop();
 
     /* For T2 related terms, we classify C2_qjsb and C2_qjbs into three parts:
      * 1) blocks both belong to qjsb and qjbs
@@ -750,6 +778,7 @@ void SADSRG::H2_T2_C2_PH(BlockedTensor& H2, BlockedTensor& T2, BlockedTensor& S2
      */
 
     // figure out blocks intersection and difference
+
     std::sort(large_blocks_qjbs.begin(), large_blocks_qjbs.end());
     std::sort(large_blocks_qjsb.begin(), large_blocks_qjsb.end());
     std::vector<std::string> large_blocks_common(36), large_blocks_sb(36), large_blocks_bs(36);
@@ -815,6 +844,7 @@ void SADSRG::H2_T2_C2_PH(BlockedTensor& H2, BlockedTensor& T2, BlockedTensor& S2
         };
 
     // blocks that are in common
+    timer t5("Batching C2[qjcb]: T2");
     compute_222ph_t2(large_blocks_common, 2,
                      [&](BlockedTensor& H2sub, BlockedTensor& X2sub, BlockedTensor& C2sub) {
                          C2sub["jsb"] = -alpha * H2sub["ams"] * T2["mjab"];
@@ -828,8 +858,10 @@ void SADSRG::H2_T2_C2_PH(BlockedTensor& H2, BlockedTensor& T2, BlockedTensor& S2
                          C2sub["jsb"] += 0.5 * alpha * T2["ijxb"] * X2sub["xis"];
                          C2sub["jbs"] += 0.5 * alpha * T2["ijbx"] * X2sub["xis"];
                      });
+    t5.stop();
 
     // blocks that are unique in qjsb
+    timer t6("Batching C2[qjkb]: T2");
     compute_222ph_t2(large_blocks_sb, 2,
                      [&](BlockedTensor& H2sub, BlockedTensor& X2sub, BlockedTensor& C2sub) {
                          C2sub["jsb"] = -alpha * H2sub["ams"] * T2["mjab"];
@@ -840,8 +872,10 @@ void SADSRG::H2_T2_C2_PH(BlockedTensor& H2, BlockedTensor& T2, BlockedTensor& S2
                          X2sub["xis"] = H2sub["yis"] * L1_["xy"];
                          C2sub["jsb"] += 0.5 * alpha * T2["ijxb"] * X2sub["xis"];
                      });
+    t6.stop();
 
     // blocks that are unique in qjbs
+    timer t7("Batching C2[qjbk]: T2");
     compute_222ph_t2(large_blocks_bs, 3,
                      [&](BlockedTensor& H2sub, BlockedTensor& X2sub, BlockedTensor& C2sub) {
                          C2sub["jbs"] = -alpha * H2sub["ams"] * T2["mjba"];
@@ -852,12 +886,11 @@ void SADSRG::H2_T2_C2_PH(BlockedTensor& H2, BlockedTensor& T2, BlockedTensor& S2
                          X2sub["xis"] = H2sub["yis"] * L1_["xy"];
                          C2sub["jbs"] += 0.5 * alpha * T2["ijbx"] * X2sub["xis"];
                      });
-
-    timer_off("H2_T2_C2_PH");
+    t7.stop();
 }
 
 void SADSRG::V_T1_C0_DF(BlockedTensor& B, BlockedTensor& T1, const double& alpha, double& C0) {
-    local_timer timer;
+    timer t("V_T1_C0_DF");
 
     double E = 0.0;
 
@@ -870,15 +903,16 @@ void SADSRG::V_T1_C0_DF(BlockedTensor& B, BlockedTensor& T1, const double& alpha
     E *= alpha;
     C0 += E;
 
+    auto elapsed_time = t.stop();
+    dsrg_time_.add("210", elapsed_time);
     if (print_ > 2) {
-        outfile->Printf("\n    Time for [H2, T1] -> C0 : %12.3f", timer.get());
+        outfile->Printf("\n    Time for [H2, T1] -> C0 : %12.3f", elapsed_time);
     }
-    dsrg_time_.add("210", timer.get());
 }
 
 std::vector<double> SADSRG::V_T2_C0_DF(BlockedTensor& B, BlockedTensor& T2, BlockedTensor& S2,
                                        const double& alpha, double& C0) {
-    local_timer timer;
+    timer t("V_T2_C0_DF");
 
     std::vector<double> Eout{0.0, 0.0, 0.0};
     double E = 0.0;
@@ -907,16 +941,17 @@ std::vector<double> SADSRG::V_T2_C0_DF(BlockedTensor& B, BlockedTensor& T2, Bloc
     E *= alpha;
     C0 += E;
 
+    auto elapsed_time = t.stop();
+    dsrg_time_.add("220", elapsed_time);
     if (print_ > 2) {
-        outfile->Printf("\n    Time for [H2, T2] -> C0 : %12.3f", timer.get());
+        outfile->Printf("\n    Time for [H2, T2] -> C0 : %12.3f", elapsed_time);
     }
-    dsrg_time_.add("220", timer.get());
     return Eout;
 }
 
 void SADSRG::V_T1_C1_DF(BlockedTensor& B, BlockedTensor& T1, const double& alpha,
                         BlockedTensor& C1) {
-    local_timer timer;
+    timer t("V_T1_C1_DF");
 
     auto temp = ambit::BlockedTensor::build(tensor_type_, "DFtemp211", {"L"});
     temp["g"] += 2.0 * alpha * T1["ma"] * B["gam"];
@@ -931,15 +966,16 @@ void SADSRG::V_T1_C1_DF(BlockedTensor& B, BlockedTensor& T1, const double& alpha
 
     C1["qp"] -= 0.5 * alpha * T1["xe"] * L1_["yx"] * B["gep"] * B["gqy"];
 
+    auto elapsed_time = t.stop();
+    dsrg_time_.add("211", elapsed_time);
     if (print_ > 2) {
-        outfile->Printf("\n    Time for [H2, T1] -> C1 : %12.3f", timer.get());
+        outfile->Printf("\n    Time for [H2, T1] -> C1 : %12.3f", elapsed_time);
     }
-    dsrg_time_.add("211", timer.get());
 }
 
 void SADSRG::V_T2_C1_DF(BlockedTensor& B, BlockedTensor& T2, BlockedTensor& S2, const double& alpha,
                         BlockedTensor& C1) {
-    local_timer timer;
+    timer t("V_T2_C1_DF");
 
     // [Hbar2, T2] (C_2)^3 and C_4 * C_2 2:2 -> C1 particle contractions
     auto temp = ambit::BlockedTensor::build(tensor_type_, "DFtemp221", {"Lhp"});
@@ -1005,30 +1041,32 @@ void SADSRG::V_T2_C1_DF(BlockedTensor& B, BlockedTensor& T2, BlockedTensor& S2, 
 
     C1["qs"] += 0.5 * alpha * B["gus"] * B["gqm"] * T2["mvxy"] * L2_["xyuv"];
 
+    auto elapsed_time = t.stop();
+    dsrg_time_.add("221", elapsed_time);
     if (print_ > 2) {
-        outfile->Printf("\n    Time for [H2, T2] -> C1 : %12.3f", timer.get());
+        outfile->Printf("\n    Time for [H2, T2] -> C1 : %12.3f", elapsed_time);
     }
-    dsrg_time_.add("221", timer.get());
 }
 
 void SADSRG::V_T1_C2_DF(BlockedTensor& B, BlockedTensor& T1, const double& alpha,
                         BlockedTensor& C2) {
-    local_timer timer;
+    timer t("V_T1_C2_DF");
 
     C2["irpq"] += alpha * T1["ia"] * B["gap"] * B["grq"];
     C2["riqp"] += alpha * T1["ia"] * B["gap"] * B["grq"];
     C2["rsaq"] -= alpha * T1["ia"] * B["gri"] * B["gsq"];
     C2["srqa"] -= alpha * T1["ia"] * B["gri"] * B["gsq"];
 
+    auto elapsed_time = t.stop();
+    dsrg_time_.add("212", elapsed_time);
     if (print_ > 2) {
-        outfile->Printf("\n    Time for [H2, T1] -> C2 : %12.3f", timer.get());
+        outfile->Printf("\n    Time for [H2, T1] -> C2 : %12.3f", elapsed_time);
     }
-    dsrg_time_.add("212", timer.get());
 }
 
 void SADSRG::V_T2_C2_DF(BlockedTensor& B, BlockedTensor& T2, BlockedTensor& S2, const double& alpha,
                         BlockedTensor& C2) {
-    local_timer timer;
+    timer t("V_T2_C2_DF");
 
     // H2, T2, and C2 should have the 2-fold symmetry: pqrs = qpsr,
     // which must also apply to blocks, e.g., cavc exists <=> accv exists.
@@ -1049,18 +1087,21 @@ void SADSRG::V_T2_C2_DF(BlockedTensor& B, BlockedTensor& T2, BlockedTensor& S2, 
     V_T2_C2_HH_DF(B, T2, alpha, C2);     // hole-hole contractions
     V_T2_C2_PH_DF(B, T2, S2, alpha, C2); // hole-particle contractions
 
+    auto elapsed_time = t.stop();
+    dsrg_time_.add("222", elapsed_time);
     if (print_ > 2) {
-        outfile->Printf("\n    Time for [H2, T2] -> C2 : %12.3f", timer.get());
+        outfile->Printf("\n    Time for [H2, T2] -> C2 : %12.3f", elapsed_time);
     }
-    dsrg_time_.add("222", timer.get());
 }
 
 void SADSRG::V_T2_C2_PP_DF(BlockedTensor& B, BlockedTensor& T2, const double& alpha,
                            BlockedTensor& C2) {
-    timer_on("V_T2_C2_PP_DF");
+    timer t("V_T2_C2_PP_DF");
     auto mem = dsrg_mem_.available();
 
+    timer t0("LCCD C2[ijrs] Ambit batched r");
     C2["ijrs"] += batched("r", alpha * B["gar"] * B["gbs"] * T2["ijab"]);
+    t0.stop();
 
     // C2["ijrs"] += 0.5 * alpha * B["gyr"] * L1_["xy"] * B["gbs"] * T2["ijxb"]
     // C2["jisr"] += 0.5 * alpha * B["gyr"] * L1_["xy"] * B["gbs"] * T2["ijxb"]
@@ -1081,6 +1122,7 @@ void SADSRG::V_T2_C2_PP_DF(BlockedTensor& B, BlockedTensor& T2, const double& al
     }
 
     // 2. build intermediate Bxr["gxr"] = B["gyr"] * L1_["xy"];
+    timer tb("Build B[gxr]");
     std::vector<std::string> Bblocks_gxr;
     for (const auto& r : C2blocks_r) {
         Bblocks_gxr.push_back("La" + r);
@@ -1089,6 +1131,7 @@ void SADSRG::V_T2_C2_PP_DF(BlockedTensor& B, BlockedTensor& T2, const double& al
 
     auto Btemp = BlockedTensor::build(tensor_type_, "Bxr", Bblocks_gxr);
     Btemp["gxr"] = B["gyr"] * L1_["xy"];
+    tb.stop();
 
     // 3. figure out block labels for index b for given ij
     std::unordered_map<std::string, std::vector<std::string>> T2blocks_ij_to_b;
@@ -1112,12 +1155,14 @@ void SADSRG::V_T2_C2_PP_DF(BlockedTensor& B, BlockedTensor& T2, const double& al
     });
 
     // loop over batches of blocks that fit in memory
+    timer t2("Direct C2[ijrs]: L1 related");
     for (const auto& blocks : block_batches) {
         auto temp = BlockedTensor::build(tensor_type_, "temp222PP", blocks);
         temp["ijrs"] = 0.5 * alpha * Btemp["gxr"] * B["gbs"] * T2["ijxb"];
         C2["ijrs"] -= temp["ijrs"];
         C2["jisr"] -= temp["ijrs"];
     }
+    t2.stop();
 
     // for super large blocks, we batch over index r
 
@@ -1128,6 +1173,7 @@ void SADSRG::V_T2_C2_PP_DF(BlockedTensor& B, BlockedTensor& T2, const double& al
     }
 
     // 2. batching
+    timer t4("Batching C2[ijrs]: L1 related");
     size_t actv_size = actv_mos_.size();
 
     for (const auto& block_pair : C2big_r_to_ijs) {
@@ -1177,14 +1223,13 @@ void SADSRG::V_T2_C2_PP_DF(BlockedTensor& B, BlockedTensor& T2, const double& al
             }
         }
     }
-
+    t4.stop();
     dsrg_mem_.set_mem_avai(mem);
-    timer_off("V_T2_C2_PP_DF");
 }
 
 void SADSRG::V_T2_C2_HH_DF(BlockedTensor& B, BlockedTensor& T2, const double& alpha,
                            BlockedTensor& C2) {
-    timer_on("V_T2_C2_HH_DF");
+    timer t("V_T2_C2_HH_DF");
 
     // We need to compute the following:
     // C2["pqab"] += alpha * H2["pqij"] * T2["ijab"];
@@ -1232,6 +1277,7 @@ void SADSRG::V_T2_C2_HH_DF(BlockedTensor& B, BlockedTensor& T2, const double& al
     });
 
     // loop over batches of blocks that fit in memory
+    timer t1("Direct C2[pqab]: L1 related");
     for (const auto& blocks : block_batches) {
         std::unordered_set<std::string> Vblocks_set;
         for (const auto& pqab : blocks) {
@@ -1252,6 +1298,7 @@ void SADSRG::V_T2_C2_HH_DF(BlockedTensor& B, BlockedTensor& T2, const double& al
         C2["pqab"] += 0.5 * alpha * temp["pqab"];
         C2["qpba"] += 0.5 * alpha * temp["pqab"];
     }
+    t1.stop();
 
     // for super large blocks, we batch over index p
 
@@ -1262,6 +1309,7 @@ void SADSRG::V_T2_C2_HH_DF(BlockedTensor& B, BlockedTensor& T2, const double& al
     }
 
     // 2. batching
+    timer t3("Batching C2[ijrs]: L1 related");
     size_t m_size = core_mos_.size();
     size_t x_size = actv_mos_.size();
 
@@ -1291,19 +1339,19 @@ void SADSRG::V_T2_C2_HH_DF(BlockedTensor& B, BlockedTensor& T2, const double& al
             axpy_slice3_to_tensor4(C2, temp, -1.0, block_p, p, block_pair.second);
         }
     }
-
-    timer_off("V_T2_C2_HH_DF");
+    t3.stop();
 }
 
 void SADSRG::V_T2_C2_PH_DF(BlockedTensor& B, BlockedTensor& T2, BlockedTensor& S2,
                            const double& alpha, BlockedTensor& C2) {
+    timer t("V_T2_C2_PH_DF");
     V_T2_C2_PH_DF_J(B, S2, alpha, C2);
     V_T2_C2_PH_DF_K(B, T2, alpha, C2);
 }
 
 void SADSRG::V_T2_C2_PH_DF_J(BlockedTensor& B, BlockedTensor& S2, const double& alpha,
                              BlockedTensor& C2) {
-    timer_on("V_T2_C2_PH_DF_J");
+    timer t("V_T2_C2_PH_DF_J");
 
     // Minimal memory requirement: Lhp + Lg + ghp
 
@@ -1329,10 +1377,12 @@ void SADSRG::V_T2_C2_PH_DF_J(BlockedTensor& B, BlockedTensor& S2, const double& 
     }
 
     // build temp
+    timer t1("Build 3-index intermediate");
     auto temp = ambit::BlockedTensor::build(tensor_type_, "DFtemp222PHJ", Ljb_blocks);
     temp["gjb"] += alpha * B["gam"] * S2["mjab"];
     temp["gjb"] += 0.5 * alpha * L1_["xy"] * S2["yjab"] * B["gax"];
     temp["gjb"] -= 0.5 * alpha * L1_["xy"] * S2["ijxb"] * B["gyi"];
+    t1.stop();
 
     // contract auxiliary index and add to C2
 
@@ -1351,6 +1401,7 @@ void SADSRG::V_T2_C2_PH_DF_J(BlockedTensor& B, BlockedTensor& S2, const double& 
     }
 
     // 2. batching
+    timer t3("Batching C2[qjsb]");
     for (const auto& block_pair : C2blocks_q_to_jsb) {
         const auto& block_q = block_pair.first;
 
@@ -1382,13 +1433,12 @@ void SADSRG::V_T2_C2_PH_DF_J(BlockedTensor& B, BlockedTensor& S2, const double& 
             axpy_slice3_to_tensor4(C2, C2sub, 1.0, block_q, q, C2sub_blocks);
         }
     }
-
-    timer_off("V_T2_C2_PH_DF_J");
+    t3.stop();
 }
 
 void SADSRG::V_T2_C2_PH_DF_K(BlockedTensor& B, BlockedTensor& T2, const double& alpha,
                              BlockedTensor& C2) {
-    timer_on("V_T2_C2_PH_DF_K");
+    timer t("V_T2_C2_PH_DF_K");
 
     /* We want to compute the following expressions efficiently:
      *
@@ -1515,6 +1565,7 @@ void SADSRG::V_T2_C2_PH_DF_K(BlockedTensor& B, BlockedTensor& T2, const double& 
         };
 
     // compute for intersecting blocks
+    timer t1("Batching C2[qjcb]");
     compute_222ph_df_k(C2blocks_common, 2,
                        [&](BlockedTensor& Bsub, BlockedTensor& Vsub, BlockedTensor& Csub) {
                            Vsub["mas"] = B["gas"] * Bsub["gm"];
@@ -1529,8 +1580,10 @@ void SADSRG::V_T2_C2_PH_DF_K(BlockedTensor& B, BlockedTensor& T2, const double& 
                            Csub["jsb"] += 0.5 * alpha * Vsub["ixs"] * T2["ijxb"];
                            Csub["jbs"] += 0.5 * alpha * Vsub["ixs"] * T2["ijbx"];
                        });
+    t1.stop();
 
     // compute for qjsb unique blocks
+    timer t2("Batching C2[qjkb]");
     compute_222ph_df_k(C2blocks_qjsb, 2,
                        [&](BlockedTensor& Bsub, BlockedTensor& Vsub, BlockedTensor& Csub) {
                            Vsub["mas"] = B["gas"] * Bsub["gm"];
@@ -1542,8 +1595,10 @@ void SADSRG::V_T2_C2_PH_DF_K(BlockedTensor& B, BlockedTensor& T2, const double& 
                            Vsub["ixs"] = L1_["xy"] * Bsub["gi"] * B["gys"];
                            Csub["jsb"] += 0.5 * alpha * Vsub["ixs"] * T2["ijxb"];
                        });
+    t2.stop();
 
     // compute for qjbs unique blocks
+    timer t3("Batching C2[qjbk]");
     compute_222ph_df_k(C2blocks_qjbs, 3,
                        [&](BlockedTensor& Bsub, BlockedTensor& Vsub, BlockedTensor& Csub) {
                            Vsub["mas"] = B["gas"] * Bsub["gm"];
@@ -1555,8 +1610,7 @@ void SADSRG::V_T2_C2_PH_DF_K(BlockedTensor& B, BlockedTensor& T2, const double& 
                            Vsub["ixs"] = L1_["xy"] * Bsub["gi"] * B["gys"];
                            Csub["jbs"] += 0.5 * alpha * Vsub["ixs"] * T2["ijbx"];
                        });
-
-    timer_off("V_T2_C2_PH_DF_K");
+    t3.stop();
 }
 
 void SADSRG::H_A_Ca(BlockedTensor& H1, BlockedTensor& H2, BlockedTensor& T1, BlockedTensor& T2,
@@ -1578,6 +1632,8 @@ void SADSRG::H_A_Ca(BlockedTensor& H1, BlockedTensor& H2, BlockedTensor& T1, Blo
 void SADSRG::H_A_Ca_small(BlockedTensor& H1, BlockedTensor& H2, BlockedTensor& G2,
                           BlockedTensor& T1, BlockedTensor& T2, BlockedTensor& S2,
                           const double& alpha, BlockedTensor& C1, BlockedTensor& C2) {
+    timer t("H_A_Ca_small");
+
     /**
      * The following blocks should be available in memory:
      * G2: avac, aaac, avaa
@@ -1608,6 +1664,8 @@ void SADSRG::H_A_Ca_small(BlockedTensor& H1, BlockedTensor& H2, BlockedTensor& G
 
 void SADSRG::H_T_C1a_smallG(BlockedTensor& G2, BlockedTensor& T1, BlockedTensor& T2,
                             BlockedTensor& C1) {
+    timer t("H_A_C1a_smallG");
+
     /**
      * The following blocks should be available in memory:
      * G2: avac, aaac, avaa
@@ -1624,6 +1682,8 @@ void SADSRG::H_T_C1a_smallG(BlockedTensor& G2, BlockedTensor& T1, BlockedTensor&
 
 void SADSRG::H_T_C1a_smallS(BlockedTensor& H1, BlockedTensor& H2, BlockedTensor& T2,
                             BlockedTensor& S2, BlockedTensor& C1) {
+    timer t("H_A_C1a_smallS");
+
     /**
      * The following blocks should be available in memory:
      * H2: vvaa, aacc, avca, avac, vaaa, aaca, aaaa
@@ -1709,6 +1769,8 @@ void SADSRG::H_T_C1a_smallS(BlockedTensor& H1, BlockedTensor& H2, BlockedTensor&
 
 void SADSRG::H_T_C2a_smallS(BlockedTensor& H1, BlockedTensor& H2, BlockedTensor& T1,
                             BlockedTensor& T2, BlockedTensor& S2, BlockedTensor& C2) {
+    timer t("H_A_C2a_smallS");
+
     /**
      * The following blocks should be available in memory:
      * H2: vvaa, aacc, avca, avac, vaaa, aaca, aaaa

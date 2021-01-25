@@ -383,15 +383,11 @@ void SA_MRPT2::compute_t2_df_minimal() {
 }
 
 void SA_MRPT2::compute_t2() {
-    timer t2("Compute T2");
-
     if (eri_df_) {
         compute_t2_df_minimal();
     } else {
         compute_t2_full();
     }
-
-    t2.stop();
 }
 
 std::vector<ambit::Tensor> SA_MRPT2::init_tensor_vecs(int number_of_tensors) {

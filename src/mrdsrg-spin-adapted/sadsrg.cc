@@ -125,15 +125,15 @@ void SADSRG::startup() {
 }
 
 void SADSRG::build_fock_from_ints() {
-    local_timer lt;
+    timer t("Compute Fock matrix and clean up JK");
     print_contents("Computing Fock matrix and cleaning JK");
     ints_->make_fock_matrix(rdms_.g1a(), rdms_.g1b());
     ints_->jk_finalize();
-    print_done(lt.get());
+    print_done(t.stop());
 }
 
 void SADSRG::read_options() {
-    local_timer lt;
+    timer t("Read DSRG options");
     print_contents("Reading DSRG options");
 
     auto throw_error = [&](const std::string& message) -> void {
@@ -184,7 +184,7 @@ void SADSRG::read_options() {
     multi_state_ = foptions_->get_gen_list("AVG_STATE").size() != 0;
     multi_state_algorithm_ = foptions_->get_str("DSRG_MULTI_STATE");
 
-    print_done(lt.get());
+    print_done(t.stop());
 }
 
 void SADSRG::read_MOSpaceInfo() {
@@ -200,7 +200,7 @@ void SADSRG::read_MOSpaceInfo() {
 }
 
 void SADSRG::set_ambit_MOSpace() {
-    local_timer lt;
+    timer t("Set up Ambit MO space");
     print_contents("Setting ambit MO space");
     BlockedTensor::reset_mo_spaces();
     BlockedTensor::set_expert_mode(true);
@@ -235,7 +235,7 @@ void SADSRG::set_ambit_MOSpace() {
         label_to_spacemo_[aux_label_[0]] = aux_mos_;
     }
 
-    print_done(lt.get());
+    print_done(t.stop());
 }
 
 void SADSRG::check_init_memory() {
@@ -302,13 +302,13 @@ void SADSRG::check_init_memory() {
 }
 
 void SADSRG::init_density() {
-    local_timer lt;
+    timer t("Initialize density cumulants");
     print_contents("Initializing density cumulants");
     Eta1_ = BTF_->build(tensor_type_, "Eta1", {"aa"});
     L1_ = BTF_->build(tensor_type_, "L1", {"aa"});
     L2_ = BTF_->build(tensor_type_, "L2", {"aaaa"});
     fill_density();
-    print_done(lt.get());
+    print_done(t.stop());
 }
 
 void SADSRG::fill_density() {
@@ -328,14 +328,14 @@ void SADSRG::fill_density() {
 }
 
 void SADSRG::init_fock() {
-    local_timer lt;
+    timer t("Fill Fock from ForteIntegrals");
     print_contents("Filling Fock matrix from ForteIntegrals");
     Fock_ = BTF_->build(tensor_type_, "Fock", {"gg"});
     Fock_.iterate([&](const std::vector<size_t>& i, const std::vector<SpinType>&, double& value) {
         value = ints_->get_fock_a(i[0], i[1]);
     });
     fill_Fdiag(Fock_, Fdiag_);
-    print_done(lt.get());
+    print_done(t.stop());
 }
 
 void SADSRG::fill_Fdiag(BlockedTensor& F, std::vector<double>& Fa) {
@@ -350,6 +350,7 @@ void SADSRG::fill_Fdiag(BlockedTensor& F, std::vector<double>& Fa) {
 }
 
 double SADSRG::compute_reference_energy_from_ints() {
+    timer t("Compute DSRG reference energy");
     BlockedTensor H = BTF_->build(tensor_type_, "OEI", {"cc", "aa"}, true);
     H.iterate([&](const std::vector<size_t>& i, const std::vector<SpinType>&, double& value) {
         value = ints_->oei_a(i[0], i[1]);
@@ -403,6 +404,8 @@ void SADSRG::fill_three_index_ints(ambit::BlockedTensor B) {
 }
 
 std::shared_ptr<ActiveSpaceIntegrals> SADSRG::compute_Heff_actv() {
+    timer t("Compute DSRG active Heff");
+
     // de-normal-order DSRG transformed Hamiltonian
     double Edsrg = Eref_ + Hbar0_;
     if (foptions_->get_bool("FORM_HBAR3")) {
@@ -428,6 +431,7 @@ std::shared_ptr<ActiveSpaceIntegrals> SADSRG::compute_Heff_actv() {
 }
 
 void SADSRG::deGNO_ints(const std::string& name, double& H0, BlockedTensor& H1, BlockedTensor& H2) {
+    timer t("De-normal-order DSRG actv ints");
     print_h2("De-Normal-Order DSRG Transformed " + name);
 
     // compute scalar
@@ -571,47 +575,49 @@ void SADSRG::set_Uactv(ambit::Tensor& U) {
 
 void SADSRG::rotate_ints_semi_to_origin(const std::string& name, BlockedTensor& H1,
                                         BlockedTensor& H2) {
+    timer t("Rotate DSRG active integrals");
     print_h2("Rotate DSRG Transformed " + name + " back to Original Basis");
     ambit::Tensor temp;
     ambit::Tensor Ua = Uactv_.block("aa");
 
-    local_timer timer;
+    local_timer lt;
     print_contents("Rotating 1-body term to original basis");
     temp = H1.block("aa").clone(tensor_type_);
     H1.block("aa")("pq") = Ua("pu") * temp("uv") * Ua("qv");
-    print_done(timer.get());
+    print_done(lt.get());
 
-    timer.reset();
+    lt.reset();
     print_contents("Rotating 2-body term to original basis");
     temp = H2.block("aaaa").clone(tensor_type_);
     H2.block("aaaa")("pqrs") = Ua("pa") * Ua("qb") * temp("abcd") * Ua("rc") * Ua("sd");
-    print_done(timer.get());
+    print_done(lt.get());
 }
 
 void SADSRG::rotate_ints_semi_to_origin(const std::string& name, BlockedTensor& H1,
                                         BlockedTensor& H2, BlockedTensor& H3) {
+    timer t("Rotate DSRG active integrals");
     print_h2("Rotate DSRG Transformed " + name + " back to Original Basis");
     ambit::Tensor temp;
     ambit::Tensor Ua = Uactv_.block("aa");
 
-    local_timer timer;
+    local_timer lt;
     print_contents("Rotating 1-body term to original basis");
     temp = H1.block("aa").clone(tensor_type_);
     H1.block("aa")("pq") = Ua("pu") * temp("uv") * Ua("qv");
-    print_done(timer.get());
+    print_done(lt.get());
 
-    timer.reset();
+    lt.reset();
     print_contents("Rotating 2-body term to original basis");
     temp = H2.block("aaaa").clone(tensor_type_);
     H2.block("aaaa")("pqrs") = Ua("pa") * Ua("qb") * temp("abcd") * Ua("rc") * Ua("sd");
-    print_done(timer.get());
+    print_done(lt.get());
 
-    timer.reset();
+    lt.reset();
     print_contents("Rotating 3-body term to original basis");
     temp = H3.block("aaaaaa").clone(tensor_type_);
     H3.block("aaaaaa")("pqrstu") =
         Ua("pa") * Ua("qb") * Ua("rc") * temp("abcijk") * Ua("si") * Ua("tj") * Ua("uk");
-    print_done(timer.get());
+    print_done(lt.get());
 }
 
 bool SADSRG::check_semi_orbs() {
@@ -701,6 +707,7 @@ bool SADSRG::check_semi_orbs() {
 }
 
 void SADSRG::print_cumulant_summary() {
+    timer t("Print cumulants");
     print_h2("Density Cumulant Summary");
 
     std::vector<double> maxes(2), norms(2);

@@ -42,6 +42,7 @@ namespace forte {
 
 void SA_MRDSRG::guess_t(BlockedTensor& V, BlockedTensor& T2, BlockedTensor& F, BlockedTensor& T1,
                         BlockedTensor& B) {
+    timer t("Guess initial amplitudes");
     print_h2("Build Initial Amplitudes Guesses");
 
     guess_t2(V, T2, B);
@@ -56,7 +57,7 @@ void SA_MRDSRG::update_t() {
 }
 
 void SA_MRDSRG::guess_t2(BlockedTensor& V, BlockedTensor& T2, BlockedTensor& B) {
-    local_timer timer;
+    timer t("Guess T2 amplitudes");
 
     struct stat buf;
     if (read_amps_cwd_ and (stat(t2_file_cwd_.c_str(), &buf) == 0)) {
@@ -79,7 +80,7 @@ void SA_MRDSRG::guess_t2(BlockedTensor& V, BlockedTensor& T2, BlockedTensor& B) 
     T2norm_ = T2.norm();
     T2rms_ = 0.0;
 
-    print_done(timer.get());
+    print_done(t.stop());
 }
 
 void SA_MRDSRG::guess_t2_impl(BlockedTensor& T2) {
@@ -127,7 +128,7 @@ void SA_MRDSRG::guess_t2_impl(BlockedTensor& T2) {
 }
 
 void SA_MRDSRG::guess_t1(BlockedTensor& F, BlockedTensor& T2, BlockedTensor& T1) {
-    local_timer timer;
+    timer t("Guess T1 amplitudes");
 
     struct stat buf;
     if (read_amps_cwd_ and (stat(t1_file_cwd_.c_str(), &buf) == 0)) {
@@ -188,10 +189,12 @@ void SA_MRDSRG::guess_t1(BlockedTensor& F, BlockedTensor& T2, BlockedTensor& T1)
     T1norm_ = T1.norm();
     T1rms_ = 0.0;
 
-    print_done(timer.get());
+    print_done(t.stop());
 }
 
 void SA_MRDSRG::update_t2() {
+    timer t("Update T2 amplitudes");
+
     // make a copy of the active part of Hbar2 as it will be used as intermediate
     auto Hbar2copy = BlockedTensor::build(tensor_type_, "Hbar2 active copy", {"aaaa"});
     Hbar2copy["uvxy"] = Hbar2_["uvxy"];
@@ -314,6 +317,8 @@ void SA_MRDSRG::update_t2() {
 }
 
 void SA_MRDSRG::update_t1() {
+    timer t("Update T1 amplitudes");
+
     // make a copy of the active part of Hbar2 as it will be used as intermediate
     auto Hbar1copy = BlockedTensor::build(tensor_type_, "Hbar1 active copy", {"aa"});
     Hbar1copy["uv"] = Hbar1_["uv"];
@@ -415,20 +420,20 @@ void SA_MRDSRG::update_t1() {
 void SA_MRDSRG::dump_amps_to_disk() {
     // dump to psi4 scratch directory for reference relaxation
     if (restart_amps_ and (relax_ref_ != "NONE")) {
-        local_timer lt;
+        timer time("Dump amplitudes to scratch");
         print_contents("Dumping amplitudes to scratch dir");
         ambit::save(T1_, t1_file_chk_);
         ambit::save(T2_, t2_file_chk_);
-        print_done(lt.get());
+        print_done(time.stop());
     }
 
     // dump amplitudes to the current directory
     if (dump_amps_cwd_) {
-        local_timer lt;
+        timer time("Dump amplitudes to CWD");
         print_contents("Dumping amplitudes to current dir");
         ambit::save(T1_, t1_file_cwd_);
         ambit::save(T2_, t2_file_cwd_);
-        print_done(lt.get());
+        print_done(time.stop());
     }
 }
 

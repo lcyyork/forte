@@ -35,6 +35,7 @@
 #include "psi4/libpsio/psio.hpp"
 
 #include "helpers/printing.h"
+#include "helpers/timer.h"
 #include "sa_mrdsrg.h"
 
 using namespace psi;
@@ -188,6 +189,8 @@ void SA_MRDSRG::check_memory() {
 }
 
 void SA_MRDSRG::build_ints() {
+    timer t("Prepare integrals");
+
     // prepare one-electron integrals
     H_ = BTF_->build(tensor_type_, "H", {"gg"});
     H_.iterate([&](const std::vector<size_t>& i, const std::vector<SpinType>&, double& value) {

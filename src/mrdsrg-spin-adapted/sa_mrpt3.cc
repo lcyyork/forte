@@ -188,20 +188,20 @@ double SA_MRPT3::compute_energy_pt2() {
 
     // Compute DSRG-MRPT2 correlation energy
     double Ept2 = 0.0;
-    local_timer t1;
+    timer t1("Compute PT2 energy");
     print_contents("Computing 2nd-order energy");
     H1_T1_C0(F_, T1_, 1.0, Ept2);
     H1_T2_C0(F_, T2_, 1.0, Ept2);
     H2_T1_C0(V_, T1_, 1.0, Ept2);
     H2_T2_C0(V_, T2_, S2_, 1.0, Ept2);
-    print_done(t1.get());
+    print_done(t1.stop());
 
     // relax reference
     if (form_Hbar_) {
-        local_timer t2;
+        timer t2("PT2 ints for ref. relax");
         print_contents("Computing integrals for ref. relaxation");
         H_A_Ca(F_, V_, T1_, T2_, S2_, 0.5, Hbar1_, Hbar2_);
-        print_done(t2.get());
+        print_done(t2.stop());
     }
 
     return Ept2;
@@ -210,7 +210,7 @@ double SA_MRPT3::compute_energy_pt2() {
 double SA_MRPT3::compute_energy_pt3_1() {
     print_h2("Computing 3rd-Order Energy Contribution (1/3)");
 
-    local_timer t1;
+    timer t1("Compute PT3 energy 1");
     print_contents("Computing 3rd-order energy (1/3)");
 
     // 1- and 2-body -[[H0th,A1st],A1st]
@@ -263,14 +263,14 @@ double SA_MRPT3::compute_energy_pt3_1() {
     H2_T1_C0(O2_, T1_, factor, Ereturn);
     H2_T2_C0(O2_, T2_, S2_, factor, Ereturn);
 
-    print_done(t1.get());
+    print_done(t1.stop());
 
     if (form_Hbar_) {
-        local_timer t2;
+        timer t2("PT3 ints for ref. relax 1");
         print_contents("Computing integrals for ref. relaxation");
         factor = 1.0 / 12.0;
         H_A_Ca(O1_, O2_, T1_, T2_, S2_, factor, Hbar1_, Hbar2_);
-        print_done(t2.get());
+        print_done(t2.stop());
     }
 
     return Ereturn;
@@ -279,7 +279,7 @@ double SA_MRPT3::compute_energy_pt3_1() {
 double SA_MRPT3::compute_energy_pt3_2() {
     print_h2("Computing 3rd-Order Energy Contribution (2/3)");
 
-    local_timer t1;
+    timer t1("Prepare 2nd-order amps");
     print_contents("Preparing 2nd-order amplitudes");
 
     // compute 2nd-order amplitudes
@@ -357,7 +357,7 @@ double SA_MRPT3::compute_energy_pt3_2() {
     }
     F_["ai"] += O1_["ia"];
     V_["abij"] += O2_["ijab"];
-    print_done(t1.get());
+    print_done(t1.stop());
 
     // Step 2: compute amplitdes
     //     a) save 1st-order amplitudes for later use
@@ -371,20 +371,20 @@ double SA_MRPT3::compute_energy_pt3_2() {
     compute_t1();
 
     // compute energy from 0.5 * [[H1st + Hbar1st, A1st], A2nd]
-    local_timer t2;
+    timer t2("Compute PT3 energy 2");
     print_contents("Computing 3rd-order energy (2/3)");
     double Ereturn = 0.0;
     H1_T1_C0(X1, T1_, 1.0, Ereturn);
     H1_T2_C0(X1, T2_, 1.0, Ereturn);
     H2_T1_C0(X2, T1_, 1.0, Ereturn);
     H2_T2_C0(X2, T2_, S2_, 1.0, Ereturn);
-    print_done(t2.get());
+    print_done(t2.stop());
 
     if (form_Hbar_) {
-        local_timer t3;
+        timer t3("PT3 ints for ref. relax 2");
         print_contents("Computing integrals for ref. relaxation");
         H_A_Ca(X1, X2, T1_, T2_, S2_, 0.5, Hbar1_, Hbar2_);
-        print_done(t3.get());
+        print_done(t3.stop());
     }
 
     // analyze amplitudes
@@ -404,20 +404,20 @@ double SA_MRPT3::compute_energy_pt3_3() {
 
     // compute energy of 0.5 * [Hbar2nd, A1st]
     double Ereturn = 0.0;
-    local_timer t1;
+    timer t1("Compute PT3 energy 3");
     print_contents("Computing 3rd-order energy (3/3)");
     H1_T1_C0(F_, O1_, 1.0, Ereturn);
     H1_T2_C0(F_, O2_, 1.0, Ereturn);
     H2_T1_C0(V_, O1_, 1.0, Ereturn);
     H2_T2_C0(V_, O2_, S2_, 1.0, Ereturn);
-    print_done(t1.get());
+    print_done(t1.stop());
 
     // relax reference
     if (form_Hbar_) {
-        local_timer t2;
+        timer t2("PT3 ints for ref. relax 3");
         print_contents("Computing integrals for ref. relaxation");
         H_A_Ca(F_, V_, O1_, O2_, S2_, 0.5, Hbar1_, Hbar2_);
-        print_done(t2.get());
+        print_done(t2.stop());
     }
 
     return Ereturn;
