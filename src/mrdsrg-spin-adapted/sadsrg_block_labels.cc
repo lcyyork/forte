@@ -168,4 +168,20 @@ std::vector<std::string> SADSRG::nivo_labels() {
     return blocks_exclude_V3;
 }
 
+bool SADSRG::check_blocks_sym(const BlockedTensor& H2) {
+    if (H2.rank() != 4)
+        throw std::runtime_error("Only support 2-body (4-index) tensor!");
+
+    std::unordered_set<std::string> H2_blocks;
+    for (const auto& block : H2.block_labels()) {
+        H2_blocks.insert(block);
+    }
+
+    return std::all_of(H2_blocks.begin(), H2_blocks.end(), [&](const std::string& block) {
+        auto block_swap =
+            block.substr(1, 1) + block.substr(0, 1) + block.substr(3, 1) + block.substr(2, 1);
+        return H2_blocks.find(block_swap) != H2_blocks.end();
+    });
+}
+
 } // namespace forte

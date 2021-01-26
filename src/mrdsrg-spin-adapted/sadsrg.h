@@ -437,6 +437,10 @@ class SADSRG : public DynamicCorrelationSolver {
         return std::fabs(left.second) > std::fabs(right.second);
     }
 
+    /// Test the block symmetry of a 4-index BlockedTensor with 2-fold symmetry (pqrs = qpsr)
+    /// Due to this symmetry, we must have, e.g., cavc exists <=> accv exists.
+    bool check_blocks_sym(const BlockedTensor& H2);
+
     /// Separate a vector of block labels to vectors of small blocks that fit in memory
     std::vector<std::vector<std::string>>
     separate_blocks(const std::vector<std::string>& blocks, std::vector<std::string>& large_blocks,

@@ -374,16 +374,7 @@ void SADSRG::H2_T2_C2(BlockedTensor& H2, BlockedTensor& T2, BlockedTensor& S2, c
 
     // H2, T2, and C2 should have the 2-fold symmetry: pqrs = qpsr,
     // which must also apply to blocks, e.g., cavc exists <=> accv exists.
-    std::unordered_set<std::string> C2blocks;
-    for (const auto& block : C2.block_labels()) {
-        C2blocks.insert(block);
-    }
-    bool symmetry = std::all_of(C2blocks.begin(), C2blocks.end(), [&](const std::string& block) {
-        auto block_swap =
-            block.substr(1, 1) + block.substr(0, 1) + block.substr(3, 1) + block.substr(2, 1);
-        return C2blocks.find(block_swap) != C2blocks.end();
-    });
-    if (not symmetry) {
+    if (not check_blocks_sym(C2)) {
         throw psi::PSIEXCEPTION("Symmetry (pqrs = qpsr) not detected in C2.");
     }
 
@@ -1082,16 +1073,7 @@ void SADSRG::V_T2_C2_DF(BlockedTensor& B, BlockedTensor& T2, BlockedTensor& S2, 
 
     // H2, T2, and C2 should have the 2-fold symmetry: pqrs = qpsr,
     // which must also apply to blocks, e.g., cavc exists <=> accv exists.
-    std::unordered_set<std::string> C2blocks;
-    for (const auto& block : C2.block_labels()) {
-        C2blocks.insert(block);
-    }
-    bool symmetry = std::all_of(C2blocks.begin(), C2blocks.end(), [&](const std::string& block) {
-        auto block_swap =
-            block.substr(1, 1) + block.substr(0, 1) + block.substr(3, 1) + block.substr(2, 1);
-        return C2blocks.find(block_swap) != C2blocks.end();
-    });
-    if (not symmetry) {
+    if (not check_blocks_sym(C2)) {
         throw psi::PSIEXCEPTION("Symmetry (pqrs = qpsr) not detected in C2.");
     }
 
