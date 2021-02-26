@@ -76,26 +76,19 @@ void AdaptiveCI::startup() {
     add_aimed_degenerate_ = options_->get_bool("ACI_ADD_AIMED_DEGENERATE");
     project_out_spin_contaminants_ = options_->get_bool("SCI_PROJECT_OUT_SPIN_CONTAMINANTS");
 
-    one_cycle_ = options_->get_bool("ONE_CYCLE");
-    // Run only one calculation with initial ansatz;
-    // Can be used for CIS/CISD/CAS/GAS-CI for test
     gas_iteration_ = false;
     if (options_->get_str("ACTIVE_REF_TYPE") == "GAS_SINGLE" or
         options_->get_str("ACTIVE_REF_TYPE") == "GAS") {
         gas_iteration_ = true;
     }
-    // Iterations are within in GAS
 
     // Whether to do the occupation analysis after calculation
     occ_analysis_ = options_->get_bool("OCC_ANALYSIS");
 
-    if (one_cycle_) {
-        max_cycle_ = 0;
-    } else {
-        max_cycle_ = options_->get_int("SCI_MAX_CYCLE");
-    }
-
-    // max_cycle_ = options_->get_int("SCI_MAX_CYCLE");
+    // Run only one calculation with initial_reference
+    // Useful for CIS/CISD/CAS/GAS-CI for test
+    one_cycle_ = options_->get_bool("ONE_CYCLE");
+    max_cycle_ = one_cycle_ ? 0 : options_->get_int("SCI_MAX_CYCLE");
 
     spin_tol_ = options_->get_double("ACI_SPIN_TOL");
 
@@ -951,18 +944,16 @@ void AdaptiveCI::zero_multistate_pt2_energy_correction() {
 }
 
 void AdaptiveCI::print_gas_wfn(DeterminantHashVec& space, psi::SharedMatrix evecs) {
-    std::vector<std::string> gas_electron_name = {"GAS1_A", "GASI_B", "GAS2_A", "GAS2_B",
+    std::vector<std::string> gas_electron_name = {"GAS1_A", "GAS1_B", "GAS2_A", "GAS2_B",
                                                   "GAS3_A", "GAS3_B", "GAS4_A", "GAS4_B",
                                                   "GAS5_A", "GAS5_B", "GAS6_A", "GAS6_B"};
-
-    psi::outfile->Printf("\n  ");
-    psi::outfile->Printf("\n  GAS Contribution Analysis  ");
+    print_h2("GAS Contribution Analysis");
 
     for (int n = 0; n < nroot_; ++n) {
         DeterminantHashVec tmp;
         std::vector<double> tmp_evecs;
 
-        psi::outfile->Printf("\n  GAS contributions root %d: \n", n);
+        psi::outfile->Printf("\n  Root %d:", n);
 
         size_t max_dets = static_cast<size_t>(evecs->nrow());
         tmp.subspace(space, evecs, tmp_evecs, max_dets, n);
@@ -1020,15 +1011,26 @@ void AdaptiveCI::print_gas_wfn(DeterminantHashVec& space, psi::SharedMatrix evec
                 exit(1);
             }
         }
+
+        outfile->Printf("\n    Config.");
+        int ndash = 7;
         for (size_t j = 0; j < 2 * gas_num_; j++) {
-            outfile->Printf("  %s  ", gas_electron_name[j].c_str());
+            std::string name = gas_electron_name[j].substr(3, 3);
+            outfile->Printf("  %s", name.c_str());
+            ndash += 5;
         }
-        outfile->Printf("      Cont  \n");
+        outfile->Printf("  Contribution");
+        ndash += 14;
+        std::string dash(ndash, '-');
+        outfile->Printf("\n    %s", dash.c_str());
+
         std::map<std::vector<size_t>, double> gas_total_amp;
         for (size_t i = 0; i < gas_config_num; i++) {
+            outfile->Printf("\n    %6d ", i + 1);
             for (size_t j = 0; j < 2 * gas_num_; j++) {
-                outfile->Printf("     %d    ", gas_electrons_[i][j]);
+                outfile->Printf(" %4d", gas_electrons_[i][j]);
             }
+
             std::vector<size_t> sum_gas;
             for (size_t j = 0; j < 2 * gas_num_; j += 2) {
                 sum_gas.push_back(gas_electrons_[i][j] + gas_electrons_[i][j + 1]);
@@ -1039,15 +1041,27 @@ void AdaptiveCI::print_gas_wfn(DeterminantHashVec& space, psi::SharedMatrix evec
             } else {
                 gas_total_amp[sum_gas] += gas_amp[i];
             }
-            psi::outfile->Printf("    %.9f  \n", gas_amp[i]);
+
+            outfile->Printf(" %12.8f%%", gas_amp[i] * 100.0);
         }
-        outfile->Printf("\n");
+        outfile->Printf("\n    %s", dash.c_str());
+
+        outfile->Printf("\n    %7c", ' ');
+        for (size_t j = 0; j < gas_num_; j++) {
+            std::string name = "GAS" + std::to_string(j + 1);
+            outfile->Printf("  %6s  ", name.c_str());
+        }
+        outfile->Printf("  Contribution");
+        outfile->Printf("\n    %s", dash.c_str());
+
         for (auto element : gas_total_amp) {
+            outfile->Printf("\n    %7c", ' ');
             for (size_t j = 0; j < gas_num_; j++) {
-                outfile->Printf("           %d       ", element.first[j]);
+                outfile->Printf("  %6d  ", element.first[j]);
             }
-            outfile->Printf("     %.9f  \n", element.second);
+            outfile->Printf(" %12.8f%%", element.second * 100);
         }
+        outfile->Printf("\n    %s", dash.c_str());
     }
 }
 

@@ -76,7 +76,7 @@ class CI_Reference {
     int nact_;
 
     // Symmetry of each active MO
-    psi::Dimension mo_symmetry_;
+    std::vector<int> mo_symmetry_;
 
     // Number of active MOs per irrep
     psi::Dimension nactpi_;
@@ -106,11 +106,26 @@ class CI_Reference {
     /// GAS1_A, GAS1_B, GAS2_A, .... GAS6_B (12 elements)
     std::vector<std::vector<int>> gas_electrons_;
 
+    /// Print SCF orbital energies for GAS
+    void print_gas_scf_epsilon();
+
+    /// Compute the occupation string for a given number of electrons and orbitals
+    /// @return nirrep of vector of occupation
+    std::vector<std::vector<std::vector<bool>>> build_occ_string(size_t norb, size_t nele,
+                                                                 const std::vector<int>& symmetry);
+
+    /// Compute the cartesian product of occupation strings
+    /// @arg vector of vector of occupation
+    /// @return nirrep of vector of occupation
+    std::vector<std::vector<bool>>
+    build_gas_occ_string(const std::vector<std::vector<std::vector<bool>>>& gas_strings,
+                         const std::vector<std::vector<size_t>>& rel_mos);
+
   public:
     /// Default constructor
     CI_Reference(std::shared_ptr<SCFInfo> scf_info, std::shared_ptr<ForteOptions> options,
                  std::shared_ptr<MOSpaceInfo> mo_space_info,
-                 std::shared_ptr<ActiveSpaceIntegrals> fci_ints, int multiplicity, double ms,
+                 std::shared_ptr<ActiveSpaceIntegrals> fci_ints, int multiplicity, double twice_ms,
                  int symmetry, StateInfo state_info);
 
     /// Destructor
@@ -121,6 +136,12 @@ class CI_Reference {
 
     /// Build the CAS reference (with a high limit of basis functions)
     void build_cas_reference(std::vector<Determinant>& ref_space);
+
+    /// Build the complete CAS reference
+    void build_cas_reference_full(std::vector<Determinant>& ref_space);
+
+    /// Build the doubly occupied CI reference
+    void build_doci_reference(std::vector<Determinant>& ref_space);
 
     /// Build the complete GAS reference
     void build_gas_reference(std::vector<Determinant>& ref_space);

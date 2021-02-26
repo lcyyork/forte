@@ -33,6 +33,7 @@
 #include <unordered_set>
 
 #include "base_classes/state_info.h"
+#include "sparse_ci/determinant.h"
 #include "psi4/libmints/matrix.h"
 #include "psi4/libmints/vector.h"
 
@@ -144,6 +145,30 @@ class ActiveSpaceMethod {
     /// Compute the overlap between another set of CI vectors read from disk <this|disk>
     virtual psi::SharedMatrix overlap_ci_disk(const std::string& suffix = "");
 
+    /// Compute transition dipole moments assuming same orbitals
+    std::vector<std::vector<double>>
+    compute_transition_dipole_same_orbs(const std::vector<std::pair<size_t, size_t>>& root_list,
+                                        std::shared_ptr<ActiveSpaceMethod> method2);
+
+    /// Compute oscillator strength assuming same orbitals
+    std::vector<double>
+    compute_oscillator_strength_same_orbs(const std::vector<std::pair<size_t, size_t>>& root_list,
+                                          std::shared_ptr<ActiveSpaceMethod> method2);
+
+    /// Dump the wave function to file
+    /// @param file name
+    virtual void dump_wave_function(const std::string&) {
+        throw std::runtime_error("Not yet implemented!");
+    }
+
+    /// Read the wave function from file
+    /// @param file name
+    /// @return the number of active orbitals, the set of determinants, CI coefficients
+    virtual std::tuple<size_t, std::vector<Determinant>, psi::SharedMatrix>
+    read_wave_function(const std::string&) {
+        throw std::runtime_error("Not yet implemented!");
+    }
+
     // ==> Base Class Functionality (inherited by derived classes) <==
 
     /// Pass a set of ActiveSpaceIntegrals to the solver (e.g. an effective Hamiltonian)
@@ -162,6 +187,15 @@ class ActiveSpaceMethod {
     /// Return the state info
     const StateInfo& state() const { return state_; }
 
+    /// Return the wave function file name
+    std::string wfn_filename() const { return wfn_filename_; }
+
+    /// Return if we dump wave function to disk
+    bool dump_wfn() const { return dump_wfn_; }
+
+    /// Return if we read wave function guess from disk
+    bool read_wfn_guess() const { return read_wfn_guess_; }
+
     // ==> Base Class Handles Set Functions <==
 
     /// Set the energy convergence criterion
@@ -172,6 +206,16 @@ class ActiveSpaceMethod {
     /// @param value the convergence criterion in a.u.
     void set_r_convergence(double value);
 
+    /// Set if we dump the wave function to disk
+    void set_read_wfn_guess(bool read);
+
+    /// Set if we dump the wave function to disk
+    void set_dump_wfn(bool dump);
+
+    /// Set the file name for stroing wave function on disk
+    /// @param name the wave function file name
+    void set_wfn_filename(const std::string& name);
+
     /// Set the root that will be used to compute the properties
     /// @param the root (root = 0, 1, 2, ...)
     void set_root(int value);
@@ -179,6 +223,9 @@ class ActiveSpaceMethod {
     /// Set the print level
     /// @param level the print level (0 = no printing, 1 default)
     void set_print(int level);
+
+    /// Quiet mode (no printing, for use with CASSCF)
+    void set_quite_mode(bool quiet);
 
   protected:
     /// The list of active orbitals (absolute ordering)
@@ -216,6 +263,9 @@ class ActiveSpaceMethod {
     /// A variable to control printing information
     int print_ = 0;
 
+    /// Quiet printing
+    bool quiet_ = false;
+
     /// Eigenvalues
     psi::SharedVector evals_;
 
@@ -224,6 +274,13 @@ class ActiveSpaceMethod {
 
     /// The derived class name for generating a file name to store CI vectors
     std::string solver_name_ = "";
+
+    /// Read wave function from disk as initial guess?
+    bool read_wfn_guess_ = false;
+    /// Dump wave function to disk?
+    bool dump_wfn_ = false;
+    /// The file name for storing wave function (determinants, CI coefficients)
+    std::string wfn_filename_;
 };
 
 /**
