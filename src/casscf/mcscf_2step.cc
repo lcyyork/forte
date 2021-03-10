@@ -194,7 +194,8 @@ double MCSCF_2STEP::compute_energy() {
     double e_c;
     RDMs rdms;
     std::vector<CASSCF_HISTORY> history;
-    bool dump_wfn = ci_type_ == "DETCI";
+//    bool dump_wfn = ci_type_ == "DETCI";
+    bool dump_wfn = false;
 
     for (int macro = 1; macro <= maxiter_; ++macro) {
         // solve CI problem
