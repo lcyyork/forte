@@ -358,6 +358,15 @@ class SADSRG : public DynamicCorrelationSolver {
     void H_T_C2a_smallS(BlockedTensor& H1, BlockedTensor& H2, BlockedTensor& T1, BlockedTensor& T2,
                         BlockedTensor& S2, BlockedTensor& C2);
 
+    /// Compute two-body term of commutator C2 = [H1, A2]
+    /// H1: Hermitian, A2: Anti-Hermitian -> C2: Hermitian; k-body term with Sk symmetry
+    /// Only unique blocks are used and computed
+    void H1_A2_C2(BlockedTensor& H1, BlockedTensor& T2, const double& alpha, BlockedTensor& C2);
+
+    void H2_A1_C2(BlockedTensor& H2, BlockedTensor& T1, const double& alpha, BlockedTensor& C2);
+
+    void H2_A2_C2(BlockedTensor& H2, BlockedTensor& T2, const double& alpha, BlockedTensor& C2);
+
     // ==> miscellaneous <==
 
     /// Diagonalize the diagonal blocks of the Fock matrix
