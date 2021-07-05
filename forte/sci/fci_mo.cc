@@ -5,7 +5,7 @@
  * that implements a variety of quantum chemistry methods for strongly
  * correlated electrons.
  *
- * Copyright (c) 2012-2020 by its authors (see COPYING, COPYING.LESSER, AUTHORS).
+ * Copyright (c) 2012-2021 by its authors (see COPYING, COPYING.LESSER, AUTHORS).
  *
  * The copyrights for code used from other parties are included in
  * the corresponding files.
@@ -48,6 +48,7 @@
 #include "helpers/disk_io.h"
 #include "helpers/printing.h"
 #include "helpers/timer.h"
+#include "helpers/string_algorithms.h"
 
 #include "sparse_ci/determinant_hashvector.h"
 #include "sparse_ci/determinant_substitution_lists.h"

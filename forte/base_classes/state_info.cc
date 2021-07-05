@@ -5,7 +5,7 @@
  * that implements a variety of quantum chemistry methods for strongly
  * correlated electrons.
  *
- * Copyright (c) 2012-2020 by its authors (see COPYING, COPYING.LESSER, AUTHORS).
+ * Copyright (c) 2012-2021 by its authors (see COPYING, COPYING.LESSER, AUTHORS).
  *
  * The copyrights for code used from other parties are included in
  * the corresponding files.
@@ -153,7 +153,7 @@ std::string StateInfo::str() const {
 
 std::string StateInfo::str_minimum() const {
     std::string irrep_label1 =
-        irrep_label_.empty() ? "Irrep" + std::to_string(irrep_) : irrep_label();
+        irrep_label_.empty() ? "Irrep " + std::to_string(irrep_) : irrep_label();
     return multiplicity_label() + " (Ms = " + get_ms_string(twice_ms_) + ") " + irrep_label1;
 }
 

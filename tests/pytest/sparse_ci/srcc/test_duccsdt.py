@@ -1,16 +1,15 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+import pytest
+import forte.proc.scc as scc
+import forte
+import psi4
 
+
+@pytest.mark.skip(reason="This is a long test")
 def test_duccsdt():
     """Test projective factorized UCCSDT on Ne using RHF/cc-pVDZ orbitals"""
-
-    import pytest
-    import forte.proc.scc as scc
-    import forte
-    import psi4
-
-    forte.startup()
 
     ref_energy = -128.679016191303  # this number was obtained with the on_the_fly implementation
 
@@ -22,7 +21,6 @@ def test_duccsdt():
         forte_objs[1], forte_objs[2], forte_objs[3], cc_type='ducc', max_exc=3, e_convergence=1.0e-11
     )
 
-    forte.cleanup()
     psi4.core.clean()
 
     energy = calc_data[-1][1]

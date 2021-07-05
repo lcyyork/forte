@@ -1,14 +1,11 @@
-from setuptools import find_packages
-
 import os
 import re
 import platform
 import subprocess
 
 from distutils.version import LooseVersion
-from setuptools import setup, find_packages, Extension
+from setuptools import setup, Extension
 from setuptools.command.build_ext import build_ext
-from shutil import copyfile, copymode
 
 
 class CMakeExtension(Extension):
@@ -116,7 +113,7 @@ class CMakeBuild(build_ext):
 
 setup(
     name='forte',
-    version='0.2.0',
+    version='0.2.3',
     author='Forte developers',
     description='A hybrid Python/C++ quantum chemistry package for strongly correlated electrons.',
     long_description=
@@ -125,7 +122,7 @@ setup(
     # tell setuptools that all packages will be under the '.' directory
     package_dir={'': '.'},
     # add an extension module named 'forte' to the package
-    ext_modules=[CMakeExtension('.')],
+    ext_modules=[CMakeExtension('forte')],
     # add custom build_ext command
     cmdclass=dict(build_ext=CMakeBuild),
     test_suite='tests',
