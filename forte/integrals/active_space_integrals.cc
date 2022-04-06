@@ -190,6 +190,16 @@ void ActiveSpaceIntegrals::set_active_integrals(const ambit::Tensor& act_aa,
     tei_bb_ = act_bb.data();
 }
 
+void ActiveSpaceIntegrals::set_active_integrals_3body(const ambit::Tensor& aaa,
+                                                      const ambit::Tensor& aab,
+                                                      const ambit::Tensor& abb,
+                                                      const ambit::Tensor& bbb) {
+    H3aaa_ = aaa;
+    H3aab_ = aab;
+    H3abb_ = abb;
+    H3bbb_ = bbb;
+}
+
 void ActiveSpaceIntegrals::compute_restricted_one_body_operator() {
     nmo2_ = nmo_ * nmo_;
     oei_a_.resize(nmo2_);

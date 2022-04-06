@@ -528,19 +528,22 @@ void MASTER_DSRG::compute_dm_ref() {
 }
 
 std::shared_ptr<ActiveSpaceIntegrals> MASTER_DSRG::compute_Heff_actv() {
+    auto fci_ints =
+        std::make_shared<ActiveSpaceIntegrals>(ints_, actv_mos_, actv_mos_sym_, core_mos_);
+
     // de-normal-order DSRG transformed Hamiltonian
     double Edsrg = Eref_ + Hbar0_;
     if (foptions_->get_bool("FORM_HBAR3")) {
         deGNO_ints("Hamiltonian", Edsrg, Hbar1_, Hbar2_, Hbar3_);
         rotate_ints_semi_to_origin("Hamiltonian", Hbar1_, Hbar2_, Hbar3_);
+        fci_ints->set_active_integrals_3body(Hbar3_.block("aaaaaa"), Hbar3_.block("aaAaaA"),
+                                             Hbar3_.block("aAAaAA"), Hbar3_.block("AAAAAA"));
     } else {
         deGNO_ints("Hamiltonian", Edsrg, Hbar1_, Hbar2_);
         rotate_ints_semi_to_origin("Hamiltonian", Hbar1_, Hbar2_);
     }
 
     // create FCIIntegral shared_ptr
-    std::shared_ptr<ActiveSpaceIntegrals> fci_ints =
-        std::make_shared<ActiveSpaceIntegrals>(ints_, actv_mos_, actv_mos_sym_, core_mos_);
     fci_ints->set_active_integrals(Hbar2_.block("aaaa"), Hbar2_.block("aAaA"),
                                    Hbar2_.block("AAAA"));
     fci_ints->set_restricted_one_body_operator(Hbar1_.block("aa").data(),

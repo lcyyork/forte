@@ -559,7 +559,14 @@ ActiveSpaceSolver::compute_contracted_energy(std::shared_ptr<ActiveSpaceIntegral
     //    bool do_three_body = (max_body_ == 3 and max_rdm_level_ == 3) ? true : false;
 
     // TODO: adapt DressedQuantity for spin-free RDMs
-    DressedQuantity ints(0.0, oei_a, oei_b, tei_aa, tei_ab, tei_bb);
+    //
+    std::shared_ptr<DressedQuantity> ints;
+    if (options_->get_bool("FORM_HBAR3"))
+        ints = std::make_shared<DressedQuantity>(0.0, oei_a, oei_b, tei_aa, tei_ab, tei_bb,
+                                                 as_ints->H3aaa(), as_ints->H3aab(),
+                                                 as_ints->H3abb(), as_ints->H3bbb());
+    else
+        ints = std::make_shared<DressedQuantity>(0.0, oei_a, oei_b, tei_aa, tei_ab, tei_bb);
 
     for (const auto& state_nroots : state_nroots_map_) {
         const auto& state = state_nroots.first;
@@ -578,7 +585,7 @@ ActiveSpaceSolver::compute_contracted_energy(std::shared_ptr<ActiveSpaceIntegral
                 std::shared_ptr<RDMs> rdms =
                     method->rdms(root_list, max_rdm_level, RDMsType::spin_dependent)[0];
 
-                double H_AB = ints.contract_with_rdms(rdms);
+                double H_AB = ints->contract_with_rdms(rdms);
                 if (A == B) {
                     H_AB += as_ints->nuclear_repulsion_energy() + as_ints->scalar_energy() +
                             as_ints->frozen_core_energy();

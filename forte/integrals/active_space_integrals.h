@@ -161,6 +161,15 @@ class ActiveSpaceIntegrals {
     /// Print the alpha-alpha integrals
     void print();
 
+    /// Set the 3-body active integrals
+    void set_active_integrals_3body(const ambit::Tensor& aaa, const ambit::Tensor& aab,
+                                    const ambit::Tensor& abb, const ambit::Tensor& bbb);
+    ambit::Tensor H3aaa() { return H3aaa_; }
+    ambit::Tensor H3aab() { return H3aab_; }
+    ambit::Tensor H3abb() { return H3abb_; }
+    ambit::Tensor H3bbb() { return H3bbb_; }
+
+
   private:
     // ==> Class Private Data <==
 
@@ -208,6 +217,15 @@ class ActiveSpaceIntegrals {
     std::vector<int> active_mo_symmetry_;
     /// A Vector of indices for the restricted_docc molecular orbitals
     std::vector<size_t> restricted_docc_mo_;
+
+    /// The alpha-alpha-alpha antisymmetrized 3-electron integrals (36-fold symmetry)
+    ambit::Tensor H3aaa_;
+    /// The alpha-alpha-beta antisymmetrized 3-electron integrals (36-fold symmetry)
+    ambit::Tensor H3aab_;
+    /// The alpha-beta-beta antisymmetrized 3-electron integrals (36-fold symmetry)
+    ambit::Tensor H3abb_;
+    /// The beta-beta-beta antisymmetrized 3-electron integrals (36-fold symmetry)
+    ambit::Tensor H3bbb_;
 
     // ==> Class Private Functions <==
 
