@@ -114,8 +114,10 @@ void DETCI::build_determinant_space() {
         ci_ref.build_gas_reference(dets);
     } else if (actv_space_type_ == "DOCI") {
         ci_ref.build_doci_reference(dets);
-    } else {
+    } else if (actv_space_type_ == "CAS") {
         ci_ref.build_cas_reference_full(dets);
+    } else {
+        ci_ref.build_ci_reference(dets);
     }
 
     auto size = dets.size();
@@ -159,6 +161,7 @@ void DETCI::diagonalize_hamiltonian() {
 
     // add energy offset
     double energy_offset = as_ints_->scalar_energy() + as_ints_->nuclear_repulsion_energy();
+    outfile->Printf("\n  as_ints scalar energy = %.16f", as_ints_->scalar_energy());
     for (size_t i = 0; i < nroot_; ++i) {
         evals_->add(i, energy_offset);
         energies_[i] = evals_->get(i);

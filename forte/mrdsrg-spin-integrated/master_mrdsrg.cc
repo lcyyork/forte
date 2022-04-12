@@ -524,6 +524,7 @@ void MASTER_DSRG::compute_dm_ref() {
         dipole += dm_[z]["UV"] * Gamma1_["UV"];
         dm_ref_[z] = dipole;
         do_dm_dirs_[z] = std::fabs(dipole) > 1.0e-15 ? true : false;
+        do_dm_dirs_[z] = true;
     }
 }
 
@@ -549,6 +550,72 @@ std::shared_ptr<ActiveSpaceIntegrals> MASTER_DSRG::compute_Heff_actv() {
     fci_ints->set_restricted_one_body_operator(Hbar1_.block("aa").data(),
                                                Hbar1_.block("AA").data());
     fci_ints->set_scalar_energy(Edsrg - Enuc_ - Efrzc_);
+
+    outfile->Printf("\n\n  ==> Effective Hamiltonian Data <==");
+
+    outfile->Printf("\n    Nuclear repulsion energy: %22.15E", Enuc_);
+    outfile->Printf("\n    Closed-shell energy (+ frozen-core energy + DSRG correction): %22.15E", Edsrg - Enuc_);
+
+    outfile->Printf("\n    Active orbitals: ");
+    for (const auto& pair: mo_space_info_->relative_mo("ACTIVE")) {
+        const auto& [h, index] = pair;
+        const auto& irrep = mo_space_info_->irrep_label(h);
+        outfile->Printf("  %zu%s", index, irrep.c_str());
+    }
+
+    auto na1 = actv_mos_.size();
+    auto na2 = na1 * na1;
+    auto na3 = na2 * na1;
+    auto na4 = na3 * na1;
+    auto na5 = na4 * na1;
+
+    outfile->Printf("\n    Dressed 1-body integrals <α|α>");
+    const auto& Hbar1_data = Hbar1_.block("aa").data();
+    for (size_t u = 0; u < na1; ++u) {
+        for (size_t v = 0; v < na1; ++v) {
+            auto value = Hbar1_data[u * na1 + v];
+            if (std::fabs(value) < 1.0e-16)
+                value = 0.0;
+            outfile->Printf("\n    %2zu %2zu %22.15E", u, v, value);
+        }
+    }
+
+    outfile->Printf("\n    Dressed 2-body integrals <αβ|αβ>");
+    const auto& Hbar2_data = Hbar2_.block("aAaA").data();
+    for (size_t u = 0; u < na1; ++u) {
+        for (size_t v = 0; v < na1; ++v) {
+            for (size_t x = 0; x < na1; ++x) {
+                for (size_t y = 0; y < na1; ++y) {
+                    auto value = Hbar2_data[u * na3 + v * na2 + x * na1 + y];
+                    if (std::fabs(value) < 1.0e-16)
+                        value = 0.0;
+                    outfile->Printf("\n    %2zu %2zu %2zu %2zu %22.15E", u, v, x, y, value);
+                }
+            }
+        }
+    }
+
+    if (foptions_->get_bool("FORM_HBAR3")) {
+        outfile->Printf("\n    Dressed 3-body integrals <ααβ|ααβ>");
+        const auto& Hbar3_data = Hbar3_.block("aaAaaA").data();
+        for (size_t u = 0; u < na1; ++u) {
+            for (size_t v = 0; v < na1; ++v) {
+                for (size_t w = 0; w < na1; ++w) {
+                    for (size_t x = 0; x < na1; ++x) {
+                        for (size_t y = 0; y < na1; ++y) {
+                            for (size_t z = 0; z < na1; ++z) {
+                                auto value = Hbar3_data[u * na5 + v * na4 + w * na3 + x * na2 + y * na1 + z];
+                                if (std::fabs(value) < 1.0e-16)
+                                    value = 0.0;
+                                outfile->Printf("\n    %2zu %2zu %2zu %2zu %2zu %2zu %22.15E",
+                                                u, v, w, x, y, z, value);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
 
     return fci_ints;
 }
@@ -820,6 +887,64 @@ std::vector<DressedQuantity> MASTER_DSRG::deGNO_DMbar_actv() {
                 out.emplace_back(Mbar0_[z], Mbar1_[z].block("aa"), Mbar1_[z].block("AA"),
                                  Mbar2_[z].block("aaaa"), Mbar2_[z].block("aAaA"),
                                  Mbar2_[z].block("AAAA"));
+            }
+
+            outfile->Printf("\n\n  ==> Effective " + name + " <==");
+
+            outfile->Printf("\n    Electronic contributions (+ DSRG correction): %22.15E", Mbar0_[z]);
+
+            auto na1 = actv_mos_.size();
+            auto na2 = na1 * na1;
+            auto na3 = na2 * na1;
+            auto na4 = na3 * na1;
+            auto na5 = na4 * na1;
+
+            outfile->Printf("\n    Dressed 1-body integrals <α|α>");
+            const auto& Hbar1_data = Mbar1_[z].block("aa").data();
+            for (size_t u = 0; u < na1; ++u) {
+                for (size_t v = 0; v < na1; ++v) {
+                    auto value = Hbar1_data[u * na1 + v];
+                    if (std::fabs(value) < 1.0e-16)
+                        value = 0.0;
+                    outfile->Printf("\n    %2zu %2zu %22.15E", u, v, value);
+                }
+            }
+
+            outfile->Printf("\n    Dressed 2-body integrals <αβ|αβ>");
+            const auto& Hbar2_data = Mbar2_[z].block("aAaA").data();
+            for (size_t u = 0; u < na1; ++u) {
+                for (size_t v = 0; v < na1; ++v) {
+                    for (size_t x = 0; x < na1; ++x) {
+                        for (size_t y = 0; y < na1; ++y) {
+                            auto value = Hbar2_data[u * na3 + v * na2 + x * na1 + y];
+                            if (std::fabs(value) < 1.0e-16)
+                                value = 0.0;
+                            outfile->Printf("\n    %2zu %2zu %2zu %2zu %22.15E", u, v, x, y, value);
+                        }
+                    }
+                }
+            }
+
+            if (foptions_->get_bool("FORM_MBAR3")) {
+                outfile->Printf("\n    Dressed 3-body integrals <ααβ|ααβ>");
+                const auto& Hbar3_data = Mbar3_[z].block("aaAaaA").data();
+                for (size_t u = 0; u < na1; ++u) {
+                    for (size_t v = 0; v < na1; ++v) {
+                        for (size_t w = 0; w < na1; ++w) {
+                            for (size_t x = 0; x < na1; ++x) {
+                                for (size_t y = 0; y < na1; ++y) {
+                                    for (size_t p = 0; p < na1; ++p) {
+                                        auto value = Hbar3_data[u * na5 + v * na4 + w * na3 + x * na2 + y * na1 + p];
+                                        if (std::fabs(value) < 1.0e-16)
+                                            value = 0.0;
+                                        outfile->Printf("\n    %2zu %2zu %2zu %2zu %2zu %2zu %22.15E",
+                                                        u, v, w, x, y, p, value);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
             }
         } else {
             out.emplace_back(DressedQuantity());
