@@ -32,7 +32,6 @@
 #include "psi4/libqt/qt.h"
 #include "psi4/libmints/vector.h"
 #include "psi4/libmints/wavefunction.h"
-#include "psi4/libdiis/diisentry.h"
 #include "psi4/libdiis/diismanager.h"
 
 #include "base_classes/rdms.h"
@@ -222,8 +221,8 @@ double MCSCF_2STEP::compute_energy() {
                                       psi::DIISManager::RemovalPolicy::OldestAdded,
                                       psi::DIISManager::StoragePolicy::OnDisk);
         if (do_diis_) {
-            diis_manager.set_error_vector_size(1, psi::DIISEntry::InputType::Vector, dG.get());
-            diis_manager.set_vector_size(1, psi::DIISEntry::InputType::Vector, R.get());
+            diis_manager.set_error_vector_size(dG.get());
+            diis_manager.set_vector_size(R.get());
         }
 
         // CI convergence criteria along the way
@@ -323,13 +322,13 @@ double MCSCF_2STEP::compute_energy() {
                         psi::outfile->Printf("   ");
                     }
 
-                    diis_manager.add_entry(2, dG.get(), R.get());
+                    diis_manager.add_entry(dG.get(), R.get());
                     psi::outfile->Printf("S");
                 }
 
                 if ((macro - diis_start_) % diis_freq_ == 0 and
                     diis_manager.subspace_size() > diis_min_vec_) {
-                    diis_manager.extrapolate(1, R.get());
+                    diis_manager.extrapolate(R.get());
                     psi::outfile->Printf("/E");
 
                     // update the actual integrals for CI, skip gradient computation
