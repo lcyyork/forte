@@ -142,6 +142,39 @@ class ProcedureDSRG:
             self.semi.semicanonicalize(self.rdms)
         self.Ua, self.Ub = self.semi.Ua_t(), self.semi.Ub_t()
 
+        # ugly hack for SR first then MR
+
+        # Make a new active space solver with combined gas spaces
+        gas1 = options.get_int_list("GAS1")
+        gas2 = options.get_int_list("GAS2")
+        active = [i + j for i, j in zip(gas1, gas2)]
+
+        options_dict = self.options.dict()
+        options_dict["ACTIVE"]["value"] = active
+        options_dict["GAS2MAX"]["value"] = []
+        options_dict["GAS1"]["value"] = []
+        options_dict["GAS2"]["value"] = []
+        # options_dict["ACTIVE_REF_TYPE"]["value"] = "CAS"
+        # options_dict["CALC_TYPE"]["value"] = "SA"
+        # options_dict["DSRG_MULTI_STATE"]["value"] = "SA_FULL"
+        # options_dict["TRANSITION_DIPOLES"]["value"] = True
+        # options_dict["AVG_STATE"]["value"] = [[0, 1, 2], [5, 1, 1]]
+        # options_dict["AVG_WEIGHT"]["value"] = [[1, 0], [0]]
+        self.options.set_dict(options_dict)
+
+        # make new ci solver
+        nmopi = mo_space_info.dimension("ALL")
+        point_group = mo_space_info.point_group_label()
+        self.mo_space_info = forte.make_mo_space_info(nmopi, point_group, self.options)
+        # state_weights_map = forte.make_state_weights_map(options, mo_space_info)
+        # self.state_weights_map = state_weights_map
+        state_map = forte.to_state_nroots_map(state_weights_map)
+        active_space_solver_type = options.get_str('ACTIVE_SPACE_SOLVER')
+        as_ints = forte.make_active_space_ints(mo_space_info, ints, "ACTIVE", ["RESTRICTED_DOCC"])
+        self.active_space_solver = forte.make_active_space_solver(
+            active_space_solver_type, state_map, scf_info, self.mo_space_info, as_ints, self.options
+        )
+
     def make_dsrg_solver(self):
         """ Make a DSRG solver. """
         args = (self.rdms, self.scf_info, self.options, self.ints, self.mo_space_info)
