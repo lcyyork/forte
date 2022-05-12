@@ -17,6 +17,7 @@ class DressedQuantity {
                     ambit::Tensor ab, ambit::Tensor bb, ambit::Tensor aaa, ambit::Tensor aab,
                     ambit::Tensor abb, ambit::Tensor bbb);
     double contract_with_rdms(std::shared_ptr<RDMs> rdms);
+    void rotate(const ambit::Tensor& Ua, const ambit::Tensor& Ub);
 
   private:
     size_t max_body_;

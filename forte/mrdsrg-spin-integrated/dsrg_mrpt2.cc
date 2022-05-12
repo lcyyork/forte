@@ -492,7 +492,7 @@ double DSRG_MRPT2::compute_energy() {
             }
 
             if (do_dm_dirs_[i] || multi_state_) {
-                if (foptions_->get_bool("FORM_MBAR3")) {
+                if (Mbar_level_ > 2) {
                     compute_dm1d_pt2(dm_[i], Mbar0_[i], Mbar1_[i], Mbar2_[i], Mbar3_[i]);
                 } else {
                     compute_dm1d_pt2(dm_[i], Mbar0_[i], Mbar1_[i], Mbar2_[i]);

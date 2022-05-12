@@ -150,6 +150,8 @@ void MASTER_DSRG::read_options() {
 
     do_cu3_ = (foptions_->get_str("THREEPDC") != "ZERO");
 
+    Mbar_level_ = foptions_->get_int("DSRG_MBAR_LEVEL");
+
     outfile->Printf("Done");
 }
 
@@ -461,7 +463,7 @@ void MASTER_DSRG::init_dm_ints() {
         for (int i = 0; i < 3; ++i) {
             Mbar1_[i] = BTF_->build(tensor_type_, "DSRG DM1 " + dm_dirs_[i], spin_cases({"aa"}));
             Mbar2_[i] = BTF_->build(tensor_type_, "DSRG DM2 " + dm_dirs_[i], spin_cases({"aaaa"}));
-            if (foptions_->get_bool("FORM_MBAR3")) {
+            if (Mbar_level_ > 2) {
                 Mbar3_[i] =
                     BTF_->build(tensor_type_, "DSRG DM3 " + dm_dirs_[i], spin_cases({"aaaaaa"}));
             }
@@ -554,10 +556,11 @@ std::shared_ptr<ActiveSpaceIntegrals> MASTER_DSRG::compute_Heff_actv() {
     outfile->Printf("\n\n  ==> Effective Hamiltonian Data <==");
 
     outfile->Printf("\n    Nuclear repulsion energy: %22.15E", Enuc_);
-    outfile->Printf("\n    Closed-shell energy (+ frozen-core energy + DSRG correction): %22.15E", Edsrg - Enuc_);
+    outfile->Printf("\n    Closed-shell energy (+ frozen-core energy + DSRG correction): %22.15E",
+                    Edsrg - Enuc_);
 
     outfile->Printf("\n    Active orbitals: ");
-    for (const auto& pair: mo_space_info_->relative_mo("ACTIVE")) {
+    for (const auto& pair : mo_space_info_->relative_mo("ACTIVE")) {
         const auto& [h, index] = pair;
         const auto& irrep = mo_space_info_->irrep_label(h);
         outfile->Printf("  %zu%s", index, irrep.c_str());
@@ -592,21 +595,27 @@ std::shared_ptr<ActiveSpaceIntegrals> MASTER_DSRG::compute_Heff_actv() {
                     // aa
                     value = Hbar2_.block("aaaa").data()[u * na3 + v * na2 + x * na1 + y];
                     if (std::fabs(value) > 1.0e-15)
-                        outfile->Printf("\n    %2zu %2zu %2zu %2zu %22.15E", u * 2, v * 2, x * 2, y * 2, value);
+                        outfile->Printf("\n    %2zu %2zu %2zu %2zu %22.15E", u * 2, v * 2, x * 2,
+                                        y * 2, value);
 
                     // ab
                     value = Hbar2_.block("aAaA").data()[u * na3 + v * na2 + x * na1 + y];
                     if (std::fabs(value) > 1.0e-15) {
-                        outfile->Printf("\n    %2zu %2zu %2zu %2zu %22.15E", u * 2, v * 2 + 1, x * 2, y * 2 + 1, value);
-                        outfile->Printf("\n    %2zu %2zu %2zu %2zu %22.15E", v * 2 + 1, u * 2, x * 2, y * 2 + 1, -value);
-                        outfile->Printf("\n    %2zu %2zu %2zu %2zu %22.15E", u * 2, v * 2 + 1, y * 2 + 1, x * 2, -value);
-                        outfile->Printf("\n    %2zu %2zu %2zu %2zu %22.15E", v * 2 + 1, u * 2, y * 2 + 1, x * 2, value);
+                        outfile->Printf("\n    %2zu %2zu %2zu %2zu %22.15E", u * 2, v * 2 + 1,
+                                        x * 2, y * 2 + 1, value);
+                        outfile->Printf("\n    %2zu %2zu %2zu %2zu %22.15E", v * 2 + 1, u * 2,
+                                        x * 2, y * 2 + 1, -value);
+                        outfile->Printf("\n    %2zu %2zu %2zu %2zu %22.15E", u * 2, v * 2 + 1,
+                                        y * 2 + 1, x * 2, -value);
+                        outfile->Printf("\n    %2zu %2zu %2zu %2zu %22.15E", v * 2 + 1, u * 2,
+                                        y * 2 + 1, x * 2, value);
                     }
 
                     // bb
                     value = Hbar2_.block("AAAA").data()[u * na3 + v * na2 + x * na1 + y];
                     if (std::fabs(value) > 1.0e-15)
-                        outfile->Printf("\n    %2zu %2zu %2zu %2zu %22.15E", u * 2 + 1, v * 2 + 1, x * 2 + 1, y * 2 + 1, value);
+                        outfile->Printf("\n    %2zu %2zu %2zu %2zu %22.15E", u * 2 + 1, v * 2 + 1,
+                                        x * 2 + 1, y * 2 + 1, value);
                 }
             }
         }
@@ -624,80 +633,86 @@ std::shared_ptr<ActiveSpaceIntegrals> MASTER_DSRG::compute_Heff_actv() {
                                 double value;
 
                                 // aaa
-                                value = Hbar3_.block("aaaaaa").data()[u * na5 + v * na4 + w * na3 + x * na2 + y * na1 + z];
+                                value = Hbar3_.block("aaaaaa").data()[u * na5 + v * na4 + w * na3 +
+                                                                      x * na2 + y * na1 + z];
                                 if (std::fabs(value) > 1.0e-15)
                                     outfile->Printf("\n    %2zu %2zu %2zu %2zu %2zu %2zu %22.15E",
-                                                u * 2, v * 2, w * 2, x * 2, y * 2, z * 2, value);
+                                                    u * 2, v * 2, w * 2, x * 2, y * 2, z * 2,
+                                                    value);
 
                                 // aab
-                                value = Hbar3_.block("aaAaaA").data()[u * na5 + v * na4 + w * na3 + x * na2 + y * na1 + z];
+                                value = Hbar3_.block("aaAaaA").data()[u * na5 + v * na4 + w * na3 +
+                                                                      x * na2 + y * na1 + z];
                                 if (std::fabs(value) > 1.0e-15) {
                                     outfile->Printf("\n    %2zu %2zu %2zu %2zu %2zu %2zu %22.15E",
-                                                    u * 2, v * 2, w * 2 + 1, x * 2, y * 2, z * 2 + 1,
-                                                    value);
+                                                    u * 2, v * 2, w * 2 + 1, x * 2, y * 2,
+                                                    z * 2 + 1, value);
                                     outfile->Printf("\n    %2zu %2zu %2zu %2zu %2zu %2zu %22.15E",
-                                                    u * 2, w * 2 + 1, v * 2, x * 2, y * 2, z * 2 + 1,
-                                                    -value);
+                                                    u * 2, w * 2 + 1, v * 2, x * 2, y * 2,
+                                                    z * 2 + 1, -value);
                                     outfile->Printf("\n    %2zu %2zu %2zu %2zu %2zu %2zu %22.15E",
-                                                    w * 2 + 1, u * 2, v * 2, x * 2, y * 2, z * 2 + 1,
-                                                    value);
+                                                    w * 2 + 1, u * 2, v * 2, x * 2, y * 2,
+                                                    z * 2 + 1, value);
                                     outfile->Printf("\n    %2zu %2zu %2zu %2zu %2zu %2zu %22.15E",
-                                                    u * 2, v * 2, w * 2 + 1, x * 2, z * 2 + 1, y * 2,
-                                                    -value);
+                                                    u * 2, v * 2, w * 2 + 1, x * 2, z * 2 + 1,
+                                                    y * 2, -value);
                                     outfile->Printf("\n    %2zu %2zu %2zu %2zu %2zu %2zu %22.15E",
-                                                    u * 2, w * 2 + 1, v * 2, x * 2, z * 2 + 1, y * 2,
-                                                    value);
+                                                    u * 2, w * 2 + 1, v * 2, x * 2, z * 2 + 1,
+                                                    y * 2, value);
                                     outfile->Printf("\n    %2zu %2zu %2zu %2zu %2zu %2zu %22.15E",
-                                                    w * 2 + 1, u * 2, v * 2, x * 2, z * 2 + 1, y * 2,
-                                                    -value);
+                                                    w * 2 + 1, u * 2, v * 2, x * 2, z * 2 + 1,
+                                                    y * 2, -value);
                                     outfile->Printf("\n    %2zu %2zu %2zu %2zu %2zu %2zu %22.15E",
-                                                    u * 2, v * 2, w * 2 + 1, z * 2 + 1, x * 2, y * 2,
-                                                    value);
+                                                    u * 2, v * 2, w * 2 + 1, z * 2 + 1, x * 2,
+                                                    y * 2, value);
                                     outfile->Printf("\n    %2zu %2zu %2zu %2zu %2zu %2zu %22.15E",
-                                                    u * 2, w * 2 + 1, v * 2, z * 2 + 1, x * 2, y * 2,
-                                                    -value);
+                                                    u * 2, w * 2 + 1, v * 2, z * 2 + 1, x * 2,
+                                                    y * 2, -value);
                                     outfile->Printf("\n    %2zu %2zu %2zu %2zu %2zu %2zu %22.15E",
-                                                    w * 2 + 1, u * 2, v * 2, z * 2 + 1, x * 2, y * 2,
-                                                    value);
+                                                    w * 2 + 1, u * 2, v * 2, z * 2 + 1, x * 2,
+                                                    y * 2, value);
                                 }
 
                                 // abb
-                                value = Hbar3_.block("aAAaAA").data()[u * na5 + v * na4 + w * na3 + x * na2 + y * na1 + z];
+                                value = Hbar3_.block("aAAaAA").data()[u * na5 + v * na4 + w * na3 +
+                                                                      x * na2 + y * na1 + z];
                                 if (std::fabs(value) > 1.0e-15) {
                                     outfile->Printf("\n    %2zu %2zu %2zu %2zu %2zu %2zu %22.15E",
-                                                    u * 2, v * 2 + 1, w * 2 + 1, x * 2, y * 2 + 1, z * 2 + 1,
-                                                    value);
+                                                    u * 2, v * 2 + 1, w * 2 + 1, x * 2, y * 2 + 1,
+                                                    z * 2 + 1, value);
                                     outfile->Printf("\n    %2zu %2zu %2zu %2zu %2zu %2zu %22.15E",
-                                                    v * 2 + 1, u * 2, w * 2 + 1, x * 2, y * 2 + 1, z * 2 + 1,
-                                                    -value);
+                                                    v * 2 + 1, u * 2, w * 2 + 1, x * 2, y * 2 + 1,
+                                                    z * 2 + 1, -value);
                                     outfile->Printf("\n    %2zu %2zu %2zu %2zu %2zu %2zu %22.15E",
-                                                    v * 2 + 1, w * 2 + 1, u * 2, x * 2, y * 2 + 1, z * 2 + 1,
-                                                    value);
+                                                    v * 2 + 1, w * 2 + 1, u * 2, x * 2, y * 2 + 1,
+                                                    z * 2 + 1, value);
                                     outfile->Printf("\n    %2zu %2zu %2zu %2zu %2zu %2zu %22.15E",
-                                                    u * 2, v * 2 + 1, w * 2 + 1, y * 2 + 1, x * 2, z * 2 + 1,
-                                                    -value);
+                                                    u * 2, v * 2 + 1, w * 2 + 1, y * 2 + 1, x * 2,
+                                                    z * 2 + 1, -value);
                                     outfile->Printf("\n    %2zu %2zu %2zu %2zu %2zu %2zu %22.15E",
-                                                    v * 2 + 1, u * 2, w * 2 + 1, y * 2 + 1, x * 2, z * 2 + 1,
-                                                    value);
+                                                    v * 2 + 1, u * 2, w * 2 + 1, y * 2 + 1, x * 2,
+                                                    z * 2 + 1, value);
                                     outfile->Printf("\n    %2zu %2zu %2zu %2zu %2zu %2zu %22.15E",
-                                                    v * 2 + 1, w * 2 + 1, u * 2, y * 2 + 1, x * 2, z * 2 + 1,
-                                                    -value);
+                                                    v * 2 + 1, w * 2 + 1, u * 2, y * 2 + 1, x * 2,
+                                                    z * 2 + 1, -value);
                                     outfile->Printf("\n    %2zu %2zu %2zu %2zu %2zu %2zu %22.15E",
-                                                    u * 2, v * 2 + 1, w * 2 + 1, y * 2 + 1, z * 2 + 1, x * 2,
-                                                    value);
+                                                    u * 2, v * 2 + 1, w * 2 + 1, y * 2 + 1,
+                                                    z * 2 + 1, x * 2, value);
                                     outfile->Printf("\n    %2zu %2zu %2zu %2zu %2zu %2zu %22.15E",
-                                                    v * 2 + 1, u * 2, w * 2 + 1, y * 2 + 1, z * 2 + 1, x * 2,
-                                                    -value);
+                                                    v * 2 + 1, u * 2, w * 2 + 1, y * 2 + 1,
+                                                    z * 2 + 1, x * 2, -value);
                                     outfile->Printf("\n    %2zu %2zu %2zu %2zu %2zu %2zu %22.15E",
-                                                    v * 2 + 1, w * 2 + 1, u * 2, y * 2 + 1, z * 2 + 1, x * 2,
-                                                    value);
+                                                    v * 2 + 1, w * 2 + 1, u * 2, y * 2 + 1,
+                                                    z * 2 + 1, x * 2, value);
                                 }
 
                                 // bbb
-                                value = Hbar3_.block("AAAAAA").data()[u * na5 + v * na4 + w * na3 + x * na2 + y * na1 + z];
+                                value = Hbar3_.block("AAAAAA").data()[u * na5 + v * na4 + w * na3 +
+                                                                      x * na2 + y * na1 + z];
                                 if (std::fabs(value) > 1.0e-15)
                                     outfile->Printf("\n    %2zu %2zu %2zu %2zu %2zu %2zu %22.15E",
-                                                    u * 2 + 1, v * 2 + 1, w * 2 + 1, x * 2 + 1, y * 2 + 1, z * 2 + 1, value);
+                                                    u * 2 + 1, v * 2 + 1, w * 2 + 1, x * 2 + 1,
+                                                    y * 2 + 1, z * 2 + 1, value);
                             }
                         }
                     }
@@ -707,6 +722,19 @@ std::shared_ptr<ActiveSpaceIntegrals> MASTER_DSRG::compute_Heff_actv() {
     }
 
     return fci_ints;
+}
+
+void MASTER_DSRG::deGNO_ints(const std::string& name, double& H0, BlockedTensor& H1) {
+    print_h2("De-Normal-Order DSRG Transformed " + name);
+
+    // compute scalar
+    local_timer t0;
+    outfile->Printf("\n    %-40s ... ", "Computing the scalar term");
+
+    H0 -= H1["vu"] * Gamma1_["uv"];
+    H0 -= H1["VU"] * Gamma1_["UV"];
+
+    outfile->Printf("Done. Timing %8.3f s", t0.get());
 }
 
 void MASTER_DSRG::deGNO_ints(const std::string& name, double& H0, BlockedTensor& H1,
@@ -962,25 +990,35 @@ std::vector<DressedQuantity> MASTER_DSRG::deGNO_DMbar_actv() {
     for (int z = 0; z < 3; ++z) {
         if (do_dm_dirs_[z] || multi_state_) {
             std::string name = "Dipole " + dm_dirs_[z] + " Integrals";
-            if (foptions_->get_bool("FORM_MBAR3")) {
+            if (Mbar_level_ > 2) {
                 deGNO_ints(name, Mbar0_[z], Mbar1_[z], Mbar2_[z], Mbar3_[z]);
-                rotate_ints_semi_to_origin(name, Mbar1_[z], Mbar2_[z], Mbar3_[z]);
+//                rotate_ints_semi_to_origin(name, Mbar1_[z], Mbar2_[z], Mbar3_[z]);
                 out.emplace_back(Mbar0_[z], Mbar1_[z].block("aa"), Mbar1_[z].block("AA"),
                                  Mbar2_[z].block("aaaa"), Mbar2_[z].block("aAaA"),
                                  Mbar2_[z].block("AAAA"), Mbar3_[z].block("aaaaaa"),
                                  Mbar3_[z].block("aaAaaA"), Mbar3_[z].block("aAAaAA"),
                                  Mbar3_[z].block("AAAAAA"));
-            } else {
+            } else if (Mbar_level_ == 2) {
                 deGNO_ints(name, Mbar0_[z], Mbar1_[z], Mbar2_[z]);
-                rotate_ints_semi_to_origin(name, Mbar1_[z], Mbar2_[z]);
+//                rotate_ints_semi_to_origin(name, Mbar1_[z], Mbar2_[z]);
                 out.emplace_back(Mbar0_[z], Mbar1_[z].block("aa"), Mbar1_[z].block("AA"),
                                  Mbar2_[z].block("aaaa"), Mbar2_[z].block("aAaA"),
                                  Mbar2_[z].block("AAAA"));
+            } else {
+                deGNO_ints(name, Mbar0_[z], Mbar1_[z]);
+                out.emplace_back(Mbar0_[z], Mbar1_[z].block("aa"), Mbar1_[z].block("AA"));
             }
+
+            auto UaT = Uactv_.block("aa").clone();
+            auto UbT = Uactv_.block("AA").clone();
+            UaT("pq") = Uactv_.block("aa")("qp");
+            UbT("pq") = Uactv_.block("AA")("qp");
+            out[z].rotate(UaT, UbT);
 
             outfile->Printf("\n\n  ==> Effective " + name + " <==");
 
-            outfile->Printf("\n    Electronic contributions (+ DSRG correction): %22.15E", Mbar0_[z]);
+            outfile->Printf("\n    Electronic contributions (+ DSRG correction): %22.15E",
+                            Mbar0_[z]);
 
             auto na1 = actv_mos_.size();
             auto na2 = na1 * na1;
@@ -988,7 +1026,8 @@ std::vector<DressedQuantity> MASTER_DSRG::deGNO_DMbar_actv() {
             auto na4 = na3 * na1;
             auto na5 = na4 * na1;
 
-            outfile->Printf("\n    Dressed 1-body integrals spin orbital (odd = alpha, even = beta)");
+            outfile->Printf(
+                "\n    Dressed 1-body integrals spin orbital (odd = alpha, even = beta)");
             for (size_t u = 0; u < na1; ++u) {
                 for (size_t v = 0; v < na1; ++v) {
                     double value;
@@ -1003,37 +1042,49 @@ std::vector<DressedQuantity> MASTER_DSRG::deGNO_DMbar_actv() {
                 }
             }
 
-            outfile->Printf("\n    Dressed 2-body integrals spin orbital (odd = alpha, even = beta)");
-            for (size_t u = 0; u < na1; ++u) {
-                for (size_t v = 0; v < na1; ++v) {
-                    for (size_t x = 0; x < na1; ++x) {
-                        for (size_t y = 0; y < na1; ++y) {
-                            double value;
+            if (Mbar_level_ > 1) {
+                outfile->Printf(
+                    "\n    Dressed 2-body integrals spin orbital (odd = alpha, even = beta)");
+                for (size_t u = 0; u < na1; ++u) {
+                    for (size_t v = 0; v < na1; ++v) {
+                        for (size_t x = 0; x < na1; ++x) {
+                            for (size_t y = 0; y < na1; ++y) {
+                                double value;
 
-                            // aa
-                            value = Mbar2_[z].block("aaaa").data()[u * na3 + v * na2 + x * na1 + y];
-                            if (std::fabs(value) > 1.0e-15)
-                                outfile->Printf("\n    %2zu %2zu %2zu %2zu %22.15E", u * 2, v * 2, x * 2, y * 2, value);
+                                // aa
+                                value =
+                                    Mbar2_[z].block("aaaa").data()[u * na3 + v * na2 + x * na1 + y];
+                                if (std::fabs(value) > 1.0e-15)
+                                    outfile->Printf("\n    %2zu %2zu %2zu %2zu %22.15E", u * 2,
+                                                    v * 2, x * 2, y * 2, value);
 
-                            // ab
-                            value = Mbar2_[z].block("aAaA").data()[u * na3 + v * na2 + x * na1 + y];
-                            if (std::fabs(value) > 1.0e-15) {
-                                outfile->Printf("\n    %2zu %2zu %2zu %2zu %22.15E", u * 2, v * 2 + 1, x * 2, y * 2 + 1, value);
-                                outfile->Printf("\n    %2zu %2zu %2zu %2zu %22.15E", v * 2 + 1, u * 2, x * 2, y * 2 + 1, -value);
-                                outfile->Printf("\n    %2zu %2zu %2zu %2zu %22.15E", u * 2, v * 2 + 1, y * 2 + 1, x * 2, -value);
-                                outfile->Printf("\n    %2zu %2zu %2zu %2zu %22.15E", v * 2 + 1, u * 2, y * 2 + 1, x * 2, value);
+                                // ab
+                                value =
+                                    Mbar2_[z].block("aAaA").data()[u * na3 + v * na2 + x * na1 + y];
+                                if (std::fabs(value) > 1.0e-15) {
+                                    outfile->Printf("\n    %2zu %2zu %2zu %2zu %22.15E", u * 2,
+                                                    v * 2 + 1, x * 2, y * 2 + 1, value);
+                                    outfile->Printf("\n    %2zu %2zu %2zu %2zu %22.15E", v * 2 + 1,
+                                                    u * 2, x * 2, y * 2 + 1, -value);
+                                    outfile->Printf("\n    %2zu %2zu %2zu %2zu %22.15E", u * 2,
+                                                    v * 2 + 1, y * 2 + 1, x * 2, -value);
+                                    outfile->Printf("\n    %2zu %2zu %2zu %2zu %22.15E", v * 2 + 1,
+                                                    u * 2, y * 2 + 1, x * 2, value);
+                                }
+
+                                // bb
+                                value =
+                                    Mbar2_[z].block("AAAA").data()[u * na3 + v * na2 + x * na1 + y];
+                                if (std::fabs(value) > 1.0e-15)
+                                    outfile->Printf("\n    %2zu %2zu %2zu %2zu %22.15E", u * 2 + 1,
+                                                    v * 2 + 1, x * 2 + 1, y * 2 + 1, value);
                             }
-
-                            // bb
-                            value = Mbar2_[z].block("AAAA").data()[u * na3 + v * na2 + x * na1 + y];
-                            if (std::fabs(value) > 1.0e-15)
-                                outfile->Printf("\n    %2zu %2zu %2zu %2zu %22.15E", u * 2 + 1, v * 2 + 1, x * 2 + 1, y * 2 + 1, value);
                         }
                     }
                 }
             }
 
-            if (foptions_->get_bool("FORM_MBAR3")) {
+            if (Mbar_level_ > 2) {
                 outfile->Printf("\n    Dressed 3-body integrals <ααβ|ααβ>");
                 const auto& Hbar3_data = Mbar3_[z].block("aaAaaA").data();
                 for (size_t u = 0; u < na1; ++u) {
@@ -1042,11 +1093,13 @@ std::vector<DressedQuantity> MASTER_DSRG::deGNO_DMbar_actv() {
                             for (size_t x = 0; x < na1; ++x) {
                                 for (size_t y = 0; y < na1; ++y) {
                                     for (size_t p = 0; p < na1; ++p) {
-                                        auto value = Hbar3_data[u * na5 + v * na4 + w * na3 + x * na2 + y * na1 + p];
+                                        auto value = Hbar3_data[u * na5 + v * na4 + w * na3 +
+                                                                x * na2 + y * na1 + p];
                                         if (std::fabs(value) < 1.0e-16)
                                             value = 0.0;
-                                        outfile->Printf("\n    %2zu %2zu %2zu %2zu %2zu %2zu %22.15E",
-                                                        u, v, w, x, y, p, value);
+                                        outfile->Printf(
+                                            "\n    %2zu %2zu %2zu %2zu %2zu %2zu %22.15E", u, v, w,
+                                            x, y, p, value);
                                     }
                                 }
                             }

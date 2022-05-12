@@ -296,6 +296,12 @@ class MASTER_DSRG : public DynamicCorrelationSolver {
     ambit::BlockedTensor Hbar3_;
 
     /**
+     * De-normal-order a 1-body DSRG transformed integrals
+     * This will change H0 !!!
+     */
+    void deGNO_ints(const std::string& name, double& H0, BlockedTensor& H1);
+
+    /**
      * De-normal-order a 2-body DSRG transformed integrals
      * This will change H0 and H1 !!!
      */
@@ -347,6 +353,8 @@ class MASTER_DSRG : public DynamicCorrelationSolver {
     /// Compute dipole for a certain direction or not
     std::array<bool, 3> do_dm_dirs_;
 
+    /// Many-body level for DSRG transformed dipole
+    int Mbar_level_;
     /// DSRG transformed dipole scalar
     std::array<double, 3> Mbar0_;
     /// DSRG transformed 1-body dipole integrals (active only)
