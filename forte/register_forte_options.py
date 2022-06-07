@@ -546,6 +546,7 @@ def register_detci_options(options):
     options.set_group("DETCI")
 
     options.add_double("DETCI_PRINT_CIVEC", 0.05, "The printing threshold for CI vectors")
+    options.add_bool("DETCI_CISD_NO_HF", False, "Exclude HF determinant in active CID/CISD space")
 
 
 def register_integral_options(options):
@@ -726,7 +727,7 @@ def register_dsrg_options(options):
 
     options.add_bool("DSRG_MRPT3_BATCHED", False, "Force running the DSRG-MRPT3 code using the batched algorithm")
 
-    options.add_bool("IGNORE_MEMORY_WARNINGS", False, "Force running the DSRG-MRPT3 code using the batched algorithm")
+    options.add_bool("IGNORE_MEMORY_ERRORS", False, "Continue running DSRG-MRPT3 even if memory exceeds")
 
     options.add_int(
         "DSRG_DIIS_START", 2, "Iteration cycle to start adding error vectors for"
