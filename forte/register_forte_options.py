@@ -659,7 +659,7 @@ def register_dsrg_options(options):
     options.add_bool("FORM_HBAR3", False, "Form 3-body Hbar (only used in dsrg-mrpt2 with SA_SUB for testing)")
 
     options.add_int("DSRG_MBAR_LEVEL", 2, "Many-body level kept for transformed dipole integrals"
-                                     " (only used in dsrg-mrpt2 for testing)")
+                    " (only used in dsrg-mrpt2 for testing)")
     # options.add_bool("FORM_MBAR3", False, "Form 3-body mbar (only used in dsrg-mrpt2 for testing)")
 
     options.add_bool(

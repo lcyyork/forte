@@ -158,16 +158,16 @@ class ProcedureDSRG:
         # options_dict["CALC_TYPE"]["value"] = "SA"
         # options_dict["DSRG_MULTI_STATE"]["value"] = "SA_FULL"
         # options_dict["TRANSITION_DIPOLES"]["value"] = True
-        # options_dict["AVG_STATE"]["value"] = [[0, 1, 2], [5, 1, 1]]
-        # options_dict["AVG_WEIGHT"]["value"] = [[1, 0], [0]]
+        options_dict["AVG_STATE"]["value"] = [[0, 1, 2], [5, 1, 1], [5, 3, 1]]
+        options_dict["AVG_WEIGHT"]["value"] = [[1, 0], [0], [0]]
         self.options.set_dict(options_dict)
 
         # make new ci solver
         nmopi = mo_space_info.dimension("ALL")
         point_group = mo_space_info.point_group_label()
         self.mo_space_info = forte.make_mo_space_info(nmopi, point_group, self.options)
-        # state_weights_map = forte.make_state_weights_map(options, mo_space_info)
-        # self.state_weights_map = state_weights_map
+        state_weights_map = forte.make_state_weights_map(options, mo_space_info)
+        self.state_weights_map = state_weights_map
         state_map = forte.to_state_nroots_map(state_weights_map)
         active_space_solver_type = options.get_str('ACTIVE_SPACE_SOLVER')
         as_ints = forte.make_active_space_ints(mo_space_info, ints, "ACTIVE", ["RESTRICTED_DOCC"])
@@ -260,10 +260,10 @@ class ProcedureDSRG:
             state_energies_list = self.active_space_solver.compute_energy()
 
             # Reorder weights if needed
-            if self.state_ci_wfn_map is not None:
-                state_ci_wfn_map = self.active_space_solver.state_ci_wfn_map()
-                self.reorder_weights(state_ci_wfn_map)
-                self.state_ci_wfn_map = state_ci_wfn_map
+            # if self.state_ci_wfn_map is not None:
+            #     state_ci_wfn_map = self.active_space_solver.state_ci_wfn_map()
+            #     self.reorder_weights(state_ci_wfn_map)
+            #     self.state_ci_wfn_map = state_ci_wfn_map
 
             e_relax = forte.compute_average_state_energy(state_energies_list, self.state_weights_map)
             self.energies.append((e_dsrg, e_relax))

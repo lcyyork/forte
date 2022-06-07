@@ -992,7 +992,6 @@ std::vector<DressedQuantity> MASTER_DSRG::deGNO_DMbar_actv() {
             std::string name = "Dipole " + dm_dirs_[z] + " Integrals";
             if (Mbar_level_ > 2) {
                 deGNO_ints(name, Mbar0_[z], Mbar1_[z], Mbar2_[z], Mbar3_[z]);
-//                rotate_ints_semi_to_origin(name, Mbar1_[z], Mbar2_[z], Mbar3_[z]);
                 out.emplace_back(Mbar0_[z], Mbar1_[z].block("aa"), Mbar1_[z].block("AA"),
                                  Mbar2_[z].block("aaaa"), Mbar2_[z].block("aAaA"),
                                  Mbar2_[z].block("AAAA"), Mbar3_[z].block("aaaaaa"),
@@ -1000,7 +999,6 @@ std::vector<DressedQuantity> MASTER_DSRG::deGNO_DMbar_actv() {
                                  Mbar3_[z].block("AAAAAA"));
             } else if (Mbar_level_ == 2) {
                 deGNO_ints(name, Mbar0_[z], Mbar1_[z], Mbar2_[z]);
-//                rotate_ints_semi_to_origin(name, Mbar1_[z], Mbar2_[z]);
                 out.emplace_back(Mbar0_[z], Mbar1_[z].block("aa"), Mbar1_[z].block("AA"),
                                  Mbar2_[z].block("aaaa"), Mbar2_[z].block("aAaA"),
                                  Mbar2_[z].block("AAAA"));
@@ -1027,7 +1025,7 @@ std::vector<DressedQuantity> MASTER_DSRG::deGNO_DMbar_actv() {
             auto na5 = na4 * na1;
 
             outfile->Printf(
-                "\n    Dressed 1-body integrals spin orbital (odd = alpha, even = beta)");
+                "\n    Dressed 1-body integrals spin orbital (even = alpha, odd = beta)");
             for (size_t u = 0; u < na1; ++u) {
                 for (size_t v = 0; v < na1; ++v) {
                     double value;
@@ -1044,7 +1042,7 @@ std::vector<DressedQuantity> MASTER_DSRG::deGNO_DMbar_actv() {
 
             if (Mbar_level_ > 1) {
                 outfile->Printf(
-                    "\n    Dressed 2-body integrals spin orbital (odd = alpha, even = beta)");
+                    "\n    Dressed 2-body integrals spin orbital (even = alpha, odd = beta)");
                 for (size_t u = 0; u < na1; ++u) {
                     for (size_t v = 0; v < na1; ++v) {
                         for (size_t x = 0; x < na1; ++x) {
