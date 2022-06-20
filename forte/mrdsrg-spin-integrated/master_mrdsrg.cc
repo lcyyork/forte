@@ -572,7 +572,7 @@ std::shared_ptr<ActiveSpaceIntegrals> MASTER_DSRG::compute_Heff_actv() {
     auto na4 = na3 * na1;
     auto na5 = na4 * na1;
 
-    outfile->Printf("\n    Dressed 1-body integrals spin orbital (odd = alpha, even = beta)");
+    outfile->Printf("\n    Dressed 1-body integrals spin orbital (even = alpha, odd = beta)");
     for (size_t u = 0; u < na1; ++u) {
         for (size_t v = 0; v < na1; ++v) {
             auto value = Hbar1_.block("aa").data()[u * na1 + v];
@@ -585,7 +585,7 @@ std::shared_ptr<ActiveSpaceIntegrals> MASTER_DSRG::compute_Heff_actv() {
         }
     }
 
-    outfile->Printf("\n    Dressed 2-body integrals spin orbital (odd = alpha, even = beta)");
+    outfile->Printf("\n    Dressed 2-body integrals spin orbital (even = alpha, odd = beta)");
     for (size_t u = 0; u < na1; ++u) {
         for (size_t v = 0; v < na1; ++v) {
             for (size_t x = 0; x < na1; ++x) {
@@ -622,7 +622,7 @@ std::shared_ptr<ActiveSpaceIntegrals> MASTER_DSRG::compute_Heff_actv() {
     }
 
     if (foptions_->get_bool("FORM_HBAR3")) {
-        outfile->Printf("\n    Dressed 3-body integrals  spin orbital (odd = alpha, even = beta)");
+        outfile->Printf("\n    Dressed 3-body integrals  spin orbital (even = alpha, odd = beta)");
         const auto& Hbar3_data = Hbar3_.block("aaAaaA").data();
         for (size_t u = 0; u < na1; ++u) {
             for (size_t v = 0; v < na1; ++v) {
