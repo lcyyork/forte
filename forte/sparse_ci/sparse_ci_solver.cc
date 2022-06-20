@@ -208,13 +208,11 @@ SparseCISolver::diagonalize_hamiltonian_full(const std::vector<Determinant>& spa
         psi::SharedMatrix H = build_full_hamiltonian(space, as_ints);
         psi::SharedMatrix Hss = psi::linalg::triplet(S2vecs_sub, H, S2vecs_sub, true, false, false);
         Hss->set_name("Hss");
-        Hss->print();
 
         // Obtain spin selected eigen values and vectors
         psi::SharedVector Hss_vals(new Vector("Hss Eigen Values", nfound));
         psi::SharedMatrix Hss_vecs(new psi::Matrix("Hss Eigen Vectors", nfound, nfound));
         Hss->diagonalize(Hss_vecs, Hss_vals);
-        Hss_vals->print();
 
         // Project Hss_vecs back to original manifold
         psi::SharedMatrix H_vecs = psi::linalg::doublet(S2vecs_sub, Hss_vecs);
