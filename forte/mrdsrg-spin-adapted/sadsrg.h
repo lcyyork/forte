@@ -96,6 +96,13 @@ class SADSRG : public DynamicCorrelationSolver {
     bool store_cu3_;
     /// Three-body density cumulant algorithm
     std::string L3_algorithm_;
+    /// Cumulant truncation level
+    /// 0: keep all
+    /// 1: ignore cu3, keep only diagonal cu2, keep all cu1
+    /// 2: ignore cu3 and cu2, keep only diagonal cu1
+    int cu_trunc_level_;
+    /// Apply the above cumulant truncation
+    void truncate_cumulant();
 
     /// Multi-state computation if true
     bool multi_state_;

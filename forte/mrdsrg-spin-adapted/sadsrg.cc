@@ -107,6 +107,9 @@ void SADSRG::startup() {
     // initialize Fock matrix
     init_fock();
 
+    // truncate cumulants
+    truncate_cumulant();
+
     // recompute reference energy from ForteIntegral
     compute_reference_energy_from_ints();
 
@@ -172,6 +175,9 @@ void SADSRG::read_options() {
     do_cu3_ = foptions_->get_str("THREEPDC") != "ZERO";
     L3_algorithm_ = foptions_->get_str("DSRG_3RDM_ALGORITHM");
     store_cu3_ = do_cu3_ and (L3_algorithm_ == "EXPLICIT");
+    cu_trunc_level_ = foptions_->get_int("DSRG_CU_TRUNC_LEVEL");
+    // if (cu_trunc_level_ > 0)
+    //     do_cu3_ = false;
 
     ntamp_ = foptions_->get_int("NTAMP");
     intruder_tamp_ = foptions_->get_double("INTRUDER_TAMP");
@@ -728,6 +734,29 @@ void SADSRG::print_cumulant_summary() {
     outfile->Printf("\n    %-6s %12.6f %12.6f", "max", maxes[0], maxes[1]);
     outfile->Printf("\n    %-6s %12.6f %12.6f", "2-norm", norms[0], norms[1]);
     outfile->Printf("\n    %s", dash.c_str());
+}
+
+void SADSRG::truncate_cumulant() {
+    if (cu_trunc_level_ < 1)
+        return;
+
+    if (cu_trunc_level_ > 1) {
+        L2_.zero();
+        L1_.iterate([&](const std::vector<size_t> i, const std::vector<SpinType>&, double& value) {
+            if (i[0] != i[1])
+                value = 0.0;
+        });
+        Eta1_.iterate(
+            [&](const std::vector<size_t> i, const std::vector<SpinType>&, double& value) {
+                if (i[0] != i[1])
+                    value = 0.0;
+            });
+    } else {
+        L2_.iterate([&](const std::vector<size_t> i, const std::vector<SpinType>&, double& value) {
+            if ((i[0] != i[2] or i[1] != i[3]) and (i[0] != i[3] or i[1] != i[2]))
+                value = 0.0;
+        });
+    }
 }
 
 std::vector<double> SADSRG::diagonalize_Fock_diagblocks(BlockedTensor& U) {

@@ -756,6 +756,8 @@ def register_dsrg_options(options):
 
     options.add_bool("DSRG_RDM_MS_AVG", False, "Form Ms-averaged density if true")
 
+    options.add_int("DSRG_CU_TRUNC_LEVEL", 0, "Truncation level of cumulants in DSRG")
+
 
 def register_dwms_options(options):
     options.set_group("DWMS")
