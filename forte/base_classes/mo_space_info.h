@@ -236,15 +236,18 @@ class MOSpaceInfo {
     /// Information about each elementary space stored in a map
     std::map<std::string, SpaceInfo> mo_spaces_;
     /// The list of elementary spaces
-    std::vector<std::string> elementary_spaces_{
-        "FROZEN_DOCC", "RESTRICTED_DOCC", "GAS1",       "GAS2", "GAS3", "GAS4", "GAS5",
-        "GAS6",        "RESTRICTED_UOCC", "FROZEN_UOCC"};
+    std::vector<std::string> elementary_spaces_{"FROZEN_DOCC",  "EXTERNAL_DOCC", "VALENCE_DOCC",
+                                                "GAS1",         "GAS2",          "GAS3",
+                                                "GAS4",         "GAS5",          "GAS6",
+                                                "VALENCE_UOCC", "EXTERNAL_UOCC", "FROZEN_UOCC"};
     /// The priority used to assign orbitals to elementary spaces
     std::vector<std::string> elementary_spaces_priority_{"GAS1",
-                                                         "RESTRICTED_UOCC",
-                                                         "RESTRICTED_DOCC",
+                                                         "EXTERNAL_UOCC",
+                                                         "EXTERNAL_DOCC",
                                                          "FROZEN_DOCC",
                                                          "FROZEN_UOCC",
+                                                         "VALENCE_DOCC",
+                                                         "VALENCE_UOCC",
                                                          "GAS2",
                                                          "GAS3",
                                                          "GAS4",
@@ -254,20 +257,26 @@ class MOSpaceInfo {
     /// Defines composite orbital spaces
     std::map<std::string, std::vector<std::string>> composite_spaces_{
         {"ALL",
-         {"FROZEN_DOCC", "RESTRICTED_DOCC", "GAS1", "GAS2", "GAS3", "GAS4", "GAS5", "GAS6",
-          "RESTRICTED_UOCC", "FROZEN_UOCC"}},
+         {"FROZEN_DOCC", "EXTERNAL_DOCC", "VALENCE_DOCC", "GAS1", "GAS2", "GAS3", "GAS4", "GAS5",
+          "GAS6", "VALENCE_UOCC", "EXTERNAL_UOCC", "FROZEN_UOCC"}},
         {"FROZEN", {"FROZEN_DOCC", "FROZEN_UOCC"}},
         {"CORRELATED",
-         {"RESTRICTED_DOCC", "GAS1", "GAS2", "GAS3", "GAS4", "GAS5", "GAS6", "RESTRICTED_UOCC"}},
+         {"EXTERNAL_DOCC", "VALENCE_DOCC", "GAS1", "GAS2", "GAS3", "GAS4", "GAS5", "GAS6",
+          "VALENCE_UOCC", "EXTERNAL_UOCC"}},
         {"ACTIVE", {"GAS1", "GAS2", "GAS3", "GAS4", "GAS5", "GAS6"}},
-        {"INACTIVE_DOCC", {"FROZEN_DOCC", "RESTRICTED_DOCC"}},
-        {"INACTIVE_UOCC", {"RESTRICTED_UOCC", "FROZEN_UOCC"}},
+        {"INACTIVE_DOCC", {"FROZEN_DOCC", "EXTERNAL_DOCC", "VALENCE_DOCC"}},
+        {"INACTIVE_UOCC", {"VALENCE_UOCC", "EXTERNAL_UOCC", "FROZEN_UOCC"}},
         // Spaces for multireference calculations
-        {"GENERALIZED HOLE", {"RESTRICTED_DOCC", "GAS1", "GAS2", "GAS3", "GAS4", "GAS5", "GAS6"}},
+        {"GENERALIZED HOLE",
+         {"EXTERNAL_DOCC", "VALENCE_DOCC", "GAS1", "GAS2", "GAS3", "GAS4", "GAS5", "GAS6"}},
         {"GENERALIZED PARTICLE",
-         {"GAS1", "GAS2", "GAS3", "GAS4", "GAS5", "GAS6", "RESTRICTED_UOCC"}},
-        {"CORE", {"RESTRICTED_DOCC"}},
-        {"VIRTUAL", {"RESTRICTED_UOCC"}}};
+         {"GAS1", "GAS2", "GAS3", "GAS4", "GAS5", "GAS6", "VALENCE_UOCC", "EXTERNAL_UOCC"}},
+        {"RESTRICTED_DOCC", {"EXTERNAL_DOCC", "VALENCE_DOCC"}},
+        {"RESTRICTED_UOCC", {"VALENCE_UOCC", "EXTERNAL_UOCC"}},
+        {"CORE", {"EXTERNAL_DOCC", "VALENCE_DOCC"}},
+        {"VIRTUAL", {"VALENCE_UOCC", "EXTERNAL_UOCC"}},
+        {"POST_DSRG_ACTIVE",
+         {"VALENCE_DOCC", "GAS1", "GAS2", "GAS3", "GAS4", "GAS5", "GAS6", "VALENCE_UOCC"}}};
 
     /// The map from all MO to the correlated MOs (excludes frozen core/virtual)
     std::vector<size_t> mo_to_cmo_;

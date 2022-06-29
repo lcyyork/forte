@@ -67,6 +67,9 @@ class SADSRG : public DynamicCorrelationSolver {
     /// Set unitary matrix (in active space) from original to semicanonical
     void set_Uactv(ambit::Tensor& U);
 
+    /// Set if considering "valence" DOCC and UOCC in post-DSRG diagonalization
+    void set_complete_valence_ints(bool cv) { complete_valence_ints_ = cv; }
+
   protected:
     /// Startup function called in constructor
     void startup();
@@ -121,6 +124,8 @@ class SADSRG : public DynamicCorrelationSolver {
 
     /// Relaxation type
     std::string relax_ref_;
+    /// Whether to prepare an enlarged active integrals for post-DSRG diagonalization
+    bool complete_valence_ints_ = false;
 
     /// Timings for computing the commutators
     DSRG_TIME dsrg_time_;

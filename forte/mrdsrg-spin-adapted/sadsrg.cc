@@ -416,6 +416,7 @@ std::shared_ptr<ActiveSpaceIntegrals> SADSRG::compute_Heff_actv() {
     // de-normal-order DSRG transformed Hamiltonian
     double Edsrg = Eref_ + Hbar0_;
     if (foptions_->get_bool("FORM_HBAR3")) {
+        throw std::runtime_error("Not yet implemented when forming Hbar3.");
         deGNO_ints("Hamiltonian", Edsrg, Hbar1_, Hbar2_, Hbar3_);
         rotate_ints_semi_to_origin("Hamiltonian", Hbar1_, Hbar2_, Hbar3_);
     } else {
@@ -734,6 +735,77 @@ void SADSRG::print_cumulant_summary() {
     outfile->Printf("\n    %s", dash.c_str());
 }
 
+std::vector<double> SADSRG::diagonalize_Fock_diagblocks(BlockedTensor& U) {
+    // set U to identity and output diagonal Fock
+    U.iterate([&](const std::vector<size_t>& i, const std::vector<SpinType>&, double& value) {
+        if (i[0] == i[1]) {
+            value = 1.0;
+        }
+    });
+    std::vector<double> Fdiag(Fdiag_);
+
+    // loop each correlated elementary space
+    int nirrep = mo_space_info_->nirrep();
+
+    for (const std::string& space :
+         {"RESTRICTED_DOCC", "GAS1", "GAS2", "GAS3", "GAS4", "GAS5", "GAS6", "RESTRICTED_UOCC"}) {
+        if (mo_space_info_->size(space) == 0 or semi_checked_results_[space])
+            continue;
+
+        std::string block, composite_space;
+        if (space == "RESTRICTED_DOCC") {
+            block = core_label_ + core_label_;
+            composite_space = space;
+        } else if (space == "RESTRICTED_UOCC") {
+            block = virt_label_ + virt_label_;
+            composite_space = space;
+        } else {
+            block = actv_label_ + actv_label_;
+            composite_space = "ACTIVE";
+        }
+
+        auto& Fdata = Fock_.block(block).data();
+        auto indices = mo_space_info_->pos_in_space(space, composite_space);
+        auto composite_size = mo_space_info_->size(composite_space);
+
+        auto dim = mo_space_info_->dimension(space);
+        auto Fd = std::make_shared<psi::Matrix>("F " + space, dim, dim);
+
+        for (int h = 0, offset = 0; h < nirrep; ++h) {
+            for (int p = 0; p < dim[h]; ++p) {
+                auto np = indices[p + offset];
+                for (int q = p; q < dim[h]; ++q) {
+                    auto nq = indices[q + offset];
+                    double v = Fdata[np * composite_size + nq];
+                    Fd->set(h, p, q, v);
+                    Fd->set(h, q, p, v);
+                }
+            }
+            offset += dim[h];
+        }
+
+        auto Usub = std::make_shared<psi::Matrix>("U " + space, dim, dim);
+        auto evals = std::make_shared<psi::Vector>("evals " + space, dim);
+        Fd->diagonalize(Usub, evals);
+
+        auto& Udata = U.block(block).data();
+        auto corr_abs_indices = mo_space_info_->corr_absolute_mo(space);
+        for (int h = 0, offset = 0; h < nirrep; ++h) {
+            for (int p = 0; p < dim[h]; ++p) {
+                auto np = indices[p + offset];
+                for (int q = 0; q < dim[h]; ++q) {
+                    auto nq = indices[q + offset];
+                    Udata[nq * composite_size + np] = Usub->get(h, p, q); // row: new, column: old
+                }
+                Fdiag[corr_abs_indices[p + offset]] = evals->get(h, p);
+            }
+            offset += dim[h];
+        }
+    }
+
+    return Fdiag;
+}
+
 void SADSRG::truncate_cumulant() {
     if (cu_trunc_level_ < 1)
         return;
@@ -782,77 +854,6 @@ void SADSRG::truncate_cumulant() {
         L3_("pqrstu") -= 0.25 * L1("pt") * L1("qu") * L1("rs");
         L3_("pqrstu") -= 0.25 * L1("pu") * L1("qs") * L1("rt");
     }
-}
-
-std::vector<double> SADSRG::diagonalize_Fock_diagblocks(BlockedTensor& U) {
-    // set U to identity and output diagonal Fock
-    U.iterate([&](const std::vector<size_t>& i, const std::vector<SpinType>&, double& value) {
-        if (i[0] == i[1]) {
-            value = 1.0;
-        }
-    });
-    std::vector<double> Fdiag(Fdiag_);
-
-    // loop each correlated elementary space
-    int nirrep = mo_space_info_->nirrep();
-
-    auto elementary_spaces = mo_space_info_->composite_space_names()["CORRELATED"];
-    for (const std::string& space : elementary_spaces) {
-        if (mo_space_info_->size(space) == 0 or semi_checked_results_[space])
-            continue;
-
-        std::string block, composite_space;
-        if (space.find("DOCC") != std::string::npos) {
-            block = core_label_ + core_label_;
-            composite_space = space;
-        } else if (space.find("UOCC") != std::string::npos) {
-            block = virt_label_ + virt_label_;
-            composite_space = space;
-        } else {
-            block = actv_label_ + actv_label_;
-            composite_space = "ACTIVE";
-        }
-
-        auto& Fdata = Fock_.block(block).data();
-        auto indices = mo_space_info_->pos_in_space(space, composite_space);
-        auto composite_size = mo_space_info_->size(composite_space);
-
-        auto dim = mo_space_info_->dimension(space);
-        auto Fd = std::make_shared<psi::Matrix>("F " + space, dim, dim);
-
-        for (int h = 0, offset = 0; h < nirrep; ++h) {
-            for (int p = 0; p < dim[h]; ++p) {
-                auto np = indices[p + offset];
-                for (int q = p; q < dim[h]; ++q) {
-                    auto nq = indices[q + offset];
-                    double v = Fdata[np * composite_size + nq];
-                    Fd->set(h, p, q, v);
-                    Fd->set(h, q, p, v);
-                }
-            }
-            offset += dim[h];
-        }
-
-        auto Usub = std::make_shared<psi::Matrix>("U " + space, dim, dim);
-        auto evals = std::make_shared<psi::Vector>("evals " + space, dim);
-        Fd->diagonalize(Usub, evals);
-
-        auto& Udata = U.block(block).data();
-        auto corr_abs_indices = mo_space_info_->corr_absolute_mo(space);
-        for (int h = 0, offset = 0; h < nirrep; ++h) {
-            for (int p = 0; p < dim[h]; ++p) {
-                auto np = indices[p + offset];
-                for (int q = 0; q < dim[h]; ++q) {
-                    auto nq = indices[q + offset];
-                    Udata[nq * composite_size + np] = Usub->get(h, p, q); // row: new, column: old
-                }
-                Fdiag[corr_abs_indices[p + offset]] = evals->get(h, p);
-            }
-            offset += dim[h];
-        }
-    }
-
-    return Fdiag;
 }
 
 void SADSRG::print_contents(const std::string& str, size_t size) {

@@ -201,10 +201,7 @@ def register_mo_space_info_options(options):
     options.set_group("MO Space Info")
 
     options.add_int_list("FROZEN_DOCC", "Number of frozen occupied orbitals per irrep (in Cotton order)")
-    options.add_int_list(
-        "RESTRICTED_DOCC", "Number of restricted doubly"
-        " occupied orbitals per irrep (in Cotton order)"
-    )
+    options.add_int_list("RESTRICTED_DOCC", "Number of restricted doubly occupied orbitals per irrep (in Cotton order)")
     options.add_int_list("ACTIVE", " Number of active orbitals per irrep (in Cotton order)")
     options.add_int_list("RESTRICTED_UOCC", "Number of restricted unoccupied orbitals per irrep (in Cotton order)")
     options.add_int_list("FROZEN_UOCC", "Number of frozen unoccupied orbitals per irrep (in Cotton order)")
@@ -215,6 +212,15 @@ def register_mo_space_info_options(options):
     options.add_int_list("GAS4", "Number of GAS4 orbitals per irrep (in Cotton order)")
     options.add_int_list("GAS5", "Number of GAS5 orbitals per irrep (in Cotton order)")
     options.add_int_list("GAS6", "Number of GAS6 orbitals per irrep (in Cotton order)")
+
+    options.add_int_list("EXTERNAL_DOCC",
+                         "Number of doubly occupied orbitals per irrep (in Cotton order)")
+    options.add_int_list("VALENCE_DOCC",
+                         "Number of doubly occupied orbitals for post-DSRG CASCI per irrep (in Cotton order)")
+    options.add_int_list("VALENCE_UOCC",
+                         "Number of virtual orbitals for post-DSRG CASCI per irrep (in Cotton order)")
+    options.add_int_list("EXTERNAL_UOCC",
+                         "Number of virtual orbitals per irrep (in Cotton order)")
 
     #    /*- Molecular orbitals to swap -
     #     *  Swap mo_1 with mo_2 in irrep symmetry
