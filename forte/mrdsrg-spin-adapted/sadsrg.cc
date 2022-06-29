@@ -176,8 +176,6 @@ void SADSRG::read_options() {
     L3_algorithm_ = foptions_->get_str("DSRG_3RDM_ALGORITHM");
     store_cu3_ = do_cu3_ and (L3_algorithm_ == "EXPLICIT");
     cu_trunc_level_ = foptions_->get_int("DSRG_CU_TRUNC_LEVEL");
-    // if (cu_trunc_level_ > 0)
-    //     do_cu3_ = false;
 
     ntamp_ = foptions_->get_int("NTAMP");
     intruder_tamp_ = foptions_->get_double("INTRUDER_TAMP");
@@ -756,6 +754,33 @@ void SADSRG::truncate_cumulant() {
             if ((i[0] != i[2] or i[1] != i[3]) and (i[0] != i[3] or i[1] != i[2]))
                 value = 0.0;
         });
+    }
+
+    // need to re-construct 3 cumulant with zero 3-RDM
+    if (do_cu3_) {
+        const auto& L1 = L1_.block("aa");
+        const auto& L2 = L2_.block("aaaa");
+
+        L3_ = ambit::Tensor::build(tensor_type_, "L3 prune", L3_.dims());
+        L3_("pqrstu") -= L1("ps") * L2("qrtu");
+        L3_("pqrstu") -= L1("qt") * L2("prsu");
+        L3_("pqrstu") -= L1("ru") * L2("pqst");
+
+        L3_("pqrstu") += 0.5 * L1("pt") * L2("qrsu");
+        L3_("pqrstu") += 0.5 * L1("pu") * L2("qrts");
+        L3_("pqrstu") += 0.5 * L1("qs") * L2("prtu");
+        L3_("pqrstu") += 0.5 * L1("qu") * L2("prst");
+        L3_("pqrstu") += 0.5 * L1("rs") * L2("pqut");
+        L3_("pqrstu") += 0.5 * L1("rt") * L2("pqsu");
+
+        L3_("pqrstu") -= L1("ps") * L1("qt") * L1("ru");
+
+        L3_("pqrstu") += 0.5 * L1("pt") * L1("qs") * L1("ru");
+        L3_("pqrstu") += 0.5 * L1("ps") * L1("qu") * L1("rt");
+        L3_("pqrstu") += 0.5 * L1("pu") * L1("qt") * L1("rs");
+
+        L3_("pqrstu") -= 0.25 * L1("pt") * L1("qu") * L1("rs");
+        L3_("pqrstu") -= 0.25 * L1("pu") * L1("qs") * L1("rt");
     }
 }
 
