@@ -134,6 +134,7 @@ class SADSRG : public DynamicCorrelationSolver {
     ambit::BlockedTensor Uactv_;
     /// Rotate 2-body DSRG transformed integrals from semicanonical back to original
     void rotate_ints_semi_to_origin(const std::string& name, BlockedTensor& H1, BlockedTensor& H2);
+    // void rotate_ints_semi_to_origin(const std::string& name, ambit::Tensor& H1, ambit::Tensor& H2);
     /// Rotate 3-body DSRG transformed integrals from semicanonical back to original
     void rotate_ints_semi_to_origin(const std::string& name, BlockedTensor& H1, BlockedTensor& H2,
                                     BlockedTensor& H3);
@@ -281,7 +282,8 @@ class SADSRG : public DynamicCorrelationSolver {
      * De-normal-order a 2-body DSRG transformed integrals
      * This will change H0 and H1 !!!
      */
-    void deGNO_ints(const std::string& name, double& H0, BlockedTensor& H1, BlockedTensor& H2);
+    void deGNO_ints(const std::string& name, double& H0, BlockedTensor& H1, BlockedTensor& H2,
+                    ambit::Tensor& H1t, ambit::Tensor& H2t);
 
     /**
      * De-normal-order a 3-body DSRG transformed integrals
