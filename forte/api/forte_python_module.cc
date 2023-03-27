@@ -82,6 +82,7 @@ void export_SparseCISolver(py::module& m);
 void export_ForteCubeFile(py::module& m);
 void export_OrbitalTransform(py::module& m);
 void export_Localize(py::module& m);
+void export_MRPT2NOS(py::module& m);
 void export_SemiCanonical(py::module& m);
 
 void set_master_screen_threshold(double value);
@@ -141,7 +142,8 @@ void export_CASSCF(py::module& m) {
 
 void export_MCSCF_2STEP(py::module& m) {
     py::class_<MCSCF_2STEP>(m, "MCSCF_2STEP")
-        .def("compute_energy", &MCSCF_2STEP::compute_energy, "Compute the MCSCF energy");
+        .def("compute_energy", &MCSCF_2STEP::compute_energy, "Compute the MCSCF energy")
+        .def("nat_occ", &MCSCF_2STEP::nat_occ, "Return the final natural occupation numbers");
 }
 
 void export_Symmetry(py::module& m) {
@@ -277,6 +279,7 @@ PYBIND11_MODULE(_forte, m) {
     export_Symmetry(m);
     export_OrbitalTransform(m);
     export_Localize(m);
+    export_MRPT2NOS(m);
     export_SemiCanonical(m);
 
     export_Determinant(m);

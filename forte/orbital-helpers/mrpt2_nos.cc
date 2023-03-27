@@ -140,10 +140,16 @@ void MRPT2_NOS::suggest_active_space(const psi::Vector& D1c_evals, const psi::Ve
 
     auto dim_core = mo_space_info_->dimension("RESTRICTED_DOCC");
     auto dim_virt = mo_space_info_->dimension("RESTRICTED_UOCC");
-    std::vector<int> newdim_rdocc(nirrep), newdim_actv(nirrep), newdim_ruocc(nirrep);
+
+    psi::Dimension newdim_actv(std::vector<int>(nirrep, 0));
+    psi::Dimension newdim_rdocc(std::vector<int>(nirrep, 0));
+    psi::Dimension newdim_ruocc(std::vector<int>(nirrep, 0));
+
+    auto fno_cutoff = 2.0 * options_->get_double("PT2NO_FNO_THRESHOLD");
+    psi::Dimension fno_dim(std::vector<int>(nirrep, 0));
 
     for (size_t h = 0; h < nirrep; ++h) {
-        auto ndocc = 0, nactv = 0, nuocc = 0;
+        auto ndocc = 0, nactv = 0, nuocc = 0, nfno = 0;
         for (int i = 0; i < dim_core[h]; ++i) {
             if (D1c_evals.get(h, i) < core_cutoff)
                 nactv++;
@@ -155,17 +161,32 @@ void MRPT2_NOS::suggest_active_space(const psi::Vector& D1c_evals, const psi::Ve
                 nactv++;
             else
                 nuocc++;
+            if (D1v_evals.get(h, a) < fno_cutoff)
+                nfno++;
         }
         newdim_actv[h] = nactv;
         newdim_rdocc[h] = ndocc;
         newdim_ruocc[h] = nuocc;
+        fno_dim[h] = nfno;
     }
 
-    if (psi::Dimension(newdim_actv).sum() == 0) {
+    // save occupation numbers to disk
+    std::unordered_map<std::string, psi::Dimension> newdims;
+    newdims["ACTIVE"] = newdim_actv + mo_space_info_->dimension("ACTIVE");
+    newdims["RESTRICTED_DOCC"] = newdim_rdocc;
+    newdims["RESTRICTED_UOCC"] = newdim_ruocc;
+    newdims["FROZEN_DOCC"] = mo_space_info_->dimension("FROZEN_DOCC");
+    newdims["FROZEN_UOCC"] = mo_space_info_->dimension("FROZEN_UOCC");
+
+    dump_occupations("mrpt2_nos_occ", newdims);
+    dump_occupations("mrpt2_fnos", {{"FROZEN_UOCC", fno_dim}});
+
+    if (newdim_actv.sum() == 0) {
         outfile->Printf("\n    MRPT2 natural orbitals finds no additional active orbitals.");
         return;
     }
 
+    // print occupation numbers considered to be active
     dash = std::string(5 + 9 + 14, '-');
     outfile->Printf("\n    %s", dash.c_str());
     outfile->Printf("\n    Irrep  Orbital   Occ. Number");
@@ -192,13 +213,6 @@ void MRPT2_NOS::suggest_active_space(const psi::Vector& D1c_evals, const psi::Ve
         outfile->Printf("\n    %s", dash.c_str());
     }
 
-    std::unordered_map<std::string, psi::Dimension> newdims;
-    newdims["ACTIVE"] = psi::Dimension(newdim_actv) + mo_space_info_->dimension("ACTIVE");
-    newdims["RESTRICTED_DOCC"] = psi::Dimension(newdim_rdocc);
-    newdims["RESTRICTED_UOCC"] = psi::Dimension(newdim_ruocc);
-    newdims["FROZEN_DOCC"] = mo_space_info_->dimension("FROZEN_DOCC");
-    newdims["FROZEN_UOCC"] = mo_space_info_->dimension("FROZEN_UOCC");
-
     print_h2("Occupation Information Suggested by MRPT2 Natural Orbitals");
 
     dash = std::string(15 + 6 * nirrep + 7, '-');
@@ -220,9 +234,5 @@ void MRPT2_NOS::suggest_active_space(const psi::Vector& D1c_evals, const psi::Ve
         outfile->Printf(" %6d", dim.sum());
     }
     outfile->Printf("\n    %s", dash.c_str());
-
-    // save occupation numbers to disk
-    dump_occupations("mrpt2_nos_occ", newdims);
 }
-
 } // namespace forte
