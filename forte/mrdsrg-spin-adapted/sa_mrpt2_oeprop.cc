@@ -1579,7 +1579,7 @@ psi::SharedMatrix SA_MRPT2::build_1rdm_cc() {
 
     print_done(t.get());
 
-    return tensor_to_matrix(D1_.block("cc"), mo_space_info_->dimension("RESTRICTED_DOCC"));
+    return tensor_to_matrix(D1c, mo_space_info_->dimension("RESTRICTED_DOCC"));
 }
 
 psi::SharedMatrix SA_MRPT2::build_1rdm_vv() {
@@ -1654,10 +1654,186 @@ psi::SharedMatrix SA_MRPT2::build_1rdm_vv() {
 
     print_done(t.get());
 
-    return tensor_to_matrix(D1_.block("vv"), mo_space_info_->dimension("RESTRICTED_UOCC"));
+    return tensor_to_matrix(D1v, mo_space_info_->dimension("RESTRICTED_UOCC"));
 }
 
-void SA_MRPT2::build_1rdm_unrelaxed(psi::SharedMatrix& D1c, psi::SharedMatrix& D1v) {
+psi::SharedMatrix SA_MRPT2::build_1rdm_aa(bool build_aa_large_t2) {
+    timer tvv("1RDM-AA");
+
+    auto D1_com = ambit::BlockedTensor::build(tensor_type_, "D1a compt", {"gg"});
+
+    auto D1a = D1_com.block("aa");
+
+    if (eri_df_) {
+        if (build_aa_large_t2) {
+            compute_1rdm_aa_vv_CCAV_DF(D1_com, {});
+            compute_1rdm_cc_aa_CAVV_DF(D1_com, {});
+        }
+    } else {
+        auto na = actv_mos_.size();
+        auto temp = ambit::Tensor::build(tensor_type_, "temp", {na, na});
+        temp("yu") = 0.5 * T2_.block("ccav")("ijya") * S2_.block("ccav")("ijua");
+        D1a("vy") += temp("yu") * Eta1_.block("aa")("uv");
+        D1a("vy") += temp("vu") * Eta1_.block("aa")("uy");
+
+        temp("xv") = 0.5 * T2_.block("cavv")("ixab") * S2_.block("cavv")("ivab");
+        D1a("xu") -= temp("xv") * L1_.block("aa")("uv");
+        D1a("xu") -= temp("uv") * L1_.block("aa")("xv");
+    }
+
+    local_timer t;
+    print_contents("Computing T1 contr. to 1RDM AA part");
+
+    D1_com["uv"] += T1_["mu"] * T1_["my"] * Eta1_["yv"];
+    D1_com["uv"] -= T1_["ve"] * T1_["xe"] * L1_["ux"];
+
+    D1_com["uv"] -= T1_["ve"] * T2_["xyez"] * L2_["uzxy"];
+    D1_com["uv"] -= T1_["mu"] * T2_["mzxy"] * L2_["xyvz"];
+
+    auto temp = ambit::BlockedTensor::build(tensor_type_, "temp", {"aa"});
+    temp["xu"] += S2_["xmue"] * T1_["me"];
+    temp["xu"] += 0.5 * S2_["mxzu"] * T1_["mw"] * Eta1_["zw"];
+    temp["xu"] += 0.5 * S2_["wxeu"] * T1_["ze"] * L1_["wz"];
+
+    temp["wu"] += 0.5 * S2_["a0,w,e,u"] * T2_["xyez"] * L2_["a0,z,x,y"];
+    temp["wu"] -= 0.5 * S2_["m,w,a0,u"] * T2_["mzxy"] * L2_["x,y,a0,z"];
+
+    D1_com["uv"] += temp["xu"] * L1_["vx"];
+    D1_com["uv"] -= temp["vx"] * L1_["xu"];
+
+    D1_com["uv"] += T2_["xyeu"] * T1_["ze"] * L2_["xyzv"];
+    D1_com["uv"] += T2_["mvxy"] * T1_["mw"] * L2_["wuxy"];
+
+    D1_com["uv"] -= T2_["vzey"] * T1_["xe"] * L2_["uzxy"];
+    D1_com["uv"] -= T2_["zvey"] * T1_["xe"] * L2_["zuxy"];
+    D1_com["uv"] -= T2_["myuw"] * T1_["mx"] * L2_["xyvw"];
+    D1_com["uv"] -= T2_["mywu"] * T1_["mx"] * L2_["xywv"];
+    print_done(t.get());
+
+    t.reset();
+    print_contents("Computing T2 contr. to 1RDM AA part");
+
+    D1_com["uv"] += 0.5 * S2_["mnux"] * T2_["mnyz"] * Eta1_["zx"] * Eta1_["yv"];
+    D1_com["uv"] -= 0.5 * S2_["vxef"] * T2_["yzef"] * L1_["xz"] * L1_["uy"];
+
+    D1_com["uv"] += 0.5 * S2_["xmue"] * T2_["zmye"] * L1_["xz"] * Eta1_["yv"];
+    D1_com["uv"] += 0.5 * S2_["mxue"] * T2_["mzye"] * L1_["xz"] * Eta1_["yv"];
+    D1_com["uv"] -= 0.5 * S2_["vmxe"] * T2_["wmye"] * Eta1_["yx"] * L1_["uw"];
+    D1_com["uv"] -= 0.5 * S2_["mvxe"] * T2_["mwye"] * Eta1_["yx"] * L1_["uw"];
+
+    D1_com["uv"] += 0.25 * S2_["yxeu"] * T2_["z,w,e,a0"] * L1_["xw"] * L1_["yz"] * Eta1_["a0,v"];
+    D1_com["uv"] -= 0.25 * S2_["mvxy"] * T2_["m,a0,w,z"] * Eta1_["wx"] * Eta1_["zy"] * L1_["u,a0"];
+
+    D1_com["uv"] += 0.25 * S2_["mxyu"] * T2_["m,w,z,a0"] * L1_["xw"] * Eta1_["zy"] * Eta1_["a0,v"];
+    D1_com["uv"] += 0.25 * S2_["mxuy"] * T2_["m,w,a0,z"] * L1_["xw"] * Eta1_["zy"] * Eta1_["a0,v"];
+    D1_com["uv"] -= 0.25 * S2_["yvex"] * T2_["z,a0,e,w"] * Eta1_["wx"] * L1_["yz"] * L1_["u,a0"];
+    D1_com["uv"] -= 0.25 * S2_["vyex"] * T2_["a0,z,e,w"] * Eta1_["wx"] * L1_["yz"] * L1_["u,a0"];
+
+    D1_com["uv"] += T2_["mnuw"] * T2_["mnxy"] * L2_["xyvw"];
+    D1_com["uv"] += 0.5 * T2_["m,a0,u,w"] * T2_["mzxy"] * L2_["xyvw"] * L1_["a0,z"];
+    D1_com["uv"] += 0.5 * T2_["m,a0,w,u"] * T2_["mzyx"] * L2_["xyvw"] * L1_["a0,z"];
+    D1_com["uv"] -= 0.5 * T2_["mvxy"] * T2_["m,a0,w,z"] * L2_["wzxy"] * L1_["u,a0"];
+
+    D1_com["uv"] -= T2_["vwef"] * T2_["xyef"] * L2_["uwxy"];
+    D1_com["uv"] -= 0.5 * T2_["v,w,e,a0"] * T2_["xyez"] * L2_["uwxy"] * Eta1_["z,a0"];
+    D1_com["uv"] -= 0.5 * T2_["w,v,e,a0"] * T2_["yxez"] * L2_["uwxy"] * Eta1_["z,a0"];
+    D1_com["uv"] += 0.5 * T2_["xyeu"] * T2_["w,z,e,a0"] * L2_["xywz"] * Eta1_["a0,v"];
+
+    std::vector<std::string> blocks{"aavv", "ccaa", "caav", "acav",
+                                    "aava", "caaa", "aaaa"}; // T2 and S2
+
+    D1_com["uv"] -= T2_["vmze"] * S2_["xmye"] * L2_["uyzx"];
+    D1_com["uv"] += T2_["mvze"] * T2_["xmye"] * L2_["uyzx"];
+    D1_com["uv"] += T2_["mvze"] * T2_["mxye"] * L2_["uyxz"];
+
+    D1_com["uv"] += T2_["zmue"] * S2_["xmye"] * L2_["zyvx"];
+    D1_com["uv"] -= T2_["mzue"] * T2_["xmye"] * L2_["zyvx"];
+    D1_com["uv"] -= T2_["mzue"] * T2_["mxye"] * L2_["zyxv"];
+
+    D1_com["uv"] += 0.5 * S2_["m,z,u,a0"] * T2_["mxwy"] * L2_["y,z,x,a0"] * Eta1_["wv"];
+    D1_com["uv"] -= 0.5 * T2_["m,z,u,a0"] * T2_["mxyw"] * L2_["y,z,x,a0"] * Eta1_["wv"];
+    D1_com["uv"] -= 0.5 * T2_["m,z,a0,u"] * T2_["mxyw"] * L2_["z,y,x,a0"] * Eta1_["wv"];
+
+    D1_com["uv"] -= 0.5 * S2_["mvwz"] * T2_["m,x,a0,y"] * L2_["uyzx"] * Eta1_["a0,w"];
+    D1_com["uv"] += 0.5 * T2_["mvwz"] * T2_["m,x,y,a0"] * L2_["uyzx"] * Eta1_["a0,w"];
+    D1_com["uv"] += 0.5 * T2_["mvzw"] * T2_["m,x,y,a0"] * L2_["uyxz"] * Eta1_["a0,w"];
+
+    D1_com["uv"] += 0.5 * S2_["mzwu"] * T2_["m,x,a0,y"] * L2_["zyvx"] * Eta1_["a0,w"];
+    D1_com["uv"] -= 0.5 * T2_["mzwu"] * T2_["m,x,y,a0"] * L2_["zyvx"] * Eta1_["a0,w"];
+    D1_com["uv"] -= 0.5 * T2_["mzuw"] * T2_["m,x,y,a0"] * L2_["zyxv"] * Eta1_["a0,w"];
+
+    D1_com["uv"] -= 0.5 * S2_["v,z,e,a0"] * T2_["wxey"] * L2_["y,z,x,a0"] * L1_["uw"];
+    D1_com["uv"] += 0.5 * T2_["v,z,e,a0"] * T2_["xwey"] * L2_["y,z,x,a0"] * L1_["uw"];
+    D1_com["uv"] += 0.5 * T2_["z,v,e,a0"] * T2_["xwey"] * L2_["z,y,x,a0"] * L1_["uw"];
+
+    D1_com["uv"] -= 0.5 * S2_["a0,v,e,z"] * T2_["wxey"] * L2_["uyzx"] * L1_["a0,w"];
+    D1_com["uv"] += 0.5 * T2_["a0,v,e,z"] * T2_["xwey"] * L2_["uyzx"] * L1_["a0,w"];
+    D1_com["uv"] += 0.5 * T2_["v,a0,e,z"] * T2_["xwey"] * L2_["uyxz"] * L1_["a0,w"];
+
+    D1_com["uv"] += 0.5 * S2_["a0,z,e,u"] * T2_["wxey"] * L2_["yzxv"] * L1_["a0,w"];
+    D1_com["uv"] -= 0.5 * T2_["a0,z,e,u"] * T2_["xwey"] * L2_["yzxv"] * L1_["a0,w"];
+    D1_com["uv"] -= 0.5 * T2_["z,a0,e,u"] * T2_["xwey"] * L2_["zyxv"] * L1_["a0,w"];
+
+    if (do_cu3_) {
+        if (store_cu3_) {
+            D1a("uv") -=
+                T2_.block("caaa")("m,z,a0,u") * T2_.block("caaa")("mwxy") * L3_("x,y,z,a0,w,v");
+            D1a("uv") -=
+                T2_.block("caaa")("m,z,u,a0") * T2_.block("caaa")("mwxy") * L3_("x,y,z,v,w,a0");
+            D1a("uv") +=
+                T2_.block("caaa")("m,v,a0,z") * T2_.block("caaa")("mwxy") * L3_("x,y,u,a0,w,z");
+
+            D1a("uv") -=
+                T2_.block("aava")("yvex") * T2_.block("aava")("w,a0,e,z") * L3_("u,y,z,x,w,a0");
+            D1a("uv") -=
+                T2_.block("aava")("vyex") * T2_.block("aava")("w,a0,e,z") * L3_("u,y,z,w,x,a0");
+            D1a("uv") +=
+                T2_.block("aava")("yxeu") * T2_.block("aava")("w,a0,e,z") * L3_("x,y,z,v,w,a0");
+        } else {
+            throw std::runtime_error("Direct algorithm for D1 VV not available!");
+        }
+    }
+
+    print_done(t.get());
+
+    double e = D1_com["uv"] * F_["uv"];
+
+    auto H0 = ambit::BlockedTensor::build(tensor_type_, "H0", {"aa"});
+    H0["uv"] = F_["uv"];
+
+    auto C1 = ambit::BlockedTensor::build(tensor_type_, "C1", {"gg"});
+    auto C2 = ambit::BlockedTensor::build(tensor_type_, "C2", {"gggg"});
+    auto O1 = ambit::BlockedTensor::build(tensor_type_, "O1", {"gg"});
+    auto O2 = ambit::BlockedTensor::build(tensor_type_, "O2", {"gggg"});
+
+    double eref = 0.0;
+
+    H1_T1_C1(H0, T1_, 1.0, C1);
+    H1_T2_C1(H0, T2_, 1.0, C1);
+    O1["pq"] = C1["pq"];
+    O1["pq"] += C1["qp"];
+
+    H1_T2_C2(H0, T2_, 1.0, C2);
+    O2["pqrs"] = C2["pqrs"];
+    O2["pqrs"] += C2["rspq"];
+
+    H1_T1_C0(O1, T1_, 1.0, eref);
+    H1_T2_C0(O1, T2_, 1.0, eref);
+
+    H2_T1_C0(O2, T1_, 1.0, eref);
+    H2_T2_C0(O2, T2_, S2_, 1.0, eref);
+
+    outfile->Printf("\n  e_ref   = %20.15f", eref);
+    outfile->Printf("\n  e_compt = %20.15f", e);
+    outfile->Printf("\n  e_diff  = %20.15f", e - eref);
+
+    exit(1);
+
+    return tensor_to_matrix(D1a, mo_space_info_->dimension("ACTIVE"));
+}
+
+void SA_MRPT2::build_1rdm_unrelaxed(psi::SharedMatrix& D1c, psi::SharedMatrix& D1v,
+                                    psi::SharedMatrix& D1a) {
     print_h2("Build Spin-Summed Unrelaxed 1-RDM (CC and VV)");
 
     D1_ = BTF_->build(tensor_type_, "D1u", {"cc", "aa", "vv"});
@@ -1669,6 +1845,7 @@ void SA_MRPT2::build_1rdm_unrelaxed(psi::SharedMatrix& D1c, psi::SharedMatrix& D
 
     D1c = build_1rdm_cc();
     D1v = build_1rdm_vv();
+    D1a = build_1rdm_aa();
 }
 
 } // namespace forte
