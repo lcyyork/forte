@@ -55,14 +55,16 @@ MRPT2_NOS::MRPT2_NOS(std::shared_ptr<RDMs> rdms, std::shared_ptr<SCFInfo> scf_in
 
 void MRPT2_NOS::compute_transformation() {
     // compute unrelaxed 1-RDMs for core and virtual blocks
-    mrpt2_->build_1rdm_unrelaxed(D1c_, D1v_);
+    mrpt2_->build_1rdm_unrelaxed(D1c_, D1v_, D1a_);
 
     psi::Process::environment.arrays["MRPT2 1RDM CC"] = D1c_;
     psi::Process::environment.arrays["MRPT2 1RDM VV"] = D1v_;
+    psi::Process::environment.arrays["MRPT2 1RDM AA"] = D1a_;
 
     // diagonalize unrelaxed 1-RDM
     auto core_mospi = D1c_->rowspi();
     auto virt_mospi = D1v_->rowspi();
+    auto actv_mospi = D1a_->rowspi();
 
     psi::Vector D1c_evals("D1c_evals", core_mospi);
     psi::Matrix D1c_evecs("D1c_evecs", core_mospi, core_mospi);
@@ -72,9 +74,31 @@ void MRPT2_NOS::compute_transformation() {
     psi::Matrix D1v_evecs("D1v_evecs", virt_mospi, virt_mospi);
     D1v_->diagonalize(D1v_evecs, D1v_evals, descending);
 
+    psi::Vector D1a_evals("D1a_evals", actv_mospi);
+    psi::Matrix D1a_evecs("D1a_evecs", actv_mospi, actv_mospi);
+    D1a_->diagonalize(D1a_evecs, D1a_evals, descending);
+
+    // print total number of electrons
+    auto compute_ne = [&](psi::Vector& vec) {
+        auto nirrep = vec.nirrep();
+        auto nmopi = vec.dimpi();
+        auto ne = 0.0;
+        for (int h = 0; h < nirrep; ++h) {
+            for (int p = 0; p < nmopi[h]; ++p)
+                ne += vec.get(h, p);
+        }
+        return ne;
+    };
+
+    outfile->Printf("\n");
+    outfile->Printf("\n    Total number of electrons in core:    %12.6f", compute_ne(D1c_evals));
+    outfile->Printf("\n    Total number of electrons in active:  %12.6f", compute_ne(D1a_evals));
+    outfile->Printf("\n    Total number of electrons in virtual: %12.6f", compute_ne(D1v_evals));
+
     // print natural orbitals
     if (options_->get_bool("NAT_ORBS_PRINT")) {
         outfile->Printf("\n");
+        D1a_evals.print();
         D1c_evals.print();
         D1v_evals.print();
     }
