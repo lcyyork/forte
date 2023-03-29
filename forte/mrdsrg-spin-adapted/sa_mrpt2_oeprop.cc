@@ -1663,7 +1663,7 @@ psi::SharedMatrix SA_MRPT2::build_1rdm_aa(bool build_aa_large_t2) {
     auto D1a = D1_.block("aa");
 
     auto temp1 = ambit::BlockedTensor::build(tensor_type_, "temp1 1rdm aa", {"aa"});
-    auto X1 = temp1.block("aa");
+    auto temp2 = ambit::BlockedTensor::build(tensor_type_, "temp2 1rdm aa", {"aaaa"});
 
     if (eri_df_) {
         if (build_aa_large_t2) {
@@ -1671,13 +1671,17 @@ psi::SharedMatrix SA_MRPT2::build_1rdm_aa(bool build_aa_large_t2) {
             compute_1rdm_cc_aa_CAVV_DF(D1_, {});
         }
     } else {
+        auto L1 = L1_.block("aa");
+        auto E1 = Eta1_.block("aa");
+        auto X1 = temp1.block("aa");
+
         X1("yu") = 0.5 * T2_.block("ccav")("ijya") * S2_.block("ccav")("ijua");
-        D1a("vy") += X1("yu") * Eta1_.block("aa")("uv");
-        D1a("vy") += X1("vu") * Eta1_.block("aa")("uy");
+        D1a("vy") += X1("yu") * E1("uv");
+        D1a("vy") += X1("vu") * E1("uy");
 
         X1("xv") = 0.5 * T2_.block("cavv")("ixab") * S2_.block("cavv")("ivab");
-        D1a("xu") -= X1("xv") * L1_.block("aa")("uv");
-        D1a("xu") -= X1("uv") * L1_.block("aa")("xv");
+        D1a("xu") -= X1("xv") * L1("uv");
+        D1a("xu") -= X1("uv") * L1("xv");
     }
 
     local_timer t;
@@ -1689,7 +1693,7 @@ psi::SharedMatrix SA_MRPT2::build_1rdm_aa(bool build_aa_large_t2) {
     D1_["uv"] -= T1_["ve"] * T2_["xyez"] * L2_["uzxy"];
     D1_["uv"] -= T1_["mu"] * T2_["mzxy"] * L2_["xyvz"];
 
-    temp1["xu"] += S2_["xmue"] * T1_["me"];
+    temp1["xu"] = S2_["xmue"] * T1_["me"];
     temp1["xu"] += 0.5 * S2_["mxzu"] * T1_["mw"] * Eta1_["zw"];
     temp1["xu"] += 0.5 * S2_["wxeu"] * T1_["ze"] * L1_["wz"];
 
@@ -1711,75 +1715,163 @@ psi::SharedMatrix SA_MRPT2::build_1rdm_aa(bool build_aa_large_t2) {
     t.reset();
     print_contents("Computing T2 contr. to 1RDM AA part");
 
-    D1_["uv"] += 0.5 * S2_["mnux"] * T2_["mnyz"] * Eta1_["zx"] * Eta1_["yv"];
-    D1_["uv"] -= 0.5 * S2_["vxef"] * T2_["yzef"] * L1_["xz"] * L1_["uy"];
+    temp2["yzxw"] = L2_["yzxw"];
+    temp2["yzxw"] += 0.5 * L1_["zx"] * Eta1_["yw"];
 
-    D1_["uv"] += 0.5 * S2_["xmue"] * T2_["zmye"] * L1_["xz"] * Eta1_["yv"];
-    D1_["uv"] += 0.5 * S2_["mxue"] * T2_["mzye"] * L1_["xz"] * Eta1_["yv"];
-    D1_["uv"] -= 0.5 * S2_["vmxe"] * T2_["wmye"] * Eta1_["yx"] * L1_["uw"];
-    D1_["uv"] -= 0.5 * S2_["mvxe"] * T2_["mwye"] * Eta1_["yx"] * L1_["uw"];
+    temp1["u,a0"] = 0.5 * S2_["mnux"] * T2_["m,n,a0,z"] * Eta1_["zx"];
+    temp1["u,a0"] += 0.5 * S2_["xmue"] * T2_["z,m,a0,e"] * L1_["xz"];
+    temp1["u,a0"] += 0.5 * S2_["mxue"] * T2_["m,z,a0,e"] * L1_["xz"];
 
-    D1_["uv"] += 0.25 * S2_["yxeu"] * T2_["z,w,e,a0"] * L1_["xw"] * L1_["yz"] * Eta1_["a0,v"];
-    D1_["uv"] -= 0.25 * S2_["mvxy"] * T2_["m,a0,w,z"] * Eta1_["wx"] * Eta1_["zy"] * L1_["u,a0"];
+    temp1["u,a0"] += 0.25 * S2_["yxeu"] * T2_["z,w,e,a0"] * L1_["xw"] * L1_["yz"];
+    temp1["u,a0"] += 0.25 * S2_["mxyu"] * T2_["m,w,z,a0"] * L1_["xw"] * Eta1_["zy"];
 
-    D1_["uv"] += 0.25 * S2_["mxyu"] * T2_["m,w,z,a0"] * L1_["xw"] * Eta1_["zy"] * Eta1_["a0,v"];
-    D1_["uv"] += 0.25 * S2_["mxuy"] * T2_["m,w,a0,z"] * L1_["xw"] * Eta1_["zy"] * Eta1_["a0,v"];
-    D1_["uv"] -= 0.25 * S2_["yvex"] * T2_["z,a0,e,w"] * Eta1_["wx"] * L1_["yz"] * L1_["u,a0"];
-    D1_["uv"] -= 0.25 * S2_["vyex"] * T2_["a0,z,e,w"] * Eta1_["wx"] * L1_["yz"] * L1_["u,a0"];
+    temp1["u,a0"] += 0.5 * S2_["mzuw"] * T2_["m,x,a0,y"] * temp2["yzxw"];
+    // temp1["u,a0"] += 0.5 * S2_["mzuw"] * T2_["m,x,a0,y"] * L2_["yzxw"];
+    // temp1["u,a0"] += 0.25 * S2_["mzuw"] * T2_["m,x,a0,y"] * L1_["zx"] * Eta1_["yw"];
 
-    D1_["uv"] += T2_["mnuw"] * T2_["mnxy"] * L2_["xyvw"];
-    D1_["uv"] += 0.5 * T2_["m,a0,u,w"] * T2_["mzxy"] * L2_["xyvw"] * L1_["a0,z"];
-    D1_["uv"] += 0.5 * T2_["m,a0,w,u"] * T2_["mzyx"] * L2_["xyvw"] * L1_["a0,z"];
-    D1_["uv"] -= 0.5 * T2_["mvxy"] * T2_["m,a0,w,z"] * L2_["wzxy"] * L1_["u,a0"];
+    temp1["u,a0"] += 0.5 * T2_["xyeu"] * T2_["w,z,e,a0"] * L2_["xywz"];
+    temp1["u,a0"] -= 0.5 * T2_["mzuw"] * T2_["m,x,y,a0"] * L2_["yzxw"];
+    temp1["u,a0"] -= 0.5 * T2_["mzwu"] * T2_["m,x,y,a0"] * L2_["zyxw"];
 
-    D1_["uv"] -= T2_["vwef"] * T2_["xyef"] * L2_["uwxy"];
-    D1_["uv"] -= 0.5 * T2_["v,w,e,a0"] * T2_["xyez"] * L2_["uwxy"] * Eta1_["z,a0"];
-    D1_["uv"] -= 0.5 * T2_["w,v,e,a0"] * T2_["yxez"] * L2_["uwxy"] * Eta1_["z,a0"];
-    D1_["uv"] += 0.5 * T2_["xyeu"] * T2_["w,z,e,a0"] * L2_["xywz"] * Eta1_["a0,v"];
+    D1_["uv"] += temp1["u,a0"] * Eta1_["a0,v"];
 
-    D1_["uv"] -= T2_["vmze"] * S2_["xmye"] * L2_["uyzx"];
-    D1_["uv"] += T2_["mvze"] * T2_["xmye"] * L2_["uyzx"];
-    D1_["uv"] += T2_["mvze"] * T2_["mxye"] * L2_["uyxz"];
+    // D1_["uv"] += 0.5 * S2_["mnux"] * T2_["m,n,a0,z"] * Eta1_["zx"] * Eta1_["a0,v"];
+    // D1_["uv"] += 0.5 * S2_["xmue"] * T2_["z,m,a0,e"] * L1_["xz"] * Eta1_["a0,v"];
+    // D1_["uv"] += 0.5 * S2_["mxue"] * T2_["m,z,a0,e"] * L1_["xz"] * Eta1_["a0,v"];
 
-    D1_["uv"] += T2_["zmue"] * S2_["xmye"] * L2_["zyvx"];
-    D1_["uv"] -= T2_["mzue"] * T2_["xmye"] * L2_["zyvx"];
-    D1_["uv"] -= T2_["mzue"] * T2_["mxye"] * L2_["zyxv"];
+    // D1_["uv"] += 0.25 * S2_["yxeu"] * T2_["z,w,e,a0"] * L1_["xw"] * L1_["yz"] * Eta1_["a0,v"];
+    // D1_["uv"] += 0.25 * S2_["mxyu"] * T2_["m,w,z,a0"] * L1_["xw"] * Eta1_["zy"] * Eta1_["a0,v"];
+    // D1_["uv"] += 0.25 * S2_["mxuy"] * T2_["m,w,a0,z"] * L1_["xw"] * Eta1_["zy"] * Eta1_["a0,v"];
 
-    D1_["uv"] += 0.5 * S2_["m,z,u,a0"] * T2_["mxwy"] * L2_["y,z,x,a0"] * Eta1_["wv"];
-    D1_["uv"] -= 0.5 * T2_["m,z,u,a0"] * T2_["mxyw"] * L2_["y,z,x,a0"] * Eta1_["wv"];
-    D1_["uv"] -= 0.5 * T2_["m,z,a0,u"] * T2_["mxyw"] * L2_["z,y,x,a0"] * Eta1_["wv"];
+    // D1_["uv"] += 0.5 * T2_["xyeu"] * T2_["w,z,e,a0"] * L2_["xywz"] * Eta1_["a0,v"];
+    // D1_["uv"] += 0.5 * S2_["m,z,u,w"] * T2_["m,x,a0,y"] * L2_["y,z,x,w"] * Eta1_["a0,v"];
+    // D1_["uv"] -= 0.5 * T2_["m,z,u,w"] * T2_["m,x,y,a0"] * L2_["y,z,x,w"] * Eta1_["a0,v"];
+    // D1_["uv"] -= 0.5 * T2_["m,z,w,u"] * T2_["m,x,y,a0"] * L2_["z,y,x,w"] * Eta1_["a0,v"];
 
-    D1_["uv"] -= 0.5 * S2_["mvwz"] * T2_["m,x,a0,y"] * L2_["uyzx"] * Eta1_["a0,w"];
-    D1_["uv"] += 0.5 * T2_["mvwz"] * T2_["m,x,y,a0"] * L2_["uyzx"] * Eta1_["a0,w"];
-    D1_["uv"] += 0.5 * T2_["mvzw"] * T2_["m,x,y,a0"] * L2_["uyxz"] * Eta1_["a0,w"];
+    temp1["a0,v"] = 0.5 * S2_["vxef"] * T2_["a0,z,e,f"] * L1_["xz"];
+    temp1["a0,v"] += 0.5 * S2_["vmxe"] * T2_["a0,m,y,e"] * Eta1_["yx"];
+    temp1["a0,v"] += 0.5 * S2_["mvxe"] * T2_["m,a0,y,e"] * Eta1_["yx"];
 
-    D1_["uv"] += 0.5 * S2_["mzwu"] * T2_["m,x,a0,y"] * L2_["zyvx"] * Eta1_["a0,w"];
-    D1_["uv"] -= 0.5 * T2_["mzwu"] * T2_["m,x,y,a0"] * L2_["zyvx"] * Eta1_["a0,w"];
-    D1_["uv"] -= 0.5 * T2_["mzuw"] * T2_["m,x,y,a0"] * L2_["zyxv"] * Eta1_["a0,w"];
+    temp1["a0,v"] += 0.25 * S2_["mvxy"] * T2_["m,a0,w,z"] * Eta1_["wx"] * Eta1_["zy"];
+    temp1["a0,v"] += 0.25 * S2_["yvex"] * T2_["z,a0,e,w"] * Eta1_["wx"] * L1_["yz"];
 
-    D1_["uv"] -= 0.5 * S2_["v,z,e,a0"] * T2_["wxey"] * L2_["y,z,x,a0"] * L1_["uw"];
-    D1_["uv"] += 0.5 * T2_["v,z,e,a0"] * T2_["xwey"] * L2_["y,z,x,a0"] * L1_["uw"];
-    D1_["uv"] += 0.5 * T2_["z,v,e,a0"] * T2_["xwey"] * L2_["z,y,x,a0"] * L1_["uw"];
+    temp1["a0,v"] += 0.5 * S2_["vzew"] * T2_["a0,x,e,y"] * temp2["yzxw"];
+    // temp1["a0,v"] += 0.5 * S2_["vzew"] * T2_["a0,x,e,y"] * L2_["yzxw"];
+    // temp1["a0,v"] += 0.25 * S2_["vzew"] * T2_["a0,x,e,y"] * Eta1_["yw"] * L1_["zx"];
 
-    D1_["uv"] -= 0.5 * S2_["a0,v,e,z"] * T2_["wxey"] * L2_["uyzx"] * L1_["a0,w"];
-    D1_["uv"] += 0.5 * T2_["a0,v,e,z"] * T2_["xwey"] * L2_["uyzx"] * L1_["a0,w"];
-    D1_["uv"] += 0.5 * T2_["v,a0,e,z"] * T2_["xwey"] * L2_["uyxz"] * L1_["a0,w"];
+    temp1["a0,v"] += 0.5 * T2_["mvxy"] * T2_["m,a0,w,z"] * L2_["wzxy"];
+    temp1["a0,v"] -= 0.5 * T2_["vzew"] * T2_["x,a0,e,y"] * L2_["yzxw"];
+    temp1["a0,v"] -= 0.5 * T2_["zvew"] * T2_["x,a0,e,y"] * L2_["zyxw"];
 
-    D1_["uv"] += 0.5 * S2_["a0,z,e,u"] * T2_["wxey"] * L2_["yzxv"] * L1_["a0,w"];
-    D1_["uv"] -= 0.5 * T2_["a0,z,e,u"] * T2_["xwey"] * L2_["yzxv"] * L1_["a0,w"];
-    D1_["uv"] -= 0.5 * T2_["z,a0,e,u"] * T2_["xwey"] * L2_["zyxv"] * L1_["a0,w"];
+    D1_["uv"] -= temp1["a0,v"] * L1_["u,a0"];
+
+    // D1_["uv"] -= 0.5 * S2_["vxef"] * T2_["a0,z,e,f"] * L1_["xz"] * L1_["u,a0"];
+    // D1_["uv"] -= 0.5 * S2_["vmxe"] * T2_["a0,m,y,e"] * Eta1_["yx"] * L1_["u,a0"];
+    // D1_["uv"] -= 0.5 * S2_["mvxe"] * T2_["m,a0,y,e"] * Eta1_["yx"] * L1_["u,a0"];
+
+    // D1_["uv"] -= 0.25 * S2_["mvxy"] * T2_["m,a0,w,z"] * Eta1_["wx"] * Eta1_["zy"] * L1_["u,a0"];
+    // D1_["uv"] -= 0.25 * S2_["yvex"] * T2_["z,a0,e,w"] * Eta1_["wx"] * L1_["yz"] * L1_["u,a0"];
+    // D1_["uv"] -= 0.25 * S2_["vyex"] * T2_["a0,z,e,w"] * Eta1_["wx"] * L1_["yz"] * L1_["u,a0"];
+
+    // D1_["uv"] -= 0.5 * T2_["mvxy"] * T2_["m,a0,w,z"] * L2_["wzxy"] * L1_["u,a0"];
+    // D1_["uv"] -= 0.5 * S2_["v,z,e,w"] * T2_["a0,x,e,y"] * L2_["y,z,x,w"] * L1_["u,a0"];
+    // D1_["uv"] += 0.5 * T2_["v,z,e,w"] * T2_["x,a0,e,y"] * L2_["y,z,x,w"] * L1_["u,a0"];
+    // D1_["uv"] += 0.5 * T2_["z,v,e,w"] * T2_["x,a0,e,y"] * L2_["z,y,x,w"] * L1_["u,a0"];
+
+    temp2["uyzx"] = T2_["mnux"] * T2_["mnzy"];
+    temp2["uyzx"] += 0.5 * T2_["m,a0,u,x"] * T2_["mwzy"] * L1_["a0,w"];
+    temp2["uyzx"] += 0.5 * T2_["m,a0,x,u"] * T2_["mwyz"] * L1_["a0,w"];
+
+    temp2["uyzx"] += T2_["zmue"] * S2_["xmye"];
+    temp2["uyzx"] -= T2_["mzue"] * T2_["xmye"];
+    temp2["uyzx"] -= T2_["myue"] * T2_["mxze"];
+
+    temp2["uyzx"] += 0.5 * S2_["mzwu"] * T2_["m,x,a0,y"] * Eta1_["a0,w"];
+    temp2["uyzx"] -= 0.5 * T2_["mzwu"] * T2_["m,x,y,a0"] * Eta1_["a0,w"];
+    temp2["uyzx"] -= 0.5 * T2_["myuw"] * T2_["m,x,z,a0"] * Eta1_["a0,w"];
+
+    temp2["uyzx"] += 0.5 * S2_["a0,z,e,u"] * T2_["wxey"] * L1_["a0,w"];
+    temp2["uyzx"] -= 0.5 * T2_["a0,z,e,u"] * T2_["xwey"] * L1_["a0,w"];
+    temp2["uyzx"] -= 0.5 * T2_["y,a0,e,u"] * T2_["xwez"] * L1_["a0,w"];
+
+    D1_["uv"] += temp2["uyzx"] * L2_["yzxv"];
+
+    // D1_["uv"] += T2_["mnux"] * T2_["mnzy"] * L2_["yzxv"];
+    // D1_["uv"] += 0.5 * T2_["m,a0,u,x"] * T2_["mwzy"] * L2_["yzxv"] * L1_["a0,w"];
+    // D1_["uv"] += 0.5 * T2_["m,a0,x,u"] * T2_["mwyz"] * L2_["yzxv"] * L1_["a0,w"];
+
+    // D1_["uv"] += T2_["zmue"] * S2_["xmye"] * L2_["yzxv"];
+    // D1_["uv"] -= T2_["mzue"] * T2_["xmye"] * L2_["yzxv"];
+    // D1_["uv"] -= T2_["myue"] * T2_["mxze"] * L2_["yzxv"];
+
+    // D1_["uv"] += 0.5 * S2_["mzwu"] * T2_["m,x,a0,y"] * L2_["yzxv"] * Eta1_["a0,w"];
+    // D1_["uv"] -= 0.5 * T2_["mzwu"] * T2_["m,x,y,a0"] * L2_["yzxv"] * Eta1_["a0,w"];
+    // D1_["uv"] -= 0.5 * T2_["myuw"] * T2_["m,x,z,a0"] * L2_["yzxv"] * Eta1_["a0,w"];
+
+    // D1_["uv"] += 0.5 * S2_["a0,z,e,u"] * T2_["wxey"] * L2_["yzxv"] * L1_["a0,w"];
+    // D1_["uv"] -= 0.5 * T2_["a0,z,e,u"] * T2_["xwey"] * L2_["yzxv"] * L1_["a0,w"];
+    // D1_["uv"] -= 0.5 * T2_["y,a0,e,u"] * T2_["xwez"] * L2_["yzxv"] * L1_["a0,w"];
+
+    temp2["yzxv"] = T2_["vyef"] * T2_["zxef"];
+    temp2["yzxv"] += 0.5 * T2_["v,y,e,a0"] * T2_["zxew"] * Eta1_["w,a0"];
+    temp2["yzxv"] += 0.5 * T2_["y,v,e,a0"] * T2_["xzew"] * Eta1_["w,a0"];
+
+    temp2["yzxv"] += T2_["vmze"] * S2_["xmye"];
+    temp2["yzxv"] -= T2_["mvze"] * T2_["xmye"];
+    temp2["yzxv"] -= T2_["mvxe"] * T2_["mzye"];
+
+    temp2["yzxv"] += 0.5 * S2_["mvwz"] * T2_["m,x,a0,y"] * Eta1_["a0,w"];
+    temp2["yzxv"] -= 0.5 * T2_["mvwz"] * T2_["m,x,y,a0"] * Eta1_["a0,w"];
+    temp2["yzxv"] -= 0.5 * T2_["mvxw"] * T2_["m,z,y,a0"] * Eta1_["a0,w"];
+
+    temp2["yzxv"] += 0.5 * S2_["a0,v,e,z"] * T2_["wxey"] * L1_["a0,w"];
+    temp2["yzxv"] -= 0.5 * T2_["a0,v,e,z"] * T2_["xwey"] * L1_["a0,w"];
+    temp2["yzxv"] -= 0.5 * T2_["v,a0,e,x"] * T2_["zwey"] * L1_["a0,w"];
+
+    D1_["uv"] -= temp2["yzxv"] * L2_["uyzx"];
+
+    // D1_["uv"] -= T2_["vyef"] * T2_["zxef"] * L2_["uyzx"];
+    // D1_["uv"] -= 0.5 * T2_["v,y,e,a0"] * T2_["zxew"] * L2_["uyzx"] * Eta1_["w,a0"];
+    // D1_["uv"] -= 0.5 * T2_["y,v,e,a0"] * T2_["xzew"] * L2_["uyzx"] * Eta1_["w,a0"];
+
+    // D1_["uv"] -= T2_["vmze"] * S2_["xmye"] * L2_["uyzx"];
+    // D1_["uv"] += T2_["mvze"] * T2_["xmye"] * L2_["uyzx"];
+    // D1_["uv"] += T2_["mvxe"] * T2_["mzye"] * L2_["uyzx"];
+
+    // D1_["uv"] -= 0.5 * S2_["mvwz"] * T2_["m,x,a0,y"] * L2_["uyzx"] * Eta1_["a0,w"];
+    // D1_["uv"] += 0.5 * T2_["mvwz"] * T2_["m,x,y,a0"] * L2_["uyzx"] * Eta1_["a0,w"];
+    // D1_["uv"] += 0.5 * T2_["mvxw"] * T2_["m,z,y,a0"] * L2_["uyzx"] * Eta1_["a0,w"];
+
+    // D1_["uv"] -= 0.5 * S2_["a0,v,e,z"] * T2_["wxey"] * L2_["uyzx"] * L1_["a0,w"];
+    // D1_["uv"] += 0.5 * T2_["a0,v,e,z"] * T2_["xwey"] * L2_["uyzx"] * L1_["a0,w"];
+    // D1_["uv"] += 0.5 * T2_["v,a0,e,x"] * T2_["zwey"] * L2_["uyzx"] * L1_["a0,w"];
 
     if (do_cu3_) {
         if (store_cu3_) {
+            temp2 = ambit::BlockedTensor::build(tensor_type_, "temp3 1rdm aa", {"aaaaaa"});
+            auto X2 = temp2.block("aaaaaa");
             auto T2c = T2_.block("caaa");
-            D1a("uv") -= T2c("m,z,a0,u") * T2c("mwxy") * L3_("x,y,z,a0,w,v");
-            D1a("uv") -= T2c("m,z,u,a0") * T2c("mwxy") * L3_("x,y,z,v,w,a0");
-            D1a("uv") += T2c("m,v,a0,z") * T2c("mwxy") * L3_("x,y,u,a0,w,z");
-
             auto T2v = T2_.block("aava");
-            D1a("uv") -= T2v("yvex") * T2v("w,a0,e,z") * L3_("u,y,z,x,w,a0");
-            D1a("uv") -= T2v("vyex") * T2v("w,a0,e,z") * L3_("u,y,z,w,x,a0");
-            D1a("uv") += T2v("yxeu") * T2v("w,a0,e,z") * L3_("x,y,z,v,w,a0");
+
+            X2("u,y,z,x,w,a0") = T2v("yxeu") * T2v("w,a0,e,z");
+            X2("u,y,z,x,w,a0") -= T2c("mxwu") * T2c("m,a0,y,z");
+            X2("u,y,z,x,w,a0") -= T2c("m,z,u,a0") * T2c("mwxy");
+            D1a("uv") += X2("u,y,z,x,w,a0") * L3_("y,z,x,w,a0,v");
+
+            X2("y,z,w,x,a0,v") = T2c("mvxw") * T2c("m,a0,y,z");
+            X2("y,z,w,x,a0,v") -= T2v("yvew") * T2v("x,a0,e,z");
+            X2("y,z,w,x,a0,v") -= T2v("vyex") * T2v("w,a0,e,z");
+            D1a("uv") += X2("y,z,w,x,a0,v") * L3_("u,y,z,w,x,a0");
+
+            // auto T2c = T2_.block("caaa");
+            // D1a("uv") -= T2c("m,z,a0,u") * T2c("mwxy") * L3_("x,y,z,a0,w,v");
+            // D1a("uv") -= T2c("m,z,u,a0") * T2c("mwxy") * L3_("x,y,z,v,w,a0");
+            // D1a("uv") += T2c("m,v,a0,z") * T2c("mwxy") * L3_("x,y,u,a0,w,z");
+
+            // auto T2v = T2_.block("aava");
+            // D1a("uv") -= T2v("yvex") * T2v("w,a0,e,z") * L3_("u,y,z,x,w,a0");
+            // D1a("uv") -= T2v("vyex") * T2v("w,a0,e,z") * L3_("u,y,z,w,x,a0");
+            // D1a("uv") += T2v("yxeu") * T2v("w,a0,e,z") * L3_("x,y,z,v,w,a0");
         } else {
             throw std::runtime_error("Direct algorithm for D1 VV not available!");
         }
@@ -1787,8 +1879,8 @@ psi::SharedMatrix SA_MRPT2::build_1rdm_aa(bool build_aa_large_t2) {
     print_done(t.get());
 
     // symmetrize D1a
-    X1("uv") = D1a("uv");
-    D1a("uv") += X1("vu");
+    temp1["uv"] = D1_["uv"];
+    D1_["uv"] += temp1["vu"];
     D1a.scale(0.5);
     D1a.print();
     exit(1);
