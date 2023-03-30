@@ -54,7 +54,7 @@ MRPT2_NOS::MRPT2_NOS(std::shared_ptr<RDMs> rdms, std::shared_ptr<SCFInfo> scf_in
 }
 
 void MRPT2_NOS::compute_transformation() {
-    // compute unrelaxed 1-RDMs for core and virtual blocks
+    // compute unrelaxed 1-RDMs for diagonal blocks
     mrpt2_->build_1rdm_unrelaxed(D1c_, D1v_, D1a_);
 
     psi::Process::environment.arrays["MRPT2 1RDM CC"] = D1c_;
@@ -90,10 +90,10 @@ void MRPT2_NOS::compute_transformation() {
         return ne;
     };
 
-    outfile->Printf("\n");
-    outfile->Printf("\n    Total number of electrons in core:    %12.6f", compute_ne(D1c_evals));
-    outfile->Printf("\n    Total number of electrons in active:  %12.6f", compute_ne(D1a_evals));
-    outfile->Printf("\n    Total number of electrons in virtual: %12.6f", compute_ne(D1v_evals));
+    print_h2("Number of Electrons");
+    outfile->Printf("\n    Number of electrons in core:    %12.6f", compute_ne(D1c_evals));
+    outfile->Printf("\n    Number of electrons in active:  %12.6f", compute_ne(D1a_evals));
+    outfile->Printf("\n    Number of electrons in virtual: %12.6f", compute_ne(D1v_evals));
 
     // print natural orbitals
     if (options_->get_bool("NAT_ORBS_PRINT")) {
@@ -104,32 +104,61 @@ void MRPT2_NOS::compute_transformation() {
     }
 
     // suggest active space
+    std::vector<std::vector<std::pair<int, int>>> rot_pairs;
     if (options_->get_bool("NAT_ACT")) {
-        suggest_active_space(D1c_evals, D1v_evals);
+        rot_pairs = suggest_active_space(D1c_evals, D1v_evals, D1a_evals);
+    }
+    for (int h = 0, nirrep = rot_pairs.size(); h < nirrep; ++h) {
+        for (const auto& [i, j] : rot_pairs[h]) {
+            outfile->Printf("\n    irrep %d, swap orbitals: %3zu <-> %-3zu", h, i, j);
+        }
     }
 
     // build transformation matrix
     auto nmopi = mo_space_info_->dimension("ALL");
     auto ncmopi = mo_space_info_->dimension("CORRELATED");
     auto frzcpi = mo_space_info_->dimension("FROZEN_DOCC");
+    auto doccpi = mo_space_info_->dimension("INACTIVE_DOCC");
+    auto holepi = doccpi + mo_space_info_->dimension("ACTIVE");
 
     Ua_ = std::make_shared<psi::Matrix>("Ua", nmopi, nmopi);
     Ua_->identity();
 
-    Slice slice_core(frzcpi, mo_space_info_->dimension("INACTIVE_DOCC"));
+    Slice slice_core(frzcpi, doccpi);
     Ua_->set_block(slice_core, D1c_evecs);
 
-    Slice slice_virt(frzcpi + mo_space_info_->dimension("GENERALIZED HOLE"), frzcpi + ncmopi);
+    Slice slice_actv(doccpi, holepi);
+    Ua_->set_block(slice_actv, D1a_evecs);
+
+    Slice slice_virt(holepi, frzcpi + ncmopi);
     Ua_->set_block(slice_virt, D1v_evecs);
+
+    auto S = std::make_shared<psi::Matrix>("Swap", nmopi, nmopi);
+    S->identity();
+
+    for (int h = 0, nirrep = rot_pairs.size(); h < nirrep; ++h) {
+        for (const auto& [i, j] : rot_pairs[h]) {
+            S->set(h, i, i, 0.0);
+            S->set(h, j, j, 0.0);
+            S->set(h, i, j, 1.0);
+            S->set(h, j, i, 1.0);
+        }
+    }
+    auto US = psi::linalg::doublet(Ua_, S, false, false);
+    Ua_->copy(US);
 
     Ub_ = Ua_->clone();
 }
 
-void MRPT2_NOS::suggest_active_space(const psi::Vector& D1c_evals, const psi::Vector& D1v_evals) {
+std::vector<std::vector<std::pair<int, int>>>
+MRPT2_NOS::suggest_active_space(const psi::Vector& D1c_evals, const psi::Vector& D1v_evals,
+                                const psi::Vector& D1a_evals) {
+    auto nirrep = mo_space_info_->nirrep();
+    std::vector<std::vector<std::pair<int, int>>> out(nirrep);
+
     // print original active space
     print_h2("Original Occupation Information (User Input)");
 
-    auto nirrep = mo_space_info_->nirrep();
     std::string dash(15 + 6 * nirrep + 7, '-');
     outfile->Printf("\n    %s", dash.c_str());
     outfile->Printf("\n    %15c", ' ');
@@ -161,80 +190,111 @@ void MRPT2_NOS::suggest_active_space(const psi::Vector& D1c_evals, const psi::Ve
 
     auto dim_frzc = mo_space_info_->dimension("FROZEN_DOCC");
     auto dim_hole = mo_space_info_->dimension("GENERALIZED HOLE");
-
+    auto dim_actv = mo_space_info_->dimension("ACTIVE");
     auto dim_core = mo_space_info_->dimension("RESTRICTED_DOCC");
     auto dim_virt = mo_space_info_->dimension("RESTRICTED_UOCC");
 
-    psi::Dimension newdim_actv(std::vector<int>(nirrep, 0));
-    psi::Dimension newdim_rdocc(std::vector<int>(nirrep, 0));
-    psi::Dimension newdim_ruocc(std::vector<int>(nirrep, 0));
+    psi::Dimension newdim_actv(nirrep, "new active");
+    psi::Dimension newdim_rdocc(nirrep, "new rdocc");
+    psi::Dimension newdim_ruocc(nirrep, "new ruocc");
+
+    psi::Dimension dim_actv_i(nirrep, "active (core like)");
+    psi::Dimension dim_actv_a(nirrep, "active (virtual like)");
 
     auto fno_cutoff = 2.0 * options_->get_double("PT2NO_FNO_THRESHOLD");
-    psi::Dimension fno_dim(std::vector<int>(nirrep, 0));
+    psi::Dimension fno_dim(nirrep, "FNO");
 
     for (size_t h = 0; h < nirrep; ++h) {
-        auto ndocc = 0, nactv = 0, nuocc = 0, nfno = 0;
+        auto ndocc = 0, nactv = 0, nuocc = 0;
+
         for (int i = 0; i < dim_core[h]; ++i) {
             if (D1c_evals.get(h, i) < core_cutoff)
                 nactv++;
             else
                 ndocc++;
         }
+
+        auto nactv_i = 0, nactv_a = 0;
+        for (int u = 0; u < dim_actv[h]; ++u) {
+            auto nu = D1a_evals.get(h, u);
+            if (nu > core_cutoff)
+                nactv_i++;
+            if (nu < virt_cutoff)
+                nactv_a++;
+        }
+        dim_actv_i[h] = nactv_i;
+        dim_actv_a[h] = nactv_a;
+
+        auto nfno = 0;
         for (int a = 0; a < dim_virt[h]; ++a) {
-            if (D1v_evals.get(h, a) > virt_cutoff)
+            auto na = D1v_evals.get(h, a);
+            if (na > virt_cutoff)
                 nactv++;
             else
                 nuocc++;
-            if (D1v_evals.get(h, a) < fno_cutoff)
+            if (na < fno_cutoff)
                 nfno++;
         }
+
+        fno_dim[h] = nfno;
         newdim_actv[h] = nactv;
         newdim_rdocc[h] = ndocc;
         newdim_ruocc[h] = nuocc;
-        fno_dim[h] = nfno;
     }
 
     // save occupation numbers to disk
     std::unordered_map<std::string, psi::Dimension> newdims;
-    newdims["ACTIVE"] = newdim_actv + mo_space_info_->dimension("ACTIVE");
-    newdims["RESTRICTED_DOCC"] = newdim_rdocc;
-    newdims["RESTRICTED_UOCC"] = newdim_ruocc;
+    newdims["ACTIVE"] = dim_actv + newdim_actv - dim_actv_a - dim_actv_i;
+    newdims["RESTRICTED_DOCC"] = newdim_rdocc + dim_actv_i;
+    newdims["RESTRICTED_UOCC"] = newdim_ruocc + dim_actv_a;
     newdims["FROZEN_DOCC"] = mo_space_info_->dimension("FROZEN_DOCC");
     newdims["FROZEN_UOCC"] = mo_space_info_->dimension("FROZEN_UOCC");
 
     dump_occupations("mrpt2_nos_occ", newdims);
     dump_occupations("mrpt2_fnos", {{"FROZEN_UOCC", fno_dim}});
 
-    if (newdim_actv.sum() == 0) {
-        outfile->Printf("\n    MRPT2 natural orbitals finds no additional active orbitals.");
-        return;
-    }
-
     // print occupation numbers considered to be active
-    dash = std::string(5 + 9 + 14, '-');
+    dash = std::string(12 + 14 + 3, '-');
     outfile->Printf("\n    %s", dash.c_str());
-    outfile->Printf("\n    Irrep  Orbital   Occ. Number");
+    outfile->Printf("\n    Orbital Idx.   Occ. Number");
     outfile->Printf("\n    %s", dash.c_str());
 
     for (size_t h = 0; h < nirrep; ++h) {
-        if (newdim_actv[h] == 0)
+        if (newdims["ACTIVE"][h] == 0 and dim_actv_i[h] == 0 and dim_actv_a[h] == 0)
             continue;
 
         auto irrep_label = mo_space_info_->irrep_label(h);
         auto core_shift = dim_frzc[h];
+        auto actv_shift = dim_frzc[h] + dim_core[h];
         auto virt_shift = dim_frzc[h] + dim_hole[h];
 
-        for (int i = newdim_rdocc[h]; i < dim_core[h]; ++i) {
-            outfile->Printf("\n    %5s  %7zu  %12.6e", irrep_label.c_str(), i + core_shift,
+        for (int i = newdim_rdocc[h]; i < dim_core[h]; ++i)
+            outfile->Printf("\n    %7zu%-5s  %12.6e  +", i + core_shift, irrep_label.c_str(),
                             D1c_evals.get(h, i));
-        }
-
-        for (int a = 0; a < dim_virt[h] - newdim_ruocc[h]; ++a) {
-            outfile->Printf("\n    %5s  %7zu  %12.6e", irrep_label.c_str(), a + virt_shift,
+        for (int u = 0; u < dim_actv_i[h]; ++u)
+            outfile->Printf("\n    %7zu%-5s  %12.6e  -", u + actv_shift, irrep_label.c_str(),
+                            D1a_evals.get(h, u));
+        for (int u = dim_actv_i[h], limit = dim_actv[h] - dim_actv_a[h]; u < limit; ++u)
+            outfile->Printf("\n    %7zu%-5s  %12.6e  .", u + actv_shift, irrep_label.c_str(),
+                            D1a_evals.get(h, u));
+        for (int u = dim_actv[h] - dim_actv_a[h]; u < dim_actv[h]; ++u)
+            outfile->Printf("\n    %7zu%-5s  %12.6e  -", u + actv_shift, irrep_label.c_str(),
+                            D1a_evals.get(h, u));
+        for (int a = 0, limit = dim_virt[h] - newdim_ruocc[h]; a < limit; ++a)
+            outfile->Printf("\n    %7zu%-5s  %12.6e  +", a + virt_shift, irrep_label.c_str(),
                             D1v_evals.get(h, a));
-        }
-
         outfile->Printf("\n    %s", dash.c_str());
+    }
+    outfile->Printf("\n    Orbital count starts from 0 within each irrep.");
+    outfile->Printf("\n    .: original active orbitals");
+    if (newdim_actv.sum())
+        outfile->Printf("\n    +: to be added as active orbitals");
+    if (dim_actv_a.sum() or dim_actv_i.sum())
+        outfile->Printf("\n    -: to be removed from active orbitals");
+
+    if (newdim_actv.sum() == 0 and dim_actv_a.sum() == 0 and dim_actv_i.sum() == 0) {
+        outfile->Printf("\n\n    MRPT2 natural orbitals finds no additional active orbitals.");
+        return out;
     }
 
     print_h2("Occupation Information Suggested by MRPT2 Natural Orbitals");
@@ -258,5 +318,23 @@ void MRPT2_NOS::suggest_active_space(const psi::Vector& D1c_evals, const psi::Ve
         outfile->Printf(" %6d", dim.sum());
     }
     outfile->Printf("\n    %s", dash.c_str());
+
+    // determine rotations outside the active space
+    for (size_t h = 0; h < nirrep; ++h) {
+        if (newdim_actv[h] == 0)
+            continue;
+        auto shift = dim_frzc[h] + dim_core[h];
+        auto current_core = shift - 1;
+        for (int u = 0; u < dim_actv_i[h]; ++u) {
+            out[h].emplace_back(u + shift, current_core--);
+        }
+
+        auto current_virt = shift + dim_actv[h];
+        shift += dim_actv[h] - dim_actv_a[h];
+        for (int u = dim_actv_a[h] - 1; u >= 0; --u) {
+            out[h].emplace_back(u + shift, current_virt++);
+        }
+    }
+    return out;
 }
 } // namespace forte
