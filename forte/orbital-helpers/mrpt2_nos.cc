@@ -97,7 +97,7 @@ void MRPT2_NOS::compute_transformation() {
 
     // print natural orbitals
     if (options_->get_bool("NAT_ORBS_PRINT")) {
-        outfile->Printf("\n");
+        outfile->Printf("\n\n");
         D1a_evals.print();
         D1c_evals.print();
         D1v_evals.print();
@@ -148,6 +148,11 @@ void MRPT2_NOS::compute_transformation() {
     Ua_->copy(US);
 
     Ub_ = Ua_->clone();
+
+    // save natural occupations to disk
+    save_psi4_vector("NAT_OCC_ACTV", D1a_evals, doccpi);
+    save_psi4_vector("NAT_OCC_CORE", D1c_evals, frzcpi);
+    save_psi4_vector("NAT_OCC_VIRT", D1v_evals, holepi);
 }
 
 std::vector<std::vector<std::pair<int, int>>>
