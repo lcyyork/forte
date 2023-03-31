@@ -142,8 +142,7 @@ void export_CASSCF(py::module& m) {
 
 void export_MCSCF_2STEP(py::module& m) {
     py::class_<MCSCF_2STEP>(m, "MCSCF_2STEP")
-        .def("compute_energy", &MCSCF_2STEP::compute_energy, "Compute the MCSCF energy")
-        .def("nat_occ", &MCSCF_2STEP::nat_occ, "Return the final natural occupation numbers");
+        .def("compute_energy", &MCSCF_2STEP::compute_energy, "Compute the MCSCF energy");
 }
 
 void export_Symmetry(py::module& m) {
