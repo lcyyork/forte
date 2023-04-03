@@ -215,6 +215,9 @@ class ActiveSpaceMethod {
     /// Return the number of roots computed
     size_t nroot() const { return nroot_; }
 
+    /// Return the max number of iterations
+    int maxiter() const { return maxiter_; }
+
     /// Return the state info
     const StateInfo& state() const { return state_; }
 

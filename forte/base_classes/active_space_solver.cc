@@ -90,6 +90,8 @@ ActiveSpaceSolver::ActiveSpaceSolver(const std::string& method,
         std::shared_ptr<ActiveSpaceMethod> method = make_active_space_method(
             method_, state, nroot, scf_info_, mo_space_info_, as_ints_, options_);
         state_method_map_[state] = method;
+        if (maxiter_ < method->maxiter())
+            maxiter_ = method->maxiter();
     }
 }
 
