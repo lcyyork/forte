@@ -1667,8 +1667,10 @@ psi::SharedMatrix SA_MRPT2::build_1rdm_aa(bool build_aa_large_t2) {
 
     if (eri_df_) {
         if (build_aa_large_t2) {
-            compute_1rdm_aa_vv_CCAV_DF(D1_, {});
-            compute_1rdm_cc_aa_CAVV_DF(D1_, {});
+            auto D1temp = BTF_->build(tensor_type_, "D1temp", {"cc", "aa", "vv"});
+            compute_1rdm_aa_vv_CCAV_DF(D1temp, {});
+            compute_1rdm_cc_aa_CAVV_DF(D1temp, {});
+            D1a("pq") += D1temp.block("aa")("pq");
         }
     } else {
         auto L1 = L1_.block("aa");
@@ -1825,7 +1827,7 @@ void SA_MRPT2::build_1rdm_unrelaxed(psi::SharedMatrix& D1c, psi::SharedMatrix& D
 
     D1c = build_1rdm_cc();
     D1v = build_1rdm_vv();
-    D1a = build_1rdm_aa();
+    D1a = build_1rdm_aa(false);
 }
 
 } // namespace forte
