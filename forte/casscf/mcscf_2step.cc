@@ -182,7 +182,7 @@ double MCSCF_2STEP::compute_energy() {
     as_solver->set_print(print_);
     as_solver->set_e_convergence(e_conv_);
     as_solver->set_r_convergence(no_orb_opt ? r_conv : 1.0e-2);
-    as_solver->set_maxiter(no_orb_opt ? as_maxiter : 15);
+    as_solver->set_maxiter(no_orb_opt ? as_maxiter : 25);
     as_solver->set_die_if_not_converged(no_orb_opt);
 
     // initial CI and resulting RDMs
@@ -464,6 +464,7 @@ double MCSCF_2STEP::diagonalize_hamiltonian(std::shared_ptr<ActiveSpaceSolver>& 
     as_solver->set_e_convergence(e_conv);
     as_solver->set_r_convergence(r_conv);
     as_solver->set_die_if_not_converged(false);
+    as_solver->set_maxiter(20);
     as_solver->set_active_space_integrals(fci_ints);
 
     const auto state_energies_map = as_solver->compute_energy();

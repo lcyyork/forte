@@ -229,6 +229,7 @@ double FCISolver::compute_energy() {
 
     if (print_) {
         outfile->Printf("\n\n  ==> Diagonalizing Hamiltonian <==\n");
+        outfile->Printf("\n  Max number of iter. : %d", maxiter_);
         outfile->Printf("\n  Energy   convergence: %.2e", e_convergence_);
         outfile->Printf("\n  Residual convergence: %.2e", r_convergence_);
         outfile->Printf("\n  -----------------------------------------------------");
