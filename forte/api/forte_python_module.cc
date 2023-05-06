@@ -60,6 +60,7 @@
 #include "mrdsrg-helper/run_dsrg.h"
 #include "mrdsrg-spin-integrated/master_mrdsrg.h"
 #include "mrdsrg-spin-adapted/sadsrg.h"
+#include "mrdsrg-spin-adapted/sa_mrpt2.h"
 #include "mrdsrg-spin-integrated/mcsrgpt2_mo.h"
 #include "integrals/one_body_integrals.h"
 #include "sci/tdci.h"
@@ -83,6 +84,7 @@ void export_SparseCISolver(py::module& m);
 void export_ForteCubeFile(py::module& m);
 void export_OrbitalTransform(py::module& m);
 void export_Localize(py::module& m);
+void export_MRPT2NOS(py::module& m);
 void export_SemiCanonical(py::module& m);
 
 void set_master_screen_threshold(double value);
@@ -284,6 +286,7 @@ PYBIND11_MODULE(_forte, m) {
     export_Symmetry(m);
     export_OrbitalTransform(m);
     export_Localize(m);
+    export_MRPT2NOS(m);
     export_SemiCanonical(m);
 
     export_Determinant(m);
@@ -335,6 +338,8 @@ PYBIND11_MODULE(_forte, m) {
         .def("tei_aa", &ActiveSpaceIntegrals::tei_aa, "alpha-alpha two-electron integral <pq||rs>")
         .def("tei_ab", &ActiveSpaceIntegrals::tei_ab, "alpha-beta two-electron integral <pq|rs>")
         .def("tei_bb", &ActiveSpaceIntegrals::tei_bb, "beta-beta two-electron integral <pq||rs>")
+        .def("add", &ActiveSpaceIntegrals::add, "Add another integrals to this one", "as_ints"_a,
+             "factor"_a = 1.0)
         .def("print", &ActiveSpaceIntegrals::print, "Print the integrals (alpha-alpha case)");
 
     // export ActiveMultipoleIntegrals
@@ -384,6 +389,25 @@ PYBIND11_MODULE(_forte, m) {
         .def("set_read_cwd_amps", &SADSRG::set_read_amps_cwd,
              "Set if reading amplitudes in the current directory or not")
         .def("clean_checkpoints", &SADSRG::clean_checkpoints, "Delete amplitudes checkpoint files");
+
+    // export spin-adapted DSRG-MRPT2
+    py::class_<SA_MRPT2>(m, "SA_MRPT2")
+        .def(
+            py::init<std::shared_ptr<RDMs>, std::shared_ptr<SCFInfo>, std::shared_ptr<ForteOptions>,
+                     std::shared_ptr<ForteIntegrals>, std::shared_ptr<MOSpaceInfo>>())
+        .def("compute_energy", &SA_MRPT2::compute_energy, "Compte the DSRG-MRPT2 energy")
+        .def("compute_Heff_actv", &SA_MRPT2::compute_Heff_actv,
+             "Return the DSRG dressed ActiveSpaceIntegrals")
+        .def("compute_mp_eff_actv", &SA_MRPT2::compute_mp_eff_actv,
+             "Return the DSRG dressed ActiveMultipoleIntegrals")
+        .def("set_Uactv", &SA_MRPT2::set_Uactv, "Ua"_a,
+             "Set active part orbital rotation matrix (from original to semicanonical)")
+        .def("set_active_space_solver", &SA_MRPT2::set_active_space_solver,
+             "Set the pointer of ActiveSpaceSolver")
+        .def("set_state_weights_map", &SA_MRPT2::set_state_weights_map,
+             "Set the map from state to the weights of all computed roots")
+        .def("clean_checkpoints", &SA_MRPT2::clean_checkpoints,
+             "Delete amplitudes checkpoint files");
 
     // export MRDSRG_SO
     py::class_<MRDSRG_SO>(m, "MRDSRG_SO")
