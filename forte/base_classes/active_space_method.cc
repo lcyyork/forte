@@ -94,6 +94,12 @@ DeterminantHashVec ActiveSpaceMethod::get_PQ_space() { return final_wfn_; }
 
 psi::SharedMatrix ActiveSpaceMethod::get_PQ_evecs() { return evecs_; }
 
+void ActiveSpaceMethod::set_maxiter(int maxiter) { maxiter_ = maxiter; }
+
+void ActiveSpaceMethod::set_die_if_not_converged(bool die) { die_if_not_converged_ = die; }
+
+void ActiveSpaceMethod::set_restart(bool restart) { restart_ = restart; }
+
 void ActiveSpaceMethod::save_transition_rdms(
     const std::vector<std::shared_ptr<RDMs>>& rdms,
     const std::vector<std::pair<size_t, size_t>>& root_list,
