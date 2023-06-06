@@ -70,6 +70,17 @@ class SADSRG : public DynamicCorrelationSolver {
     /// Set unitary matrix (in active space) from original to semicanonical
     void set_Uactv(ambit::Tensor& U);
 
+    // /// Return if DSRG Brueckner orbitals are converged
+    // bool is_brueckner_converged() { return brueckner_absmax_ < brueckner_conv_; }
+
+    /// Set max number of iterations
+    void set_maxiter(int maxiter) { maxiter_ = maxiter; }
+    /// Set die if not converged
+    void set_die_if_not_converged(bool die) { die_if_not_converged_ = die; }
+
+    /// Orbital rotation matrix due to Brueckner orbitals
+    std::shared_ptr<psi::Matrix> R_brueckner();
+
   protected:
     /// Startup function called in constructor
     void startup();
@@ -400,7 +411,7 @@ class SADSRG : public DynamicCorrelationSolver {
     /// Compute zero-body term of commutator [V, T1], V is constructed from B (DF/CD)
     void V_T1_C0_DF(BlockedTensor& B, BlockedTensor& T1, const double& alpha, double& C0);
     /// Compute zero-body term of commutator [V, T2], V is constructed from B (DF/CD)
-    std::vector<double> V_T2_C0_DF(BlockedTensor& B, BlockedTensor& T1, BlockedTensor& S2,
+    std::vector<double> V_T2_C0_DF(BlockedTensor& B, BlockedTensor& T2, BlockedTensor& S2,
                                    const double& alpha, double& C0);
 
     /// Compute one-body term of commutator [V, T1], V is constructed from B (DF/CD)
@@ -457,6 +468,11 @@ class SADSRG : public DynamicCorrelationSolver {
 
     // ==> miscellaneous <==
 
+    /// Maximum number of iterations
+    int maxiter_;
+    /// Die if not converged
+    bool die_if_not_converged_ = true;
+
     /// File name prefix for checkpoint files
     std::string chk_filename_prefix_;
 
@@ -469,9 +485,31 @@ class SADSRG : public DynamicCorrelationSolver {
     /// Print the contents with padding: <text> <padding with dots>
     void print_contents(const std::string& str, size_t size = 45);
     /// Print done and timing
-    void print_done(double t, const std::string& done="Done");
+    void print_done(double t, const std::string& done = "Done");
+
+    // ==> orbital rotations <==
+
+    /// Perform orbital rotations using an unitary matrix
+    void brueckner_orbital_rotation(ambit::BlockedTensor T1);
+
+    /// Whether perform orbital rotation to make T1 vanishing
+    bool brueckner_;
+    /// Convergence threshold for Brueckner orbitals
+    double brueckner_conv_;
+    /// Max element of T1 to compare against Brueckner convergence threshold
+    double brueckner_absmax_;
+
+    /// Compute the exponential of exp(T1 - T1^+) and return a Psi4 SharedMatrix
+    /// @param T1 the T1 matrix
+    /// @param with_symmetry if in blocked form for the returned SharedMatrix
+    psi::SharedMatrix expA1(ambit::BlockedTensor T1, bool with_symmetry);
 
     // ==> common amplitudes analysis and printing <==
+
+    /// Single excitation amplitudes
+    ambit::BlockedTensor T1_;
+    /// Double excitation amplitudes
+    ambit::BlockedTensor T2_;
 
     /// Prune internal amplitudes for T1
     void internal_amps_T1(BlockedTensor& T1);

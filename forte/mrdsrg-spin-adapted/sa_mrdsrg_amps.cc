@@ -420,7 +420,7 @@ void SA_MRDSRG::update_t1() {
 
 void SA_MRDSRG::dump_amps_to_disk() {
     // dump to psi4 scratch directory for reference relaxation
-    if (restart_amps_ and (relax_ref_ != "NONE")) {
+    if (restart_amps_ and (relax_ref_ != "NONE" or brueckner_)) {
         local_timer lt;
         print_contents("Dumping amplitudes to scratch dir");
         T1_.save(t1_file_chk_);

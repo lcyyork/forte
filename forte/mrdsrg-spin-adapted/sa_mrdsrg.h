@@ -70,8 +70,8 @@ class SA_MRDSRG : public SADSRG {
     /// Check memory
     void check_memory();
 
-    /// Maximum number of iterations
-    int maxiter_;
+    // /// Maximum number of iterations
+    // int maxiter_;
     /// Energy convergence criteria
     double e_conv_;
     /// Residual convergence criteria
@@ -82,6 +82,9 @@ class SA_MRDSRG : public SADSRG {
 
     /// Omitting blocks with >= 3 virtual indices?
     bool nivo_;
+
+    /// Use A1 dressed integrals as zeroth-order Hamiltonian
+    bool Hzero_a1_;
 
     /// Read amplitudes from previous reference relaxation step
     bool restart_amps_;
@@ -96,9 +99,12 @@ class SA_MRDSRG : public SADSRG {
     std::string corrlv_string_;
 
     /// Correlation level
-    enum class CORR_LV { LDSRG2, LDSRG2_QC };
-    std::map<std::string, CORR_LV> corrlevelmap{{"LDSRG2", CORR_LV::LDSRG2},
-                                                {"LDSRG2_QC", CORR_LV::LDSRG2_QC}};
+    enum class CORR_LV { LDSRG2, LDSRG2_QC, CC2 };
+    std::map<std::string, CORR_LV> corrlevelmap{
+        {"LDSRG2", CORR_LV::LDSRG2}, {"LDSRG2_QC", CORR_LV::LDSRG2_QC}, {"CC2", CORR_LV::CC2}};
+
+    /// Zeroth-order Hamiltonian adopted by CC2
+    std::string Hzero_;
 
     /// Max number of commutators considered in recursive single commutator algorithm
     int rsc_ncomm_;
@@ -113,10 +119,10 @@ class SA_MRDSRG : public SADSRG {
     ambit::BlockedTensor B_;
     /// Generalized Fock matrix
     ambit::BlockedTensor F_;
-    /// Single excitation amplitude
-    ambit::BlockedTensor T1_;
-    /// Double excitation amplitude
-    ambit::BlockedTensor T2_;
+    // /// Single excitation amplitude
+    // ambit::BlockedTensor T1_;
+    // /// Double excitation amplitude
+    // ambit::BlockedTensor T2_;
     /// Difference of consecutive singles
     ambit::BlockedTensor DT1_;
     /// Difference of consecutive doubles
@@ -164,8 +170,14 @@ class SA_MRDSRG : public SADSRG {
     /// Add H2's Hermitian conjugate to itself, H2 need to contain gGgG block
     void add_hermitian_conjugate(BlockedTensor& H2);
 
-    /// Setup tensors for iterations
+    /// Set up tensors for LDSRG(2) iterations
     void setup_ldsrg2_tensors();
+    /// Set up tensors for CC2 iterations
+    void setup_cc2_tensors();
+
+    /// Rotate bare integrals by U1
+    ambit::BlockedTensor rotate_integrals(double& Hbar0_, ambit::BlockedTensor& Hbar1_,
+                                          ambit::BlockedTensor& Hbar2_);
 
     /// Temporary one-body Hamiltonian
     ambit::BlockedTensor O1_;
@@ -190,6 +202,8 @@ class SA_MRDSRG : public SADSRG {
 
     /// Compute MR-LDSRG(2)
     double compute_energy_ldsrg2();
+    /// Compute CC2
+    double compute_energy_cc2();
 
     /// Compute DSRG-transformed multipoles
     void transform_one_body(const std::vector<ambit::BlockedTensor>& oetens,

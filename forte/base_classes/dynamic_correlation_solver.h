@@ -87,6 +87,9 @@ class DynamicCorrelationSolver {
         state_to_weights_ = state_to_weights;
     }
 
+    /// Set printing level
+    void set_print(int print) { print_ = print; }
+
   protected:
     /// The molecular integrals
     std::shared_ptr<ForteIntegrals> ints_;

@@ -57,8 +57,8 @@ SADSRG::SADSRG(std::shared_ptr<RDMs> rdms, std::shared_ptr<SCFInfo> scf_info,
     print_method_banner({"Spin-Adapted Multireference Driven Similarity Renormalization Group",
                          "written by Chenyang Li", thread_title});
     outfile->Printf("\n  Disclaimer:");
-    outfile->Printf("\n    The spin-adapted DSRG code is largely adopted from the spin-integrated "
-                    "code developed by");
+    outfile->Printf("\n    The spin-adapted DSRG code is largely adopted from the "
+                    "spin-integrated code developed by");
     outfile->Printf(
         "\n    Chenyang Li, Kevin P. Hannon, Tianyuan Zhang, and Francesco A. Evangelista.");
     startup();
@@ -198,6 +198,11 @@ void SADSRG::read_options() {
     read_amps_cwd_ = foptions_->get_bool("DSRG_READ_AMPS");
 
     relax_ref_ = foptions_->get_str("RELAX_REF");
+
+    maxiter_ = foptions_->get_int("DSRG_MAXITER");
+
+    brueckner_ = foptions_->get_bool("DSRG_BRUECKNER");
+    brueckner_conv_ = foptions_->get_double("BRUECKNER_CONVERGENCE");
 
     multi_state_ = foptions_->get_gen_list("AVG_STATE").size() != 0;
     multi_state_algorithm_ = foptions_->get_str("DSRG_MULTI_STATE");

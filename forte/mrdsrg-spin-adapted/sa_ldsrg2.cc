@@ -149,6 +149,7 @@ double SA_MRDSRG::compute_energy_ldsrg2() {
         }
         if (cycle > 5 and std::fabs(rms) > 10.0) {
             outfile->Printf("\n\n    Large RMS for amplitudes. Likely no convergence. Quitting.\n");
+            break;
         }
     }
 
@@ -304,83 +305,72 @@ void SA_MRDSRG::compute_hbar_sequential() {
 
     timer rotation("Hbar T1 rotation");
 
-    ambit::BlockedTensor A1;
-    A1 = BTF_->build(tensor_type_, "A1 Amplitudes", {"gg"}, true);
-    A1["ia"] = T1_["ia"];
-    A1["ai"] -= T1_["ia"];
+    auto B = rotate_integrals(Hbar0_, Hbar1_, Hbar2_);
 
-    size_t ncmo = core_mos_.size() + actv_mos_.size() + virt_mos_.size();
+    // auto A1_m = expA1(T1_, false);
 
-    psi::SharedMatrix A1_m(new psi::Matrix("A1 alpha", ncmo, ncmo));
-    A1.iterate([&](const std::vector<size_t>& i, const std::vector<SpinType>&, double& value) {
-        A1_m->set(i[0], i[1], value);
-    });
+    // ambit::BlockedTensor U1;
+    // U1 = BTF_->build(tensor_type_, "Transformer", {"gg"}, true);
+    // U1.iterate([&](const std::vector<size_t>& i, const std::vector<SpinType>&, double& value) {
+    //     value = A1_m->get(i[0], i[1]);
+    // });
 
-    // >=3 is required for high energy convergence
-    A1_m->expm(3);
+    // /// Recompute Hbar0 (ref. energy + T1 correlation), Hbar1 (Fock), and Hbar2 (aptei)
+    // /// E = 0.5 * ( H["ji"] + F["ji] ) * D1["ij"] + 0.25 * V["xyuv"] * L2["uvxy"]
 
-    ambit::BlockedTensor U1;
-    U1 = BTF_->build(tensor_type_, "Transformer", {"gg"}, true);
-    U1.iterate([&](const std::vector<size_t>& i, const std::vector<SpinType>&, double& value) {
-        value = A1_m->get(i[0], i[1]);
-    });
+    // // Hbar1 is now "bare H1"
+    // Hbar1_["rs"] = U1["rp"] * H_["pq"] * U1["sq"];
 
-    /// Recompute Hbar0 (ref. energy + T1 correlation), Hbar1 (Fock), and Hbar2 (aptei)
-    /// E = 0.5 * ( H["ji"] + F["ji] ) * D1["ij"] + 0.25 * V["xyuv"] * L2["uvxy"]
+    // Hbar0_ = 0.0;
+    // Hbar1_.block("cc").iterate([&](const std::vector<size_t>& i, double& value) {
+    //     if (i[0] == i[1])
+    //         Hbar0_ += value;
+    // });
+    // Hbar0_ += 0.5 * Hbar1_["uv"] * L1_["vu"];
 
-    // Hbar1 is now "bare H1"
-    Hbar1_["rs"] = U1["rp"] * H_["pq"] * U1["sq"];
+    // // for simplicity, create a core-core density matrix
+    // BlockedTensor D1c = BTF_->build(tensor_type_, "L1 core", {"cc"});
+    // for (size_t m = 0, nc = core_mos_.size(); m < nc; ++m) {
+    //     D1c.block("cc").data()[m * nc + m] = 2.0;
+    // }
 
-    Hbar0_ = 0.0;
-    Hbar1_.block("cc").iterate([&](const std::vector<size_t>& i, double& value) {
-        if (i[0] == i[1])
-            Hbar0_ += value;
-    });
-    Hbar0_ += 0.5 * Hbar1_["uv"] * L1_["vu"];
+    // // Hbar1 becomes "Fock"
+    // ambit::BlockedTensor B;
+    // if (eri_df_) {
+    //     B = BTF_->build(tensor_type_, "B 3-idx", {"Lgg"}, true);
+    //     B["grs"] = U1["rp"] * B_["gpq"] * U1["sq"];
 
-    // for simplicity, create a core-core density matrix
-    BlockedTensor D1c = BTF_->build(tensor_type_, "L1 core", {"cc"});
-    for (size_t m = 0, nc = core_mos_.size(); m < nc; ++m) {
-        D1c.block("cc").data()[m * nc + m] = 2.0;
-    }
+    //     BlockedTensor temp = BTF_->build(tensor_type_, "B temp", {"L"}, true);
+    //     temp["g"] = B["gmn"] * D1c["mn"];
+    //     temp["g"] += B["guv"] * L1_["uv"];
+    //     Hbar1_["pq"] += temp["g"] * B["gpq"];
 
-    // Hbar1 becomes "Fock"
-    ambit::BlockedTensor B;
-    if (eri_df_) {
-        B = BTF_->build(tensor_type_, "B 3-idx", {"Lgg"}, true);
-        B["grs"] = U1["rp"] * B_["gpq"] * U1["sq"];
+    //     Hbar1_["pq"] -= 0.5 * B["gpm"] * B["gnq"] * D1c["mn"];
+    //     Hbar1_["pq"] -= 0.5 * B["gpu"] * B["gvq"] * L1_["uv"];
+    // } else {
+    //     Hbar2_["pqrs"] = U1["pt"] * U1["qo"] * V_["t,o,g0,g1"] * U1["r,g0"] * U1["s,g1"];
 
-        BlockedTensor temp = BTF_->build(tensor_type_, "B temp", {"L"}, true);
-        temp["g"] = B["gmn"] * D1c["mn"];
-        temp["g"] += B["guv"] * L1_["uv"];
-        Hbar1_["pq"] += temp["g"] * B["gpq"];
+    //     Hbar1_["pq"] += Hbar2_["pnqm"] * D1c["mn"];
+    //     Hbar1_["pq"] -= 0.5 * Hbar2_["npqm"] * D1c["mn"];
 
-        Hbar1_["pq"] -= 0.5 * B["gpm"] * B["gnq"] * D1c["mn"];
-        Hbar1_["pq"] -= 0.5 * B["gpu"] * B["gvq"] * L1_["uv"];
-    } else {
-        Hbar2_["pqrs"] = U1["pt"] * U1["qo"] * V_["t,o,g0,g1"] * U1["r,g0"] * U1["s,g1"];
+    //     Hbar1_["pq"] += Hbar2_["pvqu"] * L1_["uv"];
+    //     Hbar1_["pq"] -= 0.5 * Hbar2_["vpqu"] * L1_["uv"];
+    // }
 
-        Hbar1_["pq"] += Hbar2_["pnqm"] * D1c["mn"];
-        Hbar1_["pq"] -= 0.5 * Hbar2_["npqm"] * D1c["mn"];
+    // // compute fully contracted term from T1
+    // Hbar1_.block("cc").iterate([&](const std::vector<size_t>& i, double& value) {
+    //     if (i[0] == i[1])
+    //         Hbar0_ += value;
+    // });
+    // Hbar0_ += 0.5 * Hbar1_["uv"] * L1_["vu"];
 
-        Hbar1_["pq"] += Hbar2_["pvqu"] * L1_["uv"];
-        Hbar1_["pq"] -= 0.5 * Hbar2_["vpqu"] * L1_["uv"];
-    }
+    // if (eri_df_) {
+    //     Hbar0_ += 0.5 * B["gux"] * B["gvy"] * L2_["xyuv"];
+    // } else {
+    //     Hbar0_ += 0.5 * Hbar2_["uvxy"] * L2_["xyuv"];
+    // }
 
-    // compute fully contracted term from T1
-    Hbar1_.block("cc").iterate([&](const std::vector<size_t>& i, double& value) {
-        if (i[0] == i[1])
-            Hbar0_ += value;
-    });
-    Hbar0_ += 0.5 * Hbar1_["uv"] * L1_["vu"];
-
-    if (eri_df_) {
-        Hbar0_ += 0.5 * B["gux"] * B["gvy"] * L2_["xyuv"];
-    } else {
-        Hbar0_ += 0.5 * Hbar2_["uvxy"] * L2_["xyuv"];
-    }
-
-    Hbar0_ += Efrzc_ + Enuc_ - Eref_;
+    // Hbar0_ += Efrzc_ + Enuc_ - Eref_;
 
     rotation.stop();
 

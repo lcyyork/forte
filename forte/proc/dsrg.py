@@ -31,6 +31,8 @@ import warnings
 import math
 import json
 import psi4
+from psi4.driver.p4util.solvers import DIIS
+from scipy.linalg import logm, expm
 
 import forte
 from forte.proc.external_active_space_solver import write_external_active_space_file
@@ -90,6 +92,11 @@ class ProcedureDSRG:
             self.relax_convergence = options.get_double("RELAX_E_CONVERGENCE")
 
         self.save_relax_energies = options.get_bool("DSRG_DUMP_RELAXED_ENERGIES")
+
+        # Orbital rotations
+        self.do_brueckner = options.get_bool("DSRG_BRUECKNER")
+        self.brueckner_maxiter = options.get_int("BRUECKNER_MAXITER")
+        self.brueckner_convergence = options.get_double("BRUECKNER_CONVERGENCE")
 
         # Filter out some ms-dsrg algorithms
         ms_dsrg_algorithm = options.get_str("DSRG_MULTI_STATE")
@@ -201,9 +208,13 @@ class ProcedureDSRG:
         self.dipoles = []
 
         # Perform the initial un-relaxed DSRG
-        self.make_dsrg_solver()
-        self.dsrg_setup()
-        e_dsrg = self.dsrg_solver.compute_energy() + self.fno_pt2_energy_shift
+        if self.do_brueckner:
+            e_dsrg = self.compute_brueckner_iterations()
+        else:
+            self.make_dsrg_solver()
+            self.dsrg_setup()
+            e_dsrg = self.dsrg_solver.compute_energy()
+        e_dsrg += self.fno_pt2_energy_shift
         if self.fno_pt2_energy_shift != 0.0:
             psi4.core.print_out(f"\n    DSRG-MRPT2 FNO energy correction:  {self.fno_pt2_energy_shift:20.15f}")
             psi4.core.print_out(f"\n    DSRG-MRPT2 FNO corrected energy:   {e_dsrg:20.15f}")
@@ -414,7 +425,7 @@ class ProcedureDSRG:
             overlap_np = np.abs(overlap.to_array())
             max_values = np.max(overlap_np, axis=1)
             permutation = np.argmax(overlap_np, axis=1)
-            check_pass = len(permutation) == len(set(permutation)) and np.all(max_values > 0.5)
+            check_pass = len(permutation) == len(set(permutation)) and np.all(max_values > 0.8)
 
             if not check_pass:
                 msg = "Relaxed states are likely wrong. Please increase the number of roots."
@@ -523,3 +534,93 @@ class ProcedureDSRG:
         self.fno_pt2_energy_shift = e_shift
         self.fno_pt2_Heff_shift = h_shift
         psi4.core.set_scalar_variable("FNO ENERGY CORRECTION", e_shift)
+
+    def compute_brueckner_iterations(self):
+        """ Iterations to obtain DSRG Brueckner orbitals. """
+        nirrep = self.mo_space_info.nirrep()
+
+        # initial MO coefficients
+        C0 = self.ints.Ca().clone()
+        dR = psi4.core.Matrix("R", C0.coldim(), C0.coldim())
+        U = psi4.core.Matrix("U", C0.coldim(), C0.coldim())
+        U.identity()
+
+        # DIIS info
+        b_diis_start = 2
+        b_diis_freq = 1
+        b_diis_max_vecs = 6
+        diis = DIIS(b_diis_max_vecs)
+
+        e_dsrg = 0.0
+        converged = False
+
+        for i in range(1, self.brueckner_maxiter + 1):
+            # solve for DSRG
+            self.make_dsrg_solver()
+            self.dsrg_setup()
+            self.dsrg_solver.set_die_if_not_converged(False)
+            self.dsrg_solver.set_maxiter(8)
+            self.dsrg_solver.set_print(0 if i != 1 else 1)
+            e_dsrg = self.dsrg_solver.compute_energy()
+
+            # rotate integrals
+            Ustep = self.dsrg_solver.R_brueckner()
+            U = psi4.core.doublet(Ustep, U, False, False)
+            R = [logm(U.nph[h]) for h in range(nirrep)]
+            R = psi4.core.Matrix.from_array(R)
+            dR.scale(-1.0)
+            dR.add(R)
+
+            dR_rms = dR.rms()
+            dR_max = dR.absmax()
+            psi4.core.print_out("\n\n  ==> Brueckner MRDSRG <==\n")
+            psi4.core.print_out(f"\n    Iter. {i:2d}: orbital RMS = {dR_rms:12.6E}, MAX = {dR_max:12.6E}")
+
+            if dR_rms < self.brueckner_convergence:
+                psi4.core.print_out("\n  DSRG orbital update converged.")
+                converged = True
+                break
+
+            if (i >= b_diis_start):
+                diis.add(R, dR)
+                psi4.core.print_out("  DIIS S")
+                if not (i % b_diis_freq and (i - b_diis_start) > 1):
+                    R = diis.extrapolate()
+                    psi4.core.print_out("/E")
+            dR.copy(R)
+
+            U = []
+            for h in range(nirrep):
+                Ru = np.triu(R.nph[h], 1)
+                U.append(expm(Ru - Ru.T))
+            U = psi4.core.Matrix.from_array(U)
+            self.ints.fix_orbital_phases(U, True, True);
+            C = psi4.core.doublet(C0, U, False, True)
+            self.ints.update_orbitals(C, C, True)
+
+            self.dsrg_solver = None
+
+            # form new active-space integrals using rotated ForteIntegrals
+            as_ints = forte.make_active_space_ints(self.mo_space_info, self.ints, "ACTIVE", ["RESTRICTED_DOCC"])
+
+            # solve for active space
+            self.active_space_solver.set_active_space_integrals(as_ints)
+            self.active_space_solver.set_restart(True)
+            state_energies_list = self.active_space_solver.compute_energy()
+            forte.compute_average_state_energy(state_energies_list, self.state_weights_map)
+            self.rdms = self.active_space_solver.compute_average_rdms(self.state_weights_map, self.max_rdm_level,
+                                                                      self.rdm_type)
+
+            # semi-canonicalize orbitals
+            if self.do_semicanonical:
+                self.semi.semicanonicalize(self.rdms)
+
+            # if self.dsrg_solver.is_brueckner_converged():
+            #     psi4.core.print_out("\n  DSRG orbital update converged.")
+            #     converged = True
+            #     break
+
+        if not converged:
+            raise psi4.p4util.PsiException(f"DSRG orbital update did not converge in {self.brueckner_maxiter} cycles!")
+
+        return e_dsrg

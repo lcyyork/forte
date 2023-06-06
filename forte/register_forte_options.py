@@ -634,7 +634,7 @@ def register_dsrg_options(options):
 
     options.add_str(
         "CORR_LEVEL", "PT2",
-        ["PT2", "PT3", "LDSRG2", "LDSRG2_QC", "LSRG2", "SRG_PT2", "QDSRG2", "LDSRG2_P3", "QDSRG2_P3"],
+        ["PT2", "PT3", "CC2", "LDSRG2", "LDSRG2_QC", "LSRG2", "SRG_PT2", "QDSRG2", "LDSRG2_P3", "QDSRG2_P3"],
         "Correlation level of MR-DSRG (used in mrdsrg code, "
         "LDSRG2_P3 and QDSRG2_P3 not implemented)"
     )
@@ -668,9 +668,11 @@ def register_dsrg_options(options):
     )
 
     options.add_str(
-        "DSRG_PT2_H0TH", "FDIAG", ["FDIAG", "FFULL", "FDIAG_VACTV", "FDIAG_VDIAG"],
-        "Different Zeroth-order Hamiltonian of DSRG-MRPT (used in mrdsrg code)"
+        "DSRG_PT2_H0TH", "FDIAG", ["FDIAG", "FFULL", "FDIAG_VACTV", "FDIAG_VDIAG", "DYALL", "FINK"],
+        "Different zeroth-order Hamiltonian of DSRG-MRPT (used in mrdsrg code)"
     )
+
+    options.add_bool("DSRG_DRESSED_H0TH", False, "Use A1 dressed Hamiltonian as zeroth-order Hamiltonian")
 
     options.add_bool("DSRG_DIPOLE", False, "Compute (if true) DSRG dipole moments")
 
@@ -822,6 +824,15 @@ def register_dsrg_options(options):
     options.add_bool("DSRG_RDM_MS_AVG", False, "Form Ms-averaged density if true")
 
     options.add_bool("SAVE_SA_DSRG_INTS", False, "Save SA-DSRG dressed integrals to dsrg_ints.json")
+
+    options.add_bool("DSRG_BRUECKNER", False,
+                     "Rotate orbitals such that MRDSRG T1 amplitudes become zero")
+
+    options.add_double("BRUECKNER_CONVERGENCE", 1.0e-6,
+                       "Threshold to consider Brueckner orbitals converged")
+
+    options.add_int("BRUECKNER_MAXITER", 40,
+                    "The max number of iterations for Brueckner orbital update")
 
 
 def register_dwms_options(options):
