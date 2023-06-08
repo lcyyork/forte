@@ -207,6 +207,8 @@ double SA_MRDSRG::compute_energy_cc2() {
                 outfile->Printf(
                     "\n\n    Large RMS for amplitudes. Likely no convergence. Quitting.\n");
             } else {
+                Hbar2_["uvxy"] = B["gux"] * B["gvy"];
+                DT2_["ijab"] = 2.0 * T2_["ijab"] - T2_["ijba"];
                 auto Va = ambit::BlockedTensor::build(tensor_type_, "Va", {"aaaa"});
                 H1_T2_C2(C1_, T2_, 0.5, Va);
                 V_T2_C2_DF(B, T2_, DT2_, 1.0, Va);

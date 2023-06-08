@@ -411,6 +411,8 @@ PYBIND11_MODULE(_forte, m) {
              "Set the pointer of ActiveSpaceSolver")
         .def("set_state_weights_map", &SA_MRPT2::set_state_weights_map,
              "Set the map from state to the weights of all computed roots")
+        .def("set_read_cwd_amps", &SADSRG::set_read_amps_cwd,
+             "Set if reading amplitudes in the current directory or not")
         .def("clean_checkpoints", &SA_MRPT2::clean_checkpoints,
              "Delete amplitudes checkpoint files")
         .def("R_brueckner", &SA_MRPT2::R_brueckner, "Unitary rotation due to A1")
