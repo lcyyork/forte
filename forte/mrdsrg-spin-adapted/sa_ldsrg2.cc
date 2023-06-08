@@ -75,6 +75,7 @@ double SA_MRDSRG::compute_energy_ldsrg2() {
     // iteration variables
     double Ecorr = 0.0;
     bool converged = false;
+    bool err_amps = false;
 
     setup_ldsrg2_tensors();
 
@@ -138,17 +139,13 @@ double SA_MRDSRG::compute_energy_ldsrg2() {
 
         // test convergence
         double rms = T1rms_ > T2rms_ ? T1rms_ : T2rms_;
-        if (std::fabs(Edelta) < e_conv_ && rms < r_conv_) {
-            converged = true;
-            break;
-        }
-
-        if (cycle == maxiter_) {
-            outfile->Printf("\n\n    The computation does not converge in %d iterations!\n",
-                            maxiter_);
-        }
-        if (cycle > 5 and std::fabs(rms) > 10.0) {
-            outfile->Printf("\n\n    Large RMS for amplitudes. Likely no convergence. Quitting.\n");
+        err_amps = (cycle > 5 and std::fabs(rms) > 10.0);
+        converged = std::fabs(Edelta) < e_conv_ && rms < r_conv_;
+        if (converged or err_amps or cycle == maxiter_) {
+            if (err_amps) {
+                outfile->Printf(
+                    "\n\n    Large RMS for amplitudes. Likely no convergence. Quitting.\n");
+            }
             break;
         }
     }
@@ -178,8 +175,11 @@ double SA_MRDSRG::compute_energy_ldsrg2() {
 
     // fail to converge
     if (!converged) {
-        clean_checkpoints(); // clean amplitudes in scratch directory
-        throw psi::PSIEXCEPTION("The MR-LDSRG(2) computation does not converge.");
+        outfile->Printf("\n\n    MR-LDSRG(2) did not converge in %d iterations!\n", maxiter_);
+        if (die_if_not_converged_ or err_amps) {
+            clean_checkpoints(); // clean amplitudes in scratch directory
+            throw psi::PSIEXCEPTION("The MR-LDSRG(2) computation does not converge.");
+        }
     }
     final.stop();
 
