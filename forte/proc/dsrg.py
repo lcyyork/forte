@@ -546,12 +546,12 @@ class ProcedureDSRG:
         U.identity()
 
         # DIIS info
-        b_diis_start = 2
+        b_diis_start = 1
         b_diis_freq = 1
-        b_diis_max_vecs = 6
+        b_diis_max_vecs = 8
         diis = DIIS(b_diis_max_vecs)
 
-        e_dsrg = 0.0
+        e_dsrg = [0.0]
         converged = False
 
         for i in range(1, self.brueckner_maxiter + 1):
@@ -559,9 +559,9 @@ class ProcedureDSRG:
             self.make_dsrg_solver()
             self.dsrg_setup()
             self.dsrg_solver.set_die_if_not_converged(False)
-            self.dsrg_solver.set_maxiter(8)
+            self.dsrg_solver.set_maxiter(1)
             self.dsrg_solver.set_print(0 if i != 1 else 1)
-            e_dsrg = self.dsrg_solver.compute_energy()
+            e_dsrg.append(self.dsrg_solver.compute_energy())
 
             # rotate integrals
             Ustep = self.dsrg_solver.R_brueckner()
@@ -571,19 +571,22 @@ class ProcedureDSRG:
             dR.scale(-1.0)
             dR.add(R)
 
+            dE = e_dsrg[-1] - e_dsrg[-2]
             dR_rms = dR.rms()
             dR_max = dR.absmax()
-            psi4.core.print_out("\n\n  ==> Brueckner MRDSRG <==\n")
-            psi4.core.print_out(f"\n    Iter. {i:2d}: orbital RMS = {dR_rms:12.6E}, MAX = {dR_max:12.6E}")
+            psi4.core.print_out(f"\n\n  ==> Brueckner MRDSRG Iter. {i} <==\n")
+            psi4.core.print_out(f"\n           Energy              dE         Orb. RMS     Orb. Max")
+            psi4.core.print_out(f"\n    -------------------- -------------- ------------ ------------")
+            psi4.core.print_out(f"\n    {e_dsrg[-1]:20.12f} {dE:14.6E} {dR_rms:12.6E} {dR_max:12.6E}")
 
-            if dR_rms < self.brueckner_convergence:
+            if dR_rms < self.brueckner_convergence and dE < self.e_convergence:
                 psi4.core.print_out("\n  DSRG orbital update converged.")
                 converged = True
                 break
 
             if (i >= b_diis_start):
                 diis.add(R, dR)
-                psi4.core.print_out("  DIIS S")
+                psi4.core.print_out("  DIIS")
                 if not (i % b_diis_freq and (i - b_diis_start) > 1):
                     R = diis.extrapolate()
                     psi4.core.print_out("/E")
@@ -615,12 +618,10 @@ class ProcedureDSRG:
             if self.do_semicanonical:
                 self.semi.semicanonicalize(self.rdms)
 
-            # if self.dsrg_solver.is_brueckner_converged():
-            #     psi4.core.print_out("\n  DSRG orbital update converged.")
-            #     converged = True
-            #     break
+        with open('dsrg_brueckner.json', 'w') as f:
+            json.dump(e_dsrg, f, indent=4)
 
         if not converged:
-            raise psi4.p4util.PsiException(f"DSRG orbital update did not converge in {self.brueckner_maxiter} cycles!")
+            raise psi4.p4util.PsiException(f"DSRG Brueckner orbitals did not converge in {self.brueckner_maxiter} cycles!")
 
-        return e_dsrg
+        return e_dsrg[-1]
