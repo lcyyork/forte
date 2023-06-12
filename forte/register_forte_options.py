@@ -834,6 +834,11 @@ def register_dsrg_options(options):
     options.add_int("BRUECKNER_MAXITER", 40,
                     "The max number of iterations for Brueckner orbital update")
 
+    options.add_int("BRUECKNER_DIIS_START", 15,
+                    "The number of iteration for Brueckner orbital update to start DIIS")
+
+    options.add_str("BRUECKNER_UPDATE", "T1", ["T1", "HBAR1"], "Brueckner orbital update method")
+
 
 def register_dwms_options(options):
     options.set_group("DWMS")

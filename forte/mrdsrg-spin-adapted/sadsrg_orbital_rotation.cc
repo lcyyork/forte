@@ -41,7 +41,7 @@ using namespace psi;
 
 namespace forte {
 
-psi::SharedMatrix SADSRG::expA1(ambit::BlockedTensor T1, bool with_symmetry) {
+std::shared_ptr<psi::Matrix> SADSRG::expA1(ambit::BlockedTensor T1, bool with_symmetry) {
     // A1 = T1 - T1^+
     auto A1 = ambit::BlockedTensor::build(tensor_type_, "A1", od_one_labels());
     A1["ia"] = T1["ia"];
@@ -63,10 +63,45 @@ psi::SharedMatrix SADSRG::expA1(ambit::BlockedTensor T1, bool with_symmetry) {
 
     A1m->expm(3); // >=3 is required for high energy convergence
 
-    psi::SharedMatrix U;
+    auto U = std::make_shared<psi::Matrix>("exp(A1) Sym", dim_corr, dim_corr);;
     if (with_symmetry) {
-        U = A1m;
-        U->set_name("exp(A1) Sym");
+        // MOM
+        auto nirrep = mo_space_info_->nirrep();
+        auto dim_core = mo_space_info_->dimension("RESTRICTED_DOCC");
+        auto dim_actv = mo_space_info_->dimension("ACTIVE");
+        auto dim_virt = mo_space_info_->dimension("RESTRICTED_UOCC");
+
+        for (int h = 0; h < nirrep; ++h) {
+            int c = 0, a = 0, v = 0;
+            for (int j = 0; j < dim_corr[h]; ++j) {
+                double vc = 0.0;
+                for (int i = 0; i < dim_core[h]; ++i) {
+                    vc += A1m->get(h, j, i);
+                }
+
+                double va = 0.0;
+                for (int i = 0; i < dim_actv[h]; ++i) {
+                    va += A1m->get(h, j, i + dim_core[h]);
+                }
+
+                double vv = 0.0;
+                for (int i = 0; i < dim_virt[h]; ++i) {
+                    vv += A1m->get(h, j, i + dim_core[h] + dim_actv[h]);
+                }
+
+                double m = std::max({std::fabs(vc), std::fabs(va), std::fabs(vv)});
+                if (m == std::fabs(vc)) {
+                    U->set_row(h, c, A1m->get_row(h, j));
+                    c++;
+                } else if (m == std::fabs(va)) {
+                    U->set_row(h, a + dim_core[h], A1m->get_row(h, j));
+                    a++;
+                } else {
+                    U->set_row(h, v + dim_core[h] + dim_actv[h], A1m->get_row(h, j));
+                    v++;
+                }
+            }
+        }
     } else {
         auto nirrep = mo_space_info_->nirrep();
         size_t ncmo = core_mos_.size() + actv_mos_.size() + virt_mos_.size();
@@ -85,13 +120,84 @@ psi::SharedMatrix SADSRG::expA1(ambit::BlockedTensor T1, bool with_symmetry) {
     return U;
 }
 
+std::shared_ptr<psi::Matrix> SADSRG::diagonalize_H1(ambit::BlockedTensor H1) {
+    auto rel_mos = mo_space_info_->relative_mo("CORRELATED");
+    auto dim_corr = mo_space_info_->dimension("CORRELATED");
+    auto dim_frzc = mo_space_info_->dimension("FROZEN_DOCC");
+
+    auto G = std::make_shared<psi::Matrix>("G1", dim_corr, dim_corr);
+    H1.iterate([&](const std::vector<size_t>& i, const std::vector<SpinType>&, double& value) {
+        auto [h0, i0] = rel_mos[i[0]];
+        auto [h1, i1] = rel_mos[i[1]];
+        if (h0 == h1) {
+            G->set(h0, i0 - dim_frzc[h0], i1 - dim_frzc[h1], value);
+        }
+    });
+
+    auto evals = std::make_shared<psi::Vector>("G evals", dim_corr);
+    auto evecs = std::make_shared<psi::Matrix>("G evecs", dim_corr, dim_corr);
+    G->diagonalize(evecs, evals);
+    evecs->eivprint(evals);
+
+    // MOM
+    auto nirrep = mo_space_info_->nirrep();
+    auto dim_core = mo_space_info_->dimension("RESTRICTED_DOCC");
+    auto dim_actv = mo_space_info_->dimension("ACTIVE");
+    auto dim_virt = mo_space_info_->dimension("RESTRICTED_UOCC");
+
+    auto U = std::make_shared<psi::Matrix>("U", dim_corr, dim_corr);
+
+    for (int h = 0; h < nirrep; ++h) {
+        int c = 0, a = 0, v = 0;
+        for (int j = 0; j < dim_corr[h]; ++j) {
+            double vc = 0.0;
+            for (int i = 0; i < dim_core[h]; ++i) {
+                vc += evecs->get(h, i, j);
+            }
+
+            double va = 0.0;
+            for (int i = 0; i < dim_actv[h]; ++i) {
+                va += evecs->get(h, i + dim_core[h], j);
+            }
+
+            double vv = 0.0;
+            for (int i = 0; i < dim_virt[h]; ++i) {
+                vv += evecs->get(h, i + dim_core[h] + dim_actv[h], j);
+            }
+
+            outfile->Printf("\n  h = %d, j = %2d, vc = %.6f, va = %.6f, vv = %.6f", h, j, vc, va,
+                            vv);
+
+            double m = std::max({std::fabs(vc), std::fabs(va), std::fabs(vv)});
+            if (m == std::fabs(vc)) {
+                U->set_column(h, c, evecs->get_column(h, j));
+                c++;
+            } else if (m == std::fabs(va)) {
+                U->set_column(h, a + dim_core[h], evecs->get_column(h, j));
+                a++;
+            } else {
+                U->set_column(h, v + dim_core[h] + dim_actv[h], evecs->get_column(h, j));
+                v++;
+            }
+        }
+    }
+    U->print();
+
+    return U;
+}
+
 std::shared_ptr<psi::Matrix> SADSRG::R_brueckner() {
     auto nirrep = mo_space_info_->nirrep();
     auto dim_corr = mo_space_info_->dimension("CORRELATED");
     auto dim_frzc = mo_space_info_->dimension("FROZEN_DOCC");
 
     // build unitary rotation matrix: exp(T1 - T1^+)
-    auto A1m = expA1(T1_, true);
+    std::shared_ptr<psi::Matrix> A1m;
+    if (foptions_->get_str("BRUECKNER_UPDATE") == "T1") {
+        A1m = expA1(T1_, true);
+    } else {
+        A1m = diagonalize_H1(Hbar1_);
+    }
 
     // include frozen orbitals for U
     auto dim_all = mo_space_info_->dimension("ALL");

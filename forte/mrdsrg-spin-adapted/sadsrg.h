@@ -502,7 +502,10 @@ class SADSRG : public DynamicCorrelationSolver {
     /// Compute the exponential of exp(T1 - T1^+) and return a Psi4 SharedMatrix
     /// @param T1 the T1 matrix
     /// @param with_symmetry if in blocked form for the returned SharedMatrix
-    psi::SharedMatrix expA1(ambit::BlockedTensor T1, bool with_symmetry);
+    std::shared_ptr<psi::Matrix> expA1(ambit::BlockedTensor T1, bool with_symmetry);
+
+    /// Diagonalize Hbar1 and return the unitary matrix in Psi4 SharedMatrix form
+    std::shared_ptr<psi::Matrix> diagonalize_H1(ambit::BlockedTensor H1);
 
     // ==> common amplitudes analysis and printing <==
 

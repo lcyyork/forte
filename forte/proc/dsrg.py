@@ -97,6 +97,7 @@ class ProcedureDSRG:
         self.do_brueckner = options.get_bool("DSRG_BRUECKNER")
         self.brueckner_maxiter = options.get_int("BRUECKNER_MAXITER")
         self.brueckner_convergence = options.get_double("BRUECKNER_CONVERGENCE")
+        self.brueckner_diis_start = options.get_int("BRUECKNER_DIIS_START")
 
         # Filter out some ms-dsrg algorithms
         ms_dsrg_algorithm = options.get_str("DSRG_MULTI_STATE")
@@ -541,12 +542,13 @@ class ProcedureDSRG:
 
         # initial MO coefficients
         C0 = self.ints.Ca().clone()
+        # C = self.ints.Ca().clone()
         dR = psi4.core.Matrix("R", C0.coldim(), C0.coldim())
         U = psi4.core.Matrix("U", C0.coldim(), C0.coldim())
         U.identity()
 
         # DIIS info
-        b_diis_start = 1
+        b_diis_start = self.brueckner_diis_start
         b_diis_freq = 1
         b_diis_max_vecs = 8
         diis = DIIS(b_diis_max_vecs)
@@ -559,7 +561,7 @@ class ProcedureDSRG:
             self.make_dsrg_solver()
             self.dsrg_setup()
             self.dsrg_solver.set_die_if_not_converged(False)
-            self.dsrg_solver.set_maxiter(1)
+            # self.dsrg_solver.set_maxiter(1)
             self.dsrg_solver.set_print(0 if i != 1 else 1)
             e_dsrg.append(self.dsrg_solver.compute_energy())
 
@@ -570,6 +572,9 @@ class ProcedureDSRG:
             R = psi4.core.Matrix.from_array(R)
             dR.scale(-1.0)
             dR.add(R)
+            # R = Ustep.clone()
+            # dR.identity()
+            # dR.subtract(Ustep)
 
             dE = e_dsrg[-1] - e_dsrg[-2]
             dR_rms = dR.rms()
@@ -597,8 +602,10 @@ class ProcedureDSRG:
                 Ru = np.triu(R.nph[h], 1)
                 U.append(expm(Ru - Ru.T))
             U = psi4.core.Matrix.from_array(U)
-            self.ints.fix_orbital_phases(U, True, True);
+            self.ints.fix_orbital_phases(U.transpose(), True, True);
             C = psi4.core.doublet(C0, U, False, True)
+            # U = Ustep.clone()
+            # C = psi4.core.doublet(C, U, False, True)
             self.ints.update_orbitals(C, C, True)
 
             self.dsrg_solver = None
