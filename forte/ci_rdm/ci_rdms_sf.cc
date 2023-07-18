@@ -82,7 +82,7 @@ void CI_RDMS::compute_1rdm_sf(std::vector<double>& opdm) {
 }
 
 void CI_RDMS::compute_1rdm_sf_op(std::vector<double>& opdm) {
-    auto op = std::make_shared<DeterminantSubstitutionLists>(fci_ints_);
+    auto op = std::make_shared<DeterminantSubstitutionLists>(mo_symmetry_);
     op->set_quiet_mode(not print_);
     op->build_strings(wfn_);
     op->op_s_lists(wfn_);
@@ -229,7 +229,7 @@ void CI_RDMS::compute_2rdm_sf(std::vector<double>& tpdm) {
 }
 
 void CI_RDMS::compute_2rdm_sf_op(std::vector<double>& tpdm) {
-    auto op = std::make_shared<DeterminantSubstitutionLists>(fci_ints_);
+    auto op = std::make_shared<DeterminantSubstitutionLists>(mo_symmetry_);
     op->set_quiet_mode(not print_);
     op->build_strings(wfn_);
     op->tp_s_lists(wfn_);
@@ -574,7 +574,7 @@ void CI_RDMS::compute_3rdm_sf(std::vector<double>& tpdm3) {
 }
 
 void CI_RDMS::compute_3rdm_sf_op(std::vector<double>& tpdm3) {
-    auto op = std::make_shared<DeterminantSubstitutionLists>(fci_ints_);
+    auto op = std::make_shared<DeterminantSubstitutionLists>(mo_symmetry_);
     op->set_quiet_mode(not print_);
     op->build_strings(wfn_);
     op->three_s_lists(wfn_);
@@ -1175,8 +1175,8 @@ void CI_RDMS::compute_rdms_dynamic_sf(std::vector<double>& rdm1, std::vector<dou
     rdm1.assign(norb2_, 0.0);
     rdm2.assign(norb4_, 0.0);
 
-    SortedStringList a_sorted_string_list_(wfn_, fci_ints_, DetSpinType::Alpha);
-    SortedStringList b_sorted_string_list_(wfn_, fci_ints_, DetSpinType::Beta);
+    SortedStringList a_sorted_string_list_(norb_, wfn_, DetSpinType::Alpha);
+    SortedStringList b_sorted_string_list_(norb_, wfn_, DetSpinType::Beta);
     const std::vector<String>& sorted_bstr = b_sorted_string_list_.sorted_half_dets();
     size_t num_bstr = sorted_bstr.size();
     const auto& sorted_b_dets = b_sorted_string_list_.sorted_dets();
@@ -1474,8 +1474,8 @@ void CI_RDMS::compute_rdms_dynamic_sf(std::vector<double>& rdm1, std::vector<dou
     rdm2.assign(norb4_, 0.0);
     rdm3.assign(norb6_, 0.0);
 
-    SortedStringList a_sorted_string_list_(wfn_, fci_ints_, DetSpinType::Alpha);
-    SortedStringList b_sorted_string_list_(wfn_, fci_ints_, DetSpinType::Beta);
+    SortedStringList a_sorted_string_list_(norb_, wfn_, DetSpinType::Alpha);
+    SortedStringList b_sorted_string_list_(norb_, wfn_, DetSpinType::Beta);
     const std::vector<String>& sorted_bstr = b_sorted_string_list_.sorted_half_dets();
     size_t num_bstr = sorted_bstr.size();
     const auto& sorted_b_dets = b_sorted_string_list_.sorted_dets();
