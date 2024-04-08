@@ -103,6 +103,9 @@ class ActiveSpaceSolver {
     /// Compute the oscillator strengths assuming same orbitals
     void compute_fosc_same_orbs(std::shared_ptr<ActiveMultipoleIntegrals> ampints);
 
+    /// Compute the angular momentum
+    void compute_angular_momentum();
+
     /// Compute the contracted CI energy
     const std::map<StateInfo, std::vector<double>>&
     compute_contracted_energy(std::shared_ptr<forte::ActiveSpaceIntegrals> as_ints,

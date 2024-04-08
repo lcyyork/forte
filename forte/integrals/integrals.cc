@@ -546,6 +546,11 @@ std::vector<std::shared_ptr<psi::Matrix>> ForteIntegrals::mo_quadrupole_ints() c
     return std::vector<std::shared_ptr<psi::Matrix>>();
 }
 
+std::vector<std::shared_ptr<psi::Matrix>> ForteIntegrals::mo_angular_momentum_ints() const {
+    _undefined_function("mo_angular_momentum_ints");
+    return std::vector<std::shared_ptr<psi::Matrix>>();
+}
+
 void ForteIntegrals::_undefined_function(const std::string& method) const {
     outfile->Printf("\n  ForteIntegrals::" + method + "not supported for integral type " +
                     std::to_string(integral_type()));

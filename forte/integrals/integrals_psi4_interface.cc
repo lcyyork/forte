@@ -445,6 +445,26 @@ std::vector<std::shared_ptr<psi::Matrix>> Psi4Integrals::mo_quadrupole_ints() co
     return quadrupole_ints;
 }
 
+std::vector<std::shared_ptr<psi::Matrix>> Psi4Integrals::mo_angular_momentum_ints() const {
+    std::shared_ptr<psi::BasisSet> basisset = wfn_->basisset();
+    std::shared_ptr<IntegralFactory> ints_fac = std::make_shared<IntegralFactory>(basisset);
+    int nbf = basisset->nbf();
+
+    std::vector<SharedMatrix> angmom(3);
+    angmom[0] = std::make_shared<Matrix>("MO Lx", nbf, nbf);
+    angmom[1] = std::make_shared<Matrix>("MO Ly", nbf, nbf);
+    angmom[2] = std::make_shared<Matrix>("MO Lz", nbf, nbf);
+
+    std::shared_ptr<OneBodyAOInt> ints(ints_fac->ao_angular_momentum());
+    ints->compute(angmom);
+
+    auto Cao = Ca_AO();
+    for (int i = 0; i < 3; ++i) {
+        angmom[i]->transform(Cao);
+    }
+    return angmom;
+}
+
 void Psi4Integrals::make_fock_matrix(ambit::Tensor gamma_a, ambit::Tensor gamma_b) {
     // build inactive Fock
     auto rdoccpi = mo_space_info_->dimension("INACTIVE_DOCC");

@@ -167,6 +167,7 @@ const std::map<StateInfo, std::vector<double>>& ActiveSpaceSolver::compute_energ
         if (options_->get_bool("TRANSITION_DIPOLES")) {
             compute_fosc_same_orbs(as_mp_ints_);
         }
+        compute_angular_momentum();
     }
 
     return state_energies_map_;
@@ -231,6 +232,81 @@ void ActiveSpaceSolver::print_energies() {
             }
         }
         psi::outfile->Printf("\n    %s", dash.c_str());
+    }
+}
+
+void ActiveSpaceSolver::compute_angular_momentum() {
+    auto nmo = mo_space_info_->size("ALL");
+    auto docc_mos = mo_space_info_->absolute_mo("INACTIVE_DOCC");
+    auto actv_mos = mo_space_info_->absolute_mo("ACTIVE");
+
+    // compute 1-RDMs
+    psi::outfile->Printf("\n  Computing RDMs for angular momentum ...");
+    std::map<StateInfo, std::vector<std::shared_ptr<RDMs>>> state_rdms_map;
+    for (const auto& state_nroots : state_nroots_map_) {
+        const auto& [state, nroots] = state_nroots;
+        const auto& method = state_method_map_[state];
+
+        std::vector<std::pair<size_t, size_t>> root_list;
+        for (size_t i = 0; i < nroots; ++i)
+            root_list.emplace_back(i, i);
+
+        method->set_print(PrintLevel::Quiet);
+        state_rdms_map[state] = method->rdms(root_list, 1, RDMsType::spin_free);
+        method->set_print(print_);
+    }
+    psi::outfile->Printf(" Done");
+
+    // compute angular momemtum integrals
+    auto angmom = as_ints_->ints()->mo_angular_momentum_ints();
+
+    // L2 integrals
+    std::vector<std::shared_ptr<psi::Matrix>> angmom2(3);
+    for (int i = 0; i < 3; ++i) {
+        angmom2[i] = psi::linalg::doublet(angmom[i], angmom[i], false, false);
+        angmom2[i]->scale(-0.5);
+    }
+
+    psi::outfile->Printf("\n  Lx Lx^2 Ly Ly^2 Lz Lz^2 L^2");
+    for (const auto& state_nroot : state_nroots_map_) {
+        const auto& [state, nroots] = state_nroot;
+        auto irrep_label = state.irrep_label();
+        auto multi_label = upper_string(state.multiplicity_label());
+
+        for (size_t i = 0; i < nroots; ++i) {
+            std::string name = std::to_string(i) + upper_string(irrep_label);
+
+            auto d1 = state_rdms_map[state][i]->SF_G1mat();
+            auto D1 = std::make_shared<psi::Matrix>("D1", nmo, nmo);
+            // for (auto i : docc_mos) {
+            //     D1->set(i, i, 2.0);
+            // }
+            for (int u = 0, nactv = actv_mos.size(); u < nactv; ++u) {
+                auto nu = actv_mos[u];
+                for (int v = 0; v < nactv; ++v) {
+                    auto nv = actv_mos[v];
+                    D1->set(nu, nv, d1->get(u, v));
+                }
+            }
+            // D1->print();
+
+            for (int z = 0; z < 3; ++z) {
+                auto L = angmom[z]->vector_dot(D1);
+                auto L2 = angmom2[z]->vector_dot(D1);
+                // angmom2[z]->print();
+                psi::outfile->Printf("  %10.6f %10.6f", L, L2);
+            }
+
+            // auto dipole = ampints->compute_electronic_dipole(state_rdms_map[state][i]);
+            // dipole->add(*dipole_nuc);
+
+            // auto dx = dipole->get(0);
+            // auto dy = dipole->get(1);
+            // auto dz = dipole->get(2);
+            // auto dm = dipole->norm();
+            // psi::outfile->Printf("\n    %8s%15.8f%15.8f%15.8f%15.8f", name.c_str(), dx, dy, dz, dm);
+        }
+        // psi::outfile->Printf("\n    %s", dash.c_str());
     }
 }
 

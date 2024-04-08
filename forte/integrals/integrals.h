@@ -409,6 +409,11 @@ class ForteIntegrals {
     ///         each of which is a nmo x nmo std::shared_ptr<psi::Matrix> in Pitzer order
     virtual std::vector<std::shared_ptr<psi::Matrix>> mo_quadrupole_ints() const;
 
+    /// Compute MO angular momentum integrals (frozen orbitals included)
+    /// @return a vector of MO angular momentum ints in X, Y, Z order,
+    ///         each of which is a nmo x nmo std::shared_ptr<psi::Matrix> in Pitzer order
+    virtual std::vector<std::shared_ptr<psi::Matrix>> mo_angular_momentum_ints() const;
+
   protected:
     // ==> Class data <==
 
@@ -617,6 +622,9 @@ class Psi4Integrals : public ForteIntegrals {
 
     /// Build and return MO quadrupole integrals (XX, XY, XZ, YY, YZ, ZZ) in Pitzer order
     std::vector<std::shared_ptr<psi::Matrix>> mo_quadrupole_ints() const override;
+
+    /// Build and return MO angular momentum integrals in Pitzer order
+    std::vector<std::shared_ptr<psi::Matrix>> mo_angular_momentum_ints() const override;
 
   private:
     void base_initialize_psi4();
