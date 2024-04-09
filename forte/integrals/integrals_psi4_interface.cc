@@ -462,6 +462,39 @@ std::vector<std::shared_ptr<psi::Matrix>> Psi4Integrals::mo_angular_momentum_int
     for (int i = 0; i < 3; ++i) {
         angmom[i]->transform(Cao);
     }
+
+    // diagonalize Lz
+    auto dim_mo = angmom[2]->colspi();
+    auto evecs = std::make_shared<psi::Matrix>("Lz evecs", dim_mo, dim_mo);
+    auto evals = std::make_shared<psi::Vector>("Lz evals", dim_mo);
+    angmom[2]->diagonalize(evecs, evals);
+    evecs->eivprint(evals);
+
+    // rotate to Lz eigen basis
+    auto Cao_new = psi::linalg::doublet(Cao, evecs, false, false);
+    Cao_new->print();
+
+    // to SO basis
+    auto aotoso = wfn_->aotoso();
+    auto Ca_new = std::make_shared<psi::Matrix>("Ca_SO", nsopi_, nmopi_);
+
+    for (int h = 0, index = 0; h < nirrep_; ++h) {
+        auto nao = nso_;
+        auto nso = nsopi_[h];
+        if (nso == 0)
+            continue;
+
+        for (int i = 0, nmo_this = nmopi_[h]; i < nmo_this; ++i) {
+            C_DGEMV('T', nao, nso, 1.0, aotoso->pointer(h)[0], nso, &Cao_new->pointer()[0][index++],
+                    nmo_, 0.0, &Ca_new->pointer(h)[0][i], nmo_this);
+            // C_DGEMV('N', nao, nso, 1.0, aotoso->pointer(h)[0], nso, &Ca_->pointer(h)[0][i],
+            //         nmo_this, 0.0, &Ca_ao->pointer()[0][index++], nmo_);
+            //void C_DGEMV(char trans, int m, int n, double alpha, double* a, int lda, double* x, int incx, double beta, double* y, int incy);
+        }
+    }
+    Cao->print();
+    Ca_new->print();
+
     return angmom;
 }
 

@@ -260,6 +260,13 @@ void ActiveSpaceSolver::compute_angular_momentum() {
     // compute angular momemtum integrals
     auto angmom = as_ints_->ints()->mo_angular_momentum_ints();
 
+    // diagonalize Lz
+    // auto dim_mo = angmom[2]->colspi();
+    // auto evecs = std::make_shared<psi::Matrix>("Lz evecs", dim_mo, dim_mo);
+    // auto evals = std::make_shared<psi::Vector>("Lz evals", dim_mo);
+    // angmom[2]->diagonalize(evecs, evals);
+    // evecs->eivprint(evals);
+
     // L2 integrals
     std::vector<std::shared_ptr<psi::Matrix>> angmom2(3);
     for (int i = 0; i < 3; ++i) {
