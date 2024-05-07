@@ -921,6 +921,7 @@ def register_dsrg_options(options):
     options.add_bool("SAVE_SA_DSRG_INTS", False, "Save SA-DSRG dressed integrals to dsrg_ints.json")
 
     options.add_int("UCC_EX_LEVEL", 2, "UCC excitation level")
+    options.add_int_list("UCC_NROOTS_PER_IRREP", "Number of roots per irrep for EOM-UCC")
 
 
 def register_dwms_options(options):

@@ -3,6 +3,8 @@
 #include <string>
 
 #include "psi4/libmints/dimension.h"
+#include "psi4/libmints/vector.h"
+#include "psi4/libmints/matrix.h"
 
 #include "helpers/string_algorithms.h"
 
@@ -41,6 +43,8 @@ class SparseUCC {
     double r_convergence_;
     double screen_thresh_ = 1.0e-15;
 
+    double energy_;
+
     std::vector<size_t> rdocc_mos_;
     std::vector<size_t> ruocc_mos_;
 
@@ -76,5 +80,14 @@ class SparseUCC {
     std::vector<std::vector<excitation_operator>> excitation_operators_;
 
     void build_cluster_operators();
+
+    std::vector<int> nroots_per_irrep_;
+
+    std::vector<std::shared_ptr<psi::Matrix>> HbarIJ_per_irrep_;
+    std::vector<std::shared_ptr<psi::Matrix>> S2IJ_per_irrep_;
+    std::vector<std::shared_ptr<psi::Matrix>> evecs_per_irrep_;
+    std::vector<std::shared_ptr<psi::Vector>> evals_per_irrep_;
+
+    void build_HbarIJ();
 };
 } // namespace forte
