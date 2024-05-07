@@ -64,6 +64,7 @@
 #include "integrals/one_body_integrals.h"
 #include "sci/tdci.h"
 #include "genci/ci_occupation.h"
+#include "sparse_ci/sparse_ucc/ucc.h"
 
 #include "post_process/spin_corr.h"
 
@@ -429,6 +430,12 @@ PYBIND11_MODULE(_forte, m) {
     py::class_<DressedQuantity>(m, "DressedQuantity")
         .def("contract_with_rdms", &DressedQuantity::contract_with_rdms, "reference"_a,
              "Contract densities with quantity");
+
+    py::class_<SparseUCC, std::shared_ptr<SparseUCC>>(m, "SparseUCC", "UCC using sparse operators")
+        .def(py::init<std::shared_ptr<ActiveSpaceIntegrals>, std::shared_ptr<SCFInfo>,
+                      std::shared_ptr<ForteOptions>, std::shared_ptr<MOSpaceInfo>>())
+        .def("set_excitation_level", &SparseUCC::set_excitation_level)
+        .def("compute_energy", &SparseUCC::compute_energy);
 }
 
 } // namespace forte

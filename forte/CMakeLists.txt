@@ -258,6 +258,7 @@ sparse_ci/sparse_hamiltonian.cc
 sparse_ci/sq_operator_string.cc
 sparse_ci/sq_operator_string_ops.cc
 sparse_ci/sparse_state.cc
+sparse_ci/sparse_ucc/ucc.cc
 v2rdm/v2rdm.cc
 )
 

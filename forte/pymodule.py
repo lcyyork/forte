@@ -206,6 +206,8 @@ def energy_forte(name, **kwargs):
         energy = forte_driver(data)
     elif job_type == "MR-DSRG-PT2":
         energy = mr_dsrg_pt2(job_type, data)
+    elif job_type == "SR-UCC":
+        energy = sr_ucc(data)
 
     end = time.time()
 
@@ -318,6 +320,23 @@ def gradient_forte(name, **kwargs):
         dump_orbitals(data.psi_wfn)
 
     return data.psi_wfn
+
+
+def sr_ucc(data):
+    state_weights_map, scf_info, options, ints, mo_space_info = (
+        data.state_weights_map,
+        data.scf_info,
+        data.options,
+        data.ints,
+        data.mo_space_info,
+    )
+    data = ActiveSpaceInts(active="ACTIVE", core=["RESTRICTED_DOCC"]).run(data)
+    as_ints = data.as_ints
+
+    ucc = forte.SparseUCC(as_ints, scf_info, options, mo_space_info)
+    e0 = ucc.compute_energy()
+
+    return e0
 
 
 def mr_dsrg_pt2(job_type, data):

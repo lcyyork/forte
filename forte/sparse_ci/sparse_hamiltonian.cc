@@ -28,6 +28,9 @@
 
 #include <cmath>
 
+#include "psi4/libpsi4util/PsiOutStream.h"
+#include "psi4/libpsi4util/process.h"
+#include "forte-def.h"
 #include "sparse_ci/sparse_hamiltonian.h"
 
 namespace forte {
@@ -234,110 +237,124 @@ SparseState SparseHamiltonian::compute_on_the_fly(const SparseState& state, doub
 
     Determinant new_det;
 
-    for (const auto& det_c : state) {
-        const Determinant& det = det_c.first;
-        const double c = det_c.second;
+    auto n_threads = omp_get_max_threads();
+    auto state_nbuckets = state.bucket_count();
+    if (state_nbuckets < n_threads)
+        n_threads = state_nbuckets;
 
-        std::vector<int> aocc = det.get_alfa_occ(nmo);
-        std::vector<int> bocc = det.get_beta_occ(nmo);
-        std::vector<int> avir = det.get_alfa_vir(nmo);
-        std::vector<int> bvir = det.get_beta_vir(nmo);
+    std::vector<Determinant> new_det_t(n_threads);
+    std::vector<SparseState> sigma_t(n_threads);
 
-        size_t noalpha = aocc.size();
-        size_t nobeta = bocc.size();
-        size_t nvalpha = avir.size();
-        size_t nvbeta = bvir.size();
+#pragma omp parallel for num_threads(n_threads)
+    for (size_t nb = 0; nb < state_nbuckets; ++nb) {
+        int thread = omp_get_thread_num();
+        for (auto it = state.begin(nb); it != state.end(nb); ++it) {
+            const auto& [det, c] = *it;
 
-        double E_0 = as_ints_->nuclear_repulsion_energy() + as_ints_->scalar_energy();
+            std::vector<int> aocc = det.get_alfa_occ(nmo);
+            std::vector<int> bocc = det.get_beta_occ(nmo);
+            std::vector<int> avir = det.get_alfa_vir(nmo);
+            std::vector<int> bvir = det.get_beta_vir(nmo);
 
-        sigma[det] += (E_0 + as_ints_->slater_rules(det, det)) * c;
-        // aa singles
-        for (size_t i : aocc) {
-            for (size_t a : avir) {
-                if ((symm[i] ^ symm[a]) == 0) {
-                    double DHIJ = as_ints_->slater_rules_single_alpha(det, i, a);
-                    if (std::abs(DHIJ * c) >= screen_thresh) {
-                        new_det = det;
-                        new_det.set_alfa_bit(i, false);
-                        new_det.set_alfa_bit(a, true);
-                        sigma[new_det] += DHIJ * c;
-                    }
-                }
-            }
-        }
-        // bb singles
-        for (size_t i : bocc) {
-            for (size_t a : bvir) {
-                if ((symm[i] ^ symm[a]) == 0) {
-                    double DHIJ = as_ints_->slater_rules_single_beta(det, i, a);
-                    if (std::abs(DHIJ * c) >= screen_thresh) {
-                        new_det = det;
-                        new_det.set_beta_bit(i, false);
-                        new_det.set_beta_bit(a, true);
-                        sigma[new_det] += DHIJ * c;
-                    }
-                }
-            }
-        }
-        // Generate aa excitations
-        for (size_t ii = 0; ii < noalpha; ++ii) {
-            size_t i = aocc[ii];
-            for (size_t jj = ii + 1; jj < noalpha; ++jj) {
-                size_t j = aocc[jj];
-                for (size_t aa = 0; aa < nvalpha; ++aa) {
-                    size_t a = avir[aa];
-                    for (size_t bb = aa + 1; bb < nvalpha; ++bb) {
-                        size_t b = avir[bb];
-                        if ((symm[i] ^ symm[j] ^ symm[a] ^ symm[b]) == 0) {
-                            double DHIJ = as_ints_->tei_aa(i, j, a, b);
-                            if (std::abs(DHIJ * c) >= screen_thresh) {
-                                new_det = det;
-                                DHIJ *= new_det.double_excitation_aa(i, j, a, b);
-                                sigma[new_det] += DHIJ * c;
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        // Generate ab excitations
-        for (size_t i : aocc) {
-            for (size_t j : bocc) {
+            size_t noalpha = aocc.size();
+            size_t nobeta = bocc.size();
+            size_t nvalpha = avir.size();
+            size_t nvbeta = bvir.size();
+
+            double E_0 = as_ints_->nuclear_repulsion_energy() + as_ints_->scalar_energy();
+
+            sigma_t[thread][det] += (E_0 + as_ints_->slater_rules(det, det)) * c;
+            // aa singles
+            for (size_t i : aocc) {
                 for (size_t a : avir) {
-                    for (size_t b : bvir) {
-                        if ((symm[i] ^ symm[j] ^ symm[a] ^ symm[b]) == 0) {
-                            double DHIJ = as_ints_->tei_ab(i, j, a, b);
-                            if (std::abs(DHIJ * c) >= screen_thresh) {
-                                new_det = det;
-                                DHIJ *= new_det.double_excitation_ab(i, j, a, b);
-                                sigma[new_det] += DHIJ * c;
+                    if ((symm[i] ^ symm[a]) == 0) {
+                        double DHIJ = as_ints_->slater_rules_single_alpha(det, i, a);
+                        if (std::abs(DHIJ * c) >= screen_thresh) {
+                            new_det_t[thread] = det;
+                            new_det_t[thread].destroy_alfa_bit(i);
+                            new_det_t[thread].create_alfa_bit(a);
+                            sigma_t[thread][new_det_t[thread]] += DHIJ * c;
+                        }
+                    }
+                }
+            }
+            // bb singles
+            for (size_t i : bocc) {
+                for (size_t a : bvir) {
+                    if ((symm[i] ^ symm[a]) == 0) {
+                        double DHIJ = as_ints_->slater_rules_single_beta(det, i, a);
+                        if (std::abs(DHIJ * c) >= screen_thresh) {
+                            new_det_t[thread] = det;
+                            new_det_t[thread].destroy_beta_bit(i);
+                            new_det_t[thread].create_beta_bit(a);
+                            sigma_t[thread][new_det_t[thread]] += DHIJ * c;
+                        }
+                    }
+                }
+            }
+            // Generate aa excitations
+            for (size_t ii = 0; ii < noalpha; ++ii) {
+                size_t i = aocc[ii];
+                for (size_t jj = ii + 1; jj < noalpha; ++jj) {
+                    size_t j = aocc[jj];
+                    for (size_t aa = 0; aa < nvalpha; ++aa) {
+                        size_t a = avir[aa];
+                        for (size_t bb = aa + 1; bb < nvalpha; ++bb) {
+                            size_t b = avir[bb];
+                            if ((symm[i] ^ symm[j] ^ symm[a] ^ symm[b]) == 0) {
+                                double DHIJ = as_ints_->tei_aa(i, j, a, b);
+                                if (std::abs(DHIJ * c) >= screen_thresh) {
+                                    new_det_t[thread] = det;
+                                    DHIJ *= new_det_t[thread].double_excitation_aa(i, j, a, b);
+                                    sigma_t[thread][new_det_t[thread]] += DHIJ * c;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            // Generate ab excitations
+            for (size_t i : aocc) {
+                for (size_t j : bocc) {
+                    for (size_t a : avir) {
+                        for (size_t b : bvir) {
+                            if ((symm[i] ^ symm[j] ^ symm[a] ^ symm[b]) == 0) {
+                                double DHIJ = as_ints_->tei_ab(i, j, a, b);
+                                if (std::abs(DHIJ * c) >= screen_thresh) {
+                                    new_det_t[thread] = det;
+                                    DHIJ *= new_det_t[thread].double_excitation_ab(i, j, a, b);
+                                    sigma_t[thread][new_det_t[thread]] += DHIJ * c;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            // Generate bb excitations
+            for (size_t ii = 0; ii < nobeta; ++ii) {
+                size_t i = bocc[ii];
+                for (size_t jj = ii + 1; jj < nobeta; ++jj) {
+                    size_t j = bocc[jj];
+                    for (size_t aa = 0; aa < nvbeta; ++aa) {
+                        size_t a = bvir[aa];
+                        for (size_t bb = aa + 1; bb < nvbeta; ++bb) {
+                            size_t b = bvir[bb];
+                            if ((symm[i] ^ symm[j] ^ symm[a] ^ symm[b]) == 0) {
+                                double DHIJ = as_ints_->tei_bb(i, j, a, b);
+                                if (std::abs(DHIJ * c) >= screen_thresh) {
+                                    new_det_t[thread] = det;
+                                    DHIJ *= new_det_t[thread].double_excitation_bb(i, j, a, b);
+                                    sigma_t[thread][new_det_t[thread]] += DHIJ * c;
+                                }
                             }
                         }
                     }
                 }
             }
         }
-        // Generate bb excitations
-        for (size_t ii = 0; ii < nobeta; ++ii) {
-            size_t i = bocc[ii];
-            for (size_t jj = ii + 1; jj < nobeta; ++jj) {
-                size_t j = bocc[jj];
-                for (size_t aa = 0; aa < nvbeta; ++aa) {
-                    size_t a = bvir[aa];
-                    for (size_t bb = aa + 1; bb < nvbeta; ++bb) {
-                        size_t b = bvir[bb];
-                        if ((symm[i] ^ symm[j] ^ symm[a] ^ symm[b]) == 0) {
-                            double DHIJ = as_ints_->tei_bb(i, j, a, b);
-                            if (std::abs(DHIJ * c) >= screen_thresh) {
-                                new_det = det;
-                                DHIJ *= new_det.double_excitation_bb(i, j, a, b);
-                                sigma[new_det] += DHIJ * c;
-                            }
-                        }
-                    }
-                }
-            }
-        }
+    }
+    for (int i = 0; i < n_threads; ++i) {
+        sigma += sigma_t[i];
     }
     timings_["total"] += t.get();
     timings_["on_the_fly"] += t.get();

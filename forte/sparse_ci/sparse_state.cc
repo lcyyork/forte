@@ -30,6 +30,7 @@
 #include <cmath>
 #include <numeric>
 
+#include "forte-def.h"
 #include "helpers/helpers.h"
 #include "helpers/timer.h"
 #include "helpers/string_algorithms.h"
@@ -98,10 +99,19 @@ SparseState apply_operator_impl(bool is_antihermitian, const SparseOperator& sop
                   return std::abs(a.first) > std::abs(b.first);
               });
 
-    SparseState new_terms;
-    Determinant new_det;
+    auto n_threads = omp_get_max_threads();
+    if (op_sorted.size() < n_threads)
+        n_threads = op_sorted.size();
 
-    for (const auto& [t, sqop] : op_sorted) {
+    std::vector<SparseState> new_terms_t(n_threads);
+    std::vector<Determinant> new_dets_t(n_threads);
+
+    size_t op_size = op_sorted.size();
+
+#pragma omp parallel for num_threads(n_threads)
+    for (size_t i = 0; i < op_size; ++i) {
+        int thread = omp_get_thread_num();
+        const auto& [t, sqop] = op_sorted[i];
         // mask for screening determinants according to the uncontracted creation operators
         const Determinant ucre = sqop.cre() - sqop.ann();
         const Determinant sign_mask = compute_sign_mask(sqop.cre(), sqop.ann());
@@ -113,16 +123,46 @@ SparseState apply_operator_impl(bool is_antihermitian, const SparseOperator& sop
         for (auto it = state_sorted.begin(); it != last; ++it) {
             const auto& [c, det] = *it;
             if (det.fast_can_apply_operator(sqop.ann(), ucre)) {
-                auto value =
-                    faster_apply_operator_to_det(det, new_det, sqop.cre(), sqop.ann(), sign_mask);
-                new_terms[new_det] += value * t * c;
+                auto value = faster_apply_operator_to_det(det, new_dets_t[thread], sqop.cre(),
+                                                          sqop.ann(), sign_mask);
+                new_terms_t[thread][new_dets_t[thread]] += value * t * c;
             }
         }
     }
+
+    SparseState new_terms;
+    Determinant new_det;
+
+    // for (const auto& [t, sqop] : op_sorted) {
+    //     // mask for screening determinants according to the uncontracted creation operators
+    //     const Determinant ucre = sqop.cre() - sqop.ann();
+    //     const Determinant sign_mask = compute_sign_mask(sqop.cre(), sqop.ann());
+    //     const auto screen_thresh_div_t = screen_thresh / std::abs(t);
+    //     // Find the first determinant below the threshold using bisection
+    //     auto last = std::lower_bound(
+    //         state_sorted.begin(), state_sorted.end(), screen_thresh_div_t,
+    //         [](const auto& pair, double threshold) { return std::abs(pair.first) > threshold; });
+    //     for (auto it = state_sorted.begin(); it != last; ++it) {
+    //         const auto& [c, det] = *it;
+    //         if (det.fast_can_apply_operator(sqop.ann(), ucre)) {
+    //             auto value =
+    //                 faster_apply_operator_to_det(det, new_det, sqop.cre(), sqop.ann(),
+    //                 sign_mask);
+    //             new_terms[new_det] += value * t * c;
+    //         }
+    //     }
+    // }
     if (not is_antihermitian) {
+        for (int i = 0; i < n_threads; ++i) {
+            new_terms += new_terms_t[i];
+        }
         return new_terms;
     }
-    for (const auto& [t, sqop] : op_sorted) {
+
+#pragma omp parallel for num_threads(n_threads)
+    for (size_t i = 0; i < op_size; ++i) {
+        int thread = omp_get_thread_num();
+        const auto& [t, sqop] = op_sorted[i];
         // mask for screening determinants according to the uncontracted annihilation operators
         const Determinant uann = sqop.ann() - sqop.cre();
         const Determinant sign_mask = compute_sign_mask(sqop.ann(), sqop.cre());
@@ -134,11 +174,33 @@ SparseState apply_operator_impl(bool is_antihermitian, const SparseOperator& sop
         for (auto it = state_sorted.begin(); it != last; ++it) {
             const auto& [c, det] = *it;
             if (det.fast_can_apply_operator(sqop.cre(), uann)) {
-                auto value =
-                    faster_apply_operator_to_det(det, new_det, sqop.ann(), sqop.cre(), sign_mask);
-                new_terms[new_det] -= value * t * c;
+                auto value = faster_apply_operator_to_det(det, new_dets_t[thread], sqop.ann(),
+                                                          sqop.cre(), sign_mask);
+                new_terms_t[thread][new_dets_t[thread]] -= value * t * c;
             }
         }
+    }
+    // for (const auto& [t, sqop] : op_sorted) {
+    //     // mask for screening determinants according to the uncontracted annihilation operators
+    //     const Determinant uann = sqop.ann() - sqop.cre();
+    //     const Determinant sign_mask = compute_sign_mask(sqop.ann(), sqop.cre());
+    //     const auto screen_thresh_div_t = screen_thresh / std::abs(t);
+    //     // Find the first determinant below the threshold using bisection
+    //     auto last = std::lower_bound(
+    //         state_sorted.begin(), state_sorted.end(), screen_thresh_div_t,
+    //         [](const auto& pair, double threshold) { return std::abs(pair.first) > threshold; });
+    //     for (auto it = state_sorted.begin(); it != last; ++it) {
+    //         const auto& [c, det] = *it;
+    //         if (det.fast_can_apply_operator(sqop.cre(), uann)) {
+    //             auto value =
+    //                 faster_apply_operator_to_det(det, new_det, sqop.ann(), sqop.cre(),
+    //                 sign_mask);
+    //             new_terms[new_det] -= value * t * c;
+    //         }
+    //     }
+    // }
+    for (int i = 0; i < n_threads; ++i) {
+        new_terms += new_terms_t[i];
     }
     return new_terms;
 }

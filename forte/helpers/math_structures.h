@@ -108,12 +108,18 @@ class VectorSpace {
 
     /// @return an iterator to the beginning of the object
     inline auto begin() { return elements_.begin(); }
+    inline auto begin(size_t n) { return elements_.begin(n); }
     /// @return an iterator to the beginning of the object (const)
     inline auto begin() const { return elements_.begin(); }
+    inline auto begin(size_t n) const { return elements_.begin(n); }
     /// @return an iterator to the end of the object
     inline auto end() { return elements_.end(); }
+    inline auto end(size_t n) { return elements_.end(n); }
     /// @return an iterator to the end of the object (const)
     inline auto end() const { return elements_.end(); }
+    inline auto end(size_t n) const { return elements_.end(n); }
+
+    inline auto bucket_count() const { return elements_.bucket_count(); }
 
     /// @return the element corresponding to the key e
     const F& operator[](const T& e) const {

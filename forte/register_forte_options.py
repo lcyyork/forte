@@ -38,7 +38,7 @@ def register_driver_options(options):
     options.add_str(
         "JOB_TYPE",
         "NEWDRIVER",
-        ["NONE", "NEWDRIVER", "MR-DSRG-PT2", "CASSCF", "MCSCF_TWO_STEP", "TDCI"],
+        ["NONE", "NEWDRIVER", "MR-DSRG-PT2", "CASSCF", "MCSCF_TWO_STEP", "TDCI", "SR-UCC"],
         "Specify the job type",
     )
 
@@ -919,6 +919,8 @@ def register_dsrg_options(options):
     options.add_bool("DSRG_RDM_MS_AVG", False, "Form Ms-averaged density if true")
 
     options.add_bool("SAVE_SA_DSRG_INTS", False, "Save SA-DSRG dressed integrals to dsrg_ints.json")
+
+    options.add_int("UCC_EX_LEVEL", 2, "UCC excitation level")
 
 
 def register_dwms_options(options):
