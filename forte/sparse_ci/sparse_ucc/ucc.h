@@ -88,6 +88,6 @@ class SparseUCC {
     std::vector<std::shared_ptr<psi::Matrix>> evecs_per_irrep_;
     std::vector<std::shared_ptr<psi::Vector>> evals_per_irrep_;
 
-    void build_HbarIJ();
+    void diagonalize_eom_ee_hbar();
 };
 } // namespace forte

@@ -1,4 +1,5 @@
 #include <sstream>
+#include <fstream>
 #include <functional>
 #include <algorithm>
 #include <numeric>
@@ -7,8 +8,10 @@
 #include "psi4/libpsi4util/PsiOutStream.h"
 #include "psi4/libpsi4util/process.h"
 #include "psi4/libdiis/diismanager.h"
+#include "psi4/physconst.h"
 
 #include "forte-def.h"
+#include "lib/json/json.hpp"
 #include "base_classes/forte_options.h"
 #include "base_classes/mo_space_info.h"
 #include "base_classes/scf_info.h"
@@ -22,6 +25,7 @@
 #include "sparse_ci/sparse_ucc/ucc.h"
 
 using namespace psi;
+using json = nlohmann::json;
 
 namespace forte {
 
@@ -280,13 +284,15 @@ double SparseUCC::compute_energy() {
             throw std::runtime_error(
                 "UCC ground-state energy did not converge. Cannot compute excited states.");
         energy_ = e;
-        build_HbarIJ();
+        diagonalize_eom_ee_hbar();
     }
 
     return e;
 }
 
-void SparseUCC::build_HbarIJ() {
+void SparseUCC::diagonalize_eom_ee_hbar() {
+    std::map<std::string, std::vector<double>> to_disk;
+
     auto nirrep = mo_space_info_->nirrep();
     HbarIJ_per_irrep_.resize(nirrep);
     S2IJ_per_irrep_.resize(nirrep);
@@ -365,14 +371,35 @@ void SparseUCC::build_HbarIJ() {
         auto evecs = std::make_shared<psi::Matrix>(dim, dim);
         auto evals = std::make_shared<psi::Vector>(dim);
         Hbar->diagonalize(evecs, evals);
+        auto s2 = psi::linalg::triplet(evecs, S2, evecs, true, false, false);
         outfile->Printf("\n    Time for diagonalizing Hbar_IJ matrix:  %10.4e seconds",
                         timer.get());
 
         evecs_per_irrep_[h] = evecs;
         evals_per_irrep_[h] = evals;
 
-        evals->print();
+        // print results
+        outfile->Printf("\n");
+        outfile->Printf("\n    ----------------------------------------------");
+        outfile->Printf("\n    State  Multi.  delta E (eV)  delta E (Hartree)");
+        outfile->Printf("\n    ----------------------------------------------");
+        for (size_t i = 0; i < dim; ++i) {
+            auto de_in_ev = pc_hartree2ev * evals->get(i);
+            auto multi = sqrt(4 * s2->get(i, i) + 1);
+            if (i < nroots_per_irrep_[h]) {
+                outfile->Printf("\n    %5d  %6.4f  %12.6f  %17.12f", i + 1, multi, de_in_ev,
+                                evals->get(i));
+            }
+            auto key = std::to_string(h) + "," + std::to_string(lround(multi));
+            to_disk[key].push_back(evals->get(i));
+        }
+        outfile->Printf("\n    ----------------------------------------------");
     }
+
+    json j(to_disk);
+    std::ofstream of("ucc_excitation_energy.json");
+    of << std::setw(4) << j << std::endl;
+    of.close();
 }
 
 } // namespace forte
