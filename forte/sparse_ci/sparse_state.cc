@@ -141,11 +141,12 @@ SparseState apply_operator_impl(bool is_antihermitian, const SparseOperator& sop
     psi::outfile->Printf("\n  applied operator: %10.4e", timer.get());
     timer.reset();
 
+    SparseState new_terms;
     if (not is_antihermitian) {
-        for (int i = 1; i < n_threads; ++i) {
-            new_terms_t[0] += new_terms_t[i];
+        for (int i = 0; i < n_threads; ++i) {
+            new_terms += new_terms_t[i];
         }
-        return new_terms_t[0];
+        return new_terms;
     }
 
 #pragma omp parallel for num_threads(n_threads)
@@ -169,11 +170,12 @@ SparseState apply_operator_impl(bool is_antihermitian, const SparseOperator& sop
             }
         }
     }
+
     psi::outfile->Printf("\n  applied operator dagger: %10.4e", timer.get());
     for (int i = 0; i < n_threads; ++i) {
-        new_terms_t[0] += new_terms_t[i];
+        new_terms += new_terms_t[i];
     }
-    return new_terms_t[0];
+    return new_terms;
 }
 
 std::vector<double> get_projection(const SparseOperatorList& sop, const SparseState& ref,
