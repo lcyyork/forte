@@ -31,6 +31,7 @@
 #include "psi4/libpsi4util/PsiOutStream.h"
 #include "psi4/libpsi4util/process.h"
 #include "forte-def.h"
+#include "helpers/timer.h"
 #include "sparse_ci/sparse_hamiltonian.h"
 
 namespace forte {
@@ -226,16 +227,9 @@ SparseState SparseHamiltonian::compute_sigma(const SparseState& state, double sc
 }
 
 SparseState SparseHamiltonian::compute_on_the_fly(const SparseState& state, double screen_thresh) {
-    local_timer t;
-
-    // initialize a state object
-    SparseState sigma;
-
     size_t nmo = as_ints_->nmo();
 
     auto symm = as_ints_->active_mo_symmetry();
-
-    Determinant new_det;
 
     auto n_threads = omp_get_max_threads();
     auto state_nbuckets = state.bucket_count();
@@ -244,6 +238,8 @@ SparseState SparseHamiltonian::compute_on_the_fly(const SparseState& state, doub
 
     std::vector<Determinant> new_det_t(n_threads);
     std::vector<SparseState> sigma_t(n_threads);
+
+    local_timer t;
 
 #pragma omp parallel for num_threads(n_threads)
     for (size_t nb = 0; nb < state_nbuckets; ++nb) {
@@ -353,12 +349,13 @@ SparseState SparseHamiltonian::compute_on_the_fly(const SparseState& state, doub
             }
         }
     }
-    for (int i = 0; i < n_threads; ++i) {
-        sigma += sigma_t[i];
+    psi::outfile->Printf("\n  Acting H on state: %10.4e", t.get());
+    for (int i = 1; i < n_threads; ++i) {
+        sigma_t[0] += sigma_t[i];
     }
     timings_["total"] += t.get();
     timings_["on_the_fly"] += t.get();
-    return sigma;
+    return sigma_t[0];
 }
 
 std::map<std::string, double> SparseHamiltonian::timings() const { return timings_; }

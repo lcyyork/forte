@@ -30,6 +30,9 @@
 #include <numeric>
 #include <cmath>
 
+#include "psi4/libpsi4util/PsiOutStream.h"
+#include "psi4/libpsi4util/process.h"
+
 #include "sparse_ci/sparse_exp.h"
 
 namespace forte {
@@ -76,12 +79,16 @@ SparseState SparseExp::apply_exp_operator(OperatorType op_type, const SparseOper
         }
         double norm = 0.0;
         double inf_norm = 0.0;
+        local_timer timer;
         exp_state += new_terms;
+        psi::outfile->Printf("\n  exp_state += new_terms: %10.4e", timer.get());
+        timer.reset();
         for (const auto& [det, c] : new_terms) {
-            norm += std::pow(c, 2.0);
+            norm += c * c;
             inf_norm = std::max(inf_norm, std::abs(c));
         }
         norm = std::sqrt(norm);
+        psi::outfile->Printf("\n  compute norms: %10.4e", timer.get());
         if (inf_norm < screen_thresh_) {
             break;
         }

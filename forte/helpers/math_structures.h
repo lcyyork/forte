@@ -37,6 +37,10 @@
 #include <unordered_map>
 #include <vector>
 
+#include "psi4/libpsi4util/PsiOutStream.h"
+#include "psi4/libpsi4util/process.h"
+#include "helpers/timer.h"
+
 namespace forte {
 
 // Defining a function to calculate the conjugate of a value that works both for real/complex fields
@@ -209,9 +213,12 @@ class VectorSpace {
 
     /// @brief Add two vectors
     Derived& operator+=(const Derived& rhs) {
+        psi::outfile->Printf("\n  rhs size: %zu", rhs.size());
+        local_timer timer;
         for (const auto& [e, c] : rhs.elements_) {
             elements_[e] += c;
         }
+        psi::outfile->Printf("  Time: %10.4e", timer.get());
         return static_cast<Derived&>(*this);
     }
 

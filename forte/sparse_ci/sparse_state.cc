@@ -71,17 +71,22 @@ SparseState apply_operator_impl(bool is_antihermitian, const SparseOperator& sop
     if (screen_thresh < 0) {
         throw std::invalid_argument("apply_operator_impl:screen_thresh must be non-negative");
     }
+    local_timer timer;
     // make a copy of the state
     std::vector<std::pair<double, Determinant>> state_sorted;
     state_sorted.reserve(state.size());
     std::transform(state.begin(), state.end(), std::back_inserter(state_sorted),
                    [](const auto& pair) { return std::make_pair(pair.second, pair.first); });
+    psi::outfile->Printf("\n  copy state: %10.4e", timer.get());
+    timer.reset();
 
     // Sorting the vector based on the decreasing absolute value of the double
     std::sort(state_sorted.begin(), state_sorted.end(),
               [](const std::pair<double, Determinant>& a, const std::pair<double, Determinant>& b) {
                   return std::abs(a.first) > std::abs(b.first);
               });
+    psi::outfile->Printf("\n  sort state: %10.4e", timer.get());
+    timer.reset();
 
     // Find the largest coefficient in absolute value
     auto max_c = state_sorted.size() > 0 ? std::abs(state_sorted[0].first) : 0.0;
@@ -92,12 +97,16 @@ SparseState apply_operator_impl(bool is_antihermitian, const SparseOperator& sop
         if (std::abs(t * max_c) > screen_thresh)
             op_sorted.push_back(std::make_pair(t, sqop));
     }
+    psi::outfile->Printf("\n  copy operators: %10.4e", timer.get());
+    timer.reset();
     // Sorting the vector based on the decreasing absolute value of the double
     std::sort(op_sorted.begin(), op_sorted.end(),
               [](const std::pair<double, SQOperatorString>& a,
                  const std::pair<double, SQOperatorString>& b) {
                   return std::abs(a.first) > std::abs(b.first);
               });
+    psi::outfile->Printf("\n  sort operators: %10.4e", timer.get());
+    timer.reset();
 
     auto n_threads = omp_get_max_threads();
     if (op_sorted.size() < n_threads)
@@ -129,14 +138,14 @@ SparseState apply_operator_impl(bool is_antihermitian, const SparseOperator& sop
             }
         }
     }
-
-    SparseState new_terms;
+    psi::outfile->Printf("\n  applied operator: %10.4e", timer.get());
+    timer.reset();
 
     if (not is_antihermitian) {
-        for (int i = 0; i < n_threads; ++i) {
-            new_terms += new_terms_t[i];
+        for (int i = 1; i < n_threads; ++i) {
+            new_terms_t[0] += new_terms_t[i];
         }
-        return new_terms;
+        return new_terms_t[0];
     }
 
 #pragma omp parallel for num_threads(n_threads)
@@ -160,10 +169,11 @@ SparseState apply_operator_impl(bool is_antihermitian, const SparseOperator& sop
             }
         }
     }
+    psi::outfile->Printf("\n  applied operator dagger: %10.4e", timer.get());
     for (int i = 0; i < n_threads; ++i) {
-        new_terms += new_terms_t[i];
+        new_terms_t[0] += new_terms_t[i];
     }
-    return new_terms;
+    return new_terms_t[0];
 }
 
 std::vector<double> get_projection(const SparseOperatorList& sop, const SparseState& ref,
