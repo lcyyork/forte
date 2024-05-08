@@ -213,12 +213,12 @@ class VectorSpace {
 
     /// @brief Add two vectors
     Derived& operator+=(const Derived& rhs) {
-        psi::outfile->Printf("\n  rhs size: %zu", rhs.size());
-        local_timer timer;
+        // psi::outfile->Printf("\n  rhs size: %zu", rhs.size());
+        // local_timer timer;
         for (const auto& [e, c] : rhs.elements_) {
             elements_[e] += c;
         }
-        psi::outfile->Printf("  Time: %10.4e", timer.get());
+        // psi::outfile->Printf("  Time: %10.4e", timer.get());
         return static_cast<Derived&>(*this);
     }
 

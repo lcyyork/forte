@@ -234,7 +234,7 @@ SparseState SparseHamiltonian::compute_on_the_fly(const SparseState& state, doub
     auto n_threads = omp_get_max_threads();
     auto state_nbuckets = state.bucket_count();
     if (state_nbuckets < n_threads)
-        n_threads = state_nbuckets;
+        n_threads = state_nbuckets < 1 ? 1 : state_nbuckets;
 
     std::vector<Determinant> new_det_t(n_threads);
     std::vector<SparseState> sigma_t(n_threads);
@@ -349,7 +349,7 @@ SparseState SparseHamiltonian::compute_on_the_fly(const SparseState& state, doub
             }
         }
     }
-    psi::outfile->Printf("\n  Acting H on state: %10.4e", t.get());
+    psi::outfile->Printf("\n  Acted H on state: %10.4e", t.get());
     for (int i = 1; i < n_threads; ++i) {
         sigma_t[0] += sigma_t[i];
     }

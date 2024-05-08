@@ -77,16 +77,16 @@ SparseState apply_operator_impl(bool is_antihermitian, const SparseOperator& sop
     state_sorted.reserve(state.size());
     std::transform(state.begin(), state.end(), std::back_inserter(state_sorted),
                    [](const auto& pair) { return std::make_pair(pair.second, pair.first); });
-    psi::outfile->Printf("\n  copy state: %10.4e", timer.get());
-    timer.reset();
+    // psi::outfile->Printf("\n  copy state: %10.4e", timer.get());
+    // timer.reset();
 
     // Sorting the vector based on the decreasing absolute value of the double
     std::sort(state_sorted.begin(), state_sorted.end(),
               [](const std::pair<double, Determinant>& a, const std::pair<double, Determinant>& b) {
                   return std::abs(a.first) > std::abs(b.first);
               });
-    psi::outfile->Printf("\n  sort state: %10.4e", timer.get());
-    timer.reset();
+    // psi::outfile->Printf("\n  sort state: %10.4e", timer.get());
+    // timer.reset();
 
     // Find the largest coefficient in absolute value
     auto max_c = state_sorted.size() > 0 ? std::abs(state_sorted[0].first) : 0.0;
@@ -97,23 +97,22 @@ SparseState apply_operator_impl(bool is_antihermitian, const SparseOperator& sop
         if (std::abs(t * max_c) > screen_thresh)
             op_sorted.push_back(std::make_pair(t, sqop));
     }
-    psi::outfile->Printf("\n  copy operators: %10.4e", timer.get());
-    timer.reset();
+    // psi::outfile->Printf("\n  copy operators: %10.4e", timer.get());
+    // timer.reset();
     // Sorting the vector based on the decreasing absolute value of the double
     std::sort(op_sorted.begin(), op_sorted.end(),
               [](const std::pair<double, SQOperatorString>& a,
                  const std::pair<double, SQOperatorString>& b) {
                   return std::abs(a.first) > std::abs(b.first);
               });
-    psi::outfile->Printf("\n  sort operators: %10.4e", timer.get());
-    timer.reset();
+    // psi::outfile->Printf("\n  sort operators: %10.4e", timer.get());
+    // timer.reset();
 
     auto n_threads = omp_get_max_threads();
     if (op_sorted.size() < n_threads)
-        n_threads = op_sorted.size();
+        n_threads = op_sorted.size() < 1 ? 1 : op_sorted.size();
 
     std::vector<SparseState> new_terms_t(n_threads);
-    std::vector<Determinant> new_dets_t(n_threads);
 
     size_t op_size = op_sorted.size();
 
@@ -132,21 +131,23 @@ SparseState apply_operator_impl(bool is_antihermitian, const SparseOperator& sop
         for (auto it = state_sorted.begin(); it != last; ++it) {
             const auto& [c, det] = *it;
             if (det.fast_can_apply_operator(sqop.ann(), ucre)) {
-                auto value = faster_apply_operator_to_det(det, new_dets_t[thread], sqop.cre(),
-                                                          sqop.ann(), sign_mask);
-                new_terms_t[thread][new_dets_t[thread]] += value * t * c;
+                Determinant new_det;
+                auto value =
+                    faster_apply_operator_to_det(det, new_det, sqop.cre(), sqop.ann(), sign_mask);
+                new_terms_t[thread][new_det] += value * t * c;
             }
         }
     }
-    psi::outfile->Printf("\n  applied operator: %10.4e", timer.get());
-    timer.reset();
+    // psi::outfile->Printf("\n  applied operator: %10.4e", timer.get());
+    // timer.reset();
 
-    SparseState new_terms;
+    for (int i = 1; i < n_threads; ++i) {
+        new_terms_t[0] += new_terms_t[i];
+        new_terms_t[i] = SparseState();
+    }
+
     if (not is_antihermitian) {
-        for (int i = 0; i < n_threads; ++i) {
-            new_terms += new_terms_t[i];
-        }
-        return new_terms;
+        return new_terms_t[0];
     }
 
 #pragma omp parallel for num_threads(n_threads)
@@ -164,18 +165,20 @@ SparseState apply_operator_impl(bool is_antihermitian, const SparseOperator& sop
         for (auto it = state_sorted.begin(); it != last; ++it) {
             const auto& [c, det] = *it;
             if (det.fast_can_apply_operator(sqop.cre(), uann)) {
-                auto value = faster_apply_operator_to_det(det, new_dets_t[thread], sqop.ann(),
-                                                          sqop.cre(), sign_mask);
-                new_terms_t[thread][new_dets_t[thread]] -= value * t * c;
+                Determinant new_det;
+                auto value =
+                    faster_apply_operator_to_det(det, new_det, sqop.ann(), sqop.cre(), sign_mask);
+                new_terms_t[thread][new_det] -= value * t * c;
             }
         }
     }
+    // psi::outfile->Printf("\n  applied operator dagger: %10.4e", timer.get());
+    // timer.reset();
 
-    psi::outfile->Printf("\n  applied operator dagger: %10.4e", timer.get());
-    for (int i = 0; i < n_threads; ++i) {
-        new_terms += new_terms_t[i];
+    for (int i = 1; i < n_threads; ++i) {
+        new_terms_t[0] += new_terms_t[i];
     }
-    return new_terms;
+    return new_terms_t[0];
 }
 
 std::vector<double> get_projection(const SparseOperatorList& sop, const SparseState& ref,

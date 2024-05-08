@@ -71,6 +71,7 @@ SparseState SparseExp::apply_exp_operator(OperatorType op_type, const SparseOper
     SparseState new_terms;
 
     for (int k = 1; k <= maxk_; k++) {
+        local_timer timer;
         old_terms *= scaling_factor / static_cast<double>(k);
         if (op_type == OperatorType::Excitation) {
             new_terms = apply_operator_lin(sop, old_terms, screen_thresh_);
@@ -79,16 +80,13 @@ SparseState SparseExp::apply_exp_operator(OperatorType op_type, const SparseOper
         }
         double norm = 0.0;
         double inf_norm = 0.0;
-        local_timer timer;
         exp_state += new_terms;
-        psi::outfile->Printf("\n  exp_state += new_terms: %10.4e", timer.get());
-        timer.reset();
         for (const auto& [det, c] : new_terms) {
             norm += c * c;
             inf_norm = std::max(inf_norm, std::abs(c));
         }
         norm = std::sqrt(norm);
-        psi::outfile->Printf("\n  compute norms: %10.4e", timer.get());
+        psi::outfile->Printf("\n  computed exp level %d: %10.4e", k, timer.get());
         if (inf_norm < screen_thresh_) {
             break;
         }
