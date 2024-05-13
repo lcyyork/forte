@@ -271,6 +271,8 @@ class ProcedureDSRG:
             # pass to the active space solver the unitary transformation between the original basis
             # and the current semi-canonical basis
             self.active_space_solver.set_Uactv(self.Ua, self.Ub)
+            if self.options.get_str("ACTIVE_SPACE_SOLVER") == "BLOCK2":
+                self.options.set_bool("READ_ACTIVE_WFN_GUESS", True)
             state_energies_list = self.active_space_solver.compute_energy()
 
             if self.Meff_implemented:

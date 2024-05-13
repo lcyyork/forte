@@ -507,6 +507,9 @@ MCSCF_2STEP::diagonalize_hamiltonian(std::shared_ptr<ActiveSpaceSolver>& as_solv
     as_solver_->set_e_convergence(e_conv);
     as_solver_->set_r_convergence(r_conv);
     as_solver_->set_active_space_integrals(fci_ints);
+    if (ci_type_.find("BLOCK2") != std::string::npos) {
+        options_->set_bool("READ_ACTIVE_WFN_GUESS", true);
+    }
 
     const auto state_energies_map = as_solver_->compute_energy();
 
