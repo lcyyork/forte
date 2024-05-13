@@ -300,7 +300,14 @@ def register_active_space_solver_options(options):
 
     options.add_bool("READ_ACTIVE_WFN_GUESS", False, "Read CI wave function of ActiveSpaceSolver from disk")
 
+    options.add_int("MULTIPOLE_MOMENT_LEVEL", 1, "Permanent dipole (= 1) and quadrupole (= 2) moments of ActiveSpaceSolver")
+
     options.add_bool("TRANSITION_DIPOLES", False, "Compute the transition dipole moments and oscillator strengths")
+
+    options.add_bool("TRANSITION_DIPOLES_ALL", False, "Compute the transition dipole moments for all state pairs. "
+                     "By default, only transitions from the ground state is computed.")
+
+    options.add_bool("DO_ACTIVE_NTO", False, "Build natural transition orbitals and save to disk")
 
     options.add_bool(
         "PRINT_DIFFERENT_GAS_ONLY",
@@ -728,8 +735,24 @@ def register_dsrg_options(options):
     )
 
     options.add_double(
-        "DSRG_RSC_THRESHOLD", 1.0e-12, "The treshold for terminating the recursive single commutator approximation"
+        "DSRG_RSC_THRESHOLD", 1.0e-12, "The threshold for terminating the recursive single commutator approximation"
     )
+
+    options.add_bool("DSRG_FNO", False, "Perform frozen natural orbital based on DSRG-MRPT2")
+
+    options.add_bool("DSRG_FNO_PT2_CORRECTION", True, "PT2 correction to the discarded FNOs")
+
+    options.add_double("DSRG_FNO_PT2_S", 0.5, "The DSRG flow parameter s for PT2 FNO correction")
+
+    options.add_double("DSRG_FNO_CUTOFF", 1.0e-5, "The cutoff used to discard FNOs")
+
+    options.add_double("DSRG_FNO_PV", 100.0,
+                       "Percentage of virtual orbitals kept unfrozen."
+                       " If not 100.0, it takes priority over direct cutoff.")
+
+    options.add_double("DSRG_FNO_PO", 100.0,
+                       "Percentage of cumulative virtual occupancy kept unfrozen."
+                       " If not 100.0, it takes priority over all other selection schemes.")
 
     options.add_str(
         "T_ALGORITHM",
@@ -753,7 +776,7 @@ def register_dsrg_options(options):
         "DSRG_MAX_QUADRUPOLE_LEVEL", 0, "The max body level of DSRG transformed quadrupole moment (skip if < 1)"
     )
 
-    options.add_int("DSRG_MAXITER", 50, "Max iterations for nonperturbative" " MR-DSRG amplitudes update")
+    options.add_int("DSRG_MAXITER", 50, "Max iterations for nonperturbative MR-DSRG amplitudes update")
 
     options.add_double("R_CONVERGENCE", 1.0e-6, "Residue convergence criteria for amplitudes")
 
@@ -996,6 +1019,9 @@ def register_casscf_options(options):
 
     options.add_int("CASSCF_MAXITER", 100, "The maximum number of CASSCF macro iterations")
 
+    options.add_int("CASSCF_DL_MAXITER", 15,
+                    "The maximum number of Davidson-Liu for CI in every CASSCF macro iteration")
+
     options.add_int("CASSCF_MICRO_MAXITER", 40, "The maximum number of CASSCF micro iterations")
 
     options.add_int("CASSCF_MICRO_MINITER", 6, "The minimum number of CASSCF micro iterations")
@@ -1097,6 +1123,9 @@ def register_old_options(options):
 
     options.add_double("PT2NO_OCC_THRESHOLD", 0.98, "Occupancy smaller than which is considered as active")
     options.add_double("PT2NO_VIR_THRESHOLD", 0.02, "Occupancy greater than which is considered as active")
+
+    options.add_bool("MRPT2NO_ACTV_ROTATE", False,
+                     "Rotate orbitals so that the active is in the position suggested by natural orbitals")
 
     options.add_bool("MEMORY_SUMMARY", False, "Print summary of memory")
 
