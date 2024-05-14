@@ -258,6 +258,7 @@ double MCSCF_2STEP::compute_energy() {
 
         // start iterations
         lbfgs_param->maxiter = micro_miniter_;
+        int bad_count = 0;
         bool skip_de_conv = (ci_type_.find("DMRG") != std::string::npos or
                              ci_type_.find("BLOCK2") != std::string::npos);
 
@@ -304,17 +305,13 @@ double MCSCF_2STEP::compute_energy() {
                 print_h2("MCSCF Macro Iter. " + std::to_string(macro));
                 std::string title = "         Energy CI (  Delta E  )"
                                     "         Energy Opt. (  Delta E  )"
-                                    "  E_OPT - E_CI   Orbital RMS  Micro";
+                                    "  Orbital RMS  Micro";
                 if (do_diis_)
                     title += "  DIIS";
                 psi::outfile->Printf("\n    %s", title.c_str());
             }
-            psi::outfile->Printf("\n    %4d %20.12f %11.4e%20.12f %11.4e  %10.4e %4d/%c", macro + 1,
-                                 e_c, de_c, e_o, de_o, g_rms, n_micro, o_conv);
-
-            // psi::outfile->Printf("\n    %18.12f (%11.4e)  %18.12f (%11.4e)  %12.4e  %12.4e
-            // %4d/%c",
-            //                      e_c, de_c, e_o, de_o, de, g_rms, n_micro, o_conv);
+            psi::outfile->Printf("\n    %4d %20.12f %11.4e %20.12f %11.4e  %10.4e %4d/%c",
+                                 macro + 1, e_c, de_c, e_o, de_o, g_rms, n_micro, o_conv);
 
             // test convergence
             if (macro == 1 and lbfgs.converged() and std::fabs(de) < e_conv_) {
@@ -338,26 +335,20 @@ double MCSCF_2STEP::compute_energy() {
 
             // test history
             bool reset_diis = false;
-            int increase_lbfgs = 0;
-            if (macro > 6) {
-                if (macro > maxiter_ * 3 / 2) {
-                    int n_samples = 20 < maxiter_ / 2 ? 20 : maxiter_ / 2;
-                    if (not test_history(history, n_samples)) {
-                        psi::outfile->Printf(
-                            "\n\n  MCSCF does not seem to be converging! Quitting!");
-                        break;
-                    }
-                }
-                if (not test_history(history, 5 + macro / 6)) {
-                    reset_diis = true;
-                    increase_lbfgs = (lbfgs_param->maxiter + 2) < micro_maxiter_ ? 2 : 0;
-                } else {
-                    increase_lbfgs = lbfgs_param->maxiter > micro_miniter_ ? -1 : 0;
-                }
+            if (de_o > 0.0 or de_c > 0.0 or (g_rms / history[macro - 2].g_rms > 1.0))
+                ++bad_count;
+            if (bad_count > 5) {
+                reset_diis = true;
+                dl_maxiter_ += 5;
+                as_solver->set_maxiter(dl_maxiter_);
+                block2_read_wfn_ = false;
+                bad_count = 0;
+            } else {
+                block2_read_wfn_ = true;
             }
-
-            // adjust max number micro iterations
-            lbfgs_param->maxiter += increase_lbfgs;
+            if (ci_type_.find("BLOCK2") != std::string::npos) {
+                options_->set_bool("READ_ACTIVE_WFN_GUESS", block2_read_wfn_);
+            }
 
             // DIIS for orbitals
             if (do_diis_) {
@@ -503,9 +494,6 @@ MCSCF_2STEP::diagonalize_hamiltonian(std::shared_ptr<ActiveSpaceSolver>& as_solv
     as_solver->set_e_convergence(e_conv);
     as_solver->set_r_convergence(r_conv);
     as_solver->set_active_space_integrals(fci_ints);
-    if (ci_type_.find("BLOCK2") != std::string::npos) {
-        options_->set_bool("READ_ACTIVE_WFN_GUESS", true);
-    }
 
     const auto state_energies_map = as_solver->compute_energy();
 
