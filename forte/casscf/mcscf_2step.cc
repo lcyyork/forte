@@ -335,7 +335,7 @@ double MCSCF_2STEP::compute_energy() {
 
             // test history
             bool reset_diis = false;
-            if (macro > 10 and de_o > 0.0 or de_c > 0.0 or (g_rms / history[macro - 2].g_rms > 1.0))
+            if (macro > 10 and (de_o > 0.0 or de_c > 0.0 or (g_rms / history[macro - 2].g_rms > 1.0)))
                 ++bad_count;
             if (bad_count > 5) {
                 reset_diis = true;
