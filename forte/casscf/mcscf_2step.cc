@@ -189,7 +189,7 @@ double MCSCF_2STEP::compute_energy() {
     auto as_solver =
         make_active_space_solver(ci_type_, to_state_nroots_map(state_weights_map_), scf_info_,
                                  mo_space_info_, options_, cas_grad.active_space_ints());
-    as_solver->set_print(PrintLevel::Quiet);
+    // as_solver->set_print(PrintLevel::Quiet);
     as_solver->set_e_convergence(e_conv_);
     as_solver->set_r_convergence(no_orb_opt ? r_conv : 1.0e-2);
     as_solver->set_maxiter(no_orb_opt ? as_maxiter : dl_maxiter_);
