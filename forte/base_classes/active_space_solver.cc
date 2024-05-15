@@ -149,8 +149,8 @@ const std::map<StateInfo, std::vector<double>>& ActiveSpaceSolver::compute_energ
         method->set_maxiter(maxiter_);
         method->set_die_if_not_converged(die_if_not_converged_);
 
+        state_filename_map_[state] = method->wfn_filename();
         if (read_initial_guess_) {
-            state_filename_map_[state] = method->wfn_filename();
             method->set_read_wfn_guess(read_initial_guess_);
         }
 

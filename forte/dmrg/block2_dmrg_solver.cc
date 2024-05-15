@@ -229,10 +229,13 @@ Block2DMRGSolver::Block2DMRGSolver(StateInfo state, size_t nroot, std::shared_pt
     bool is_spin_adapted =
         as_ints->ints()->spin_restriction() == IntegralSpinRestriction::Restricted &&
         options_->get_bool("BLOCK2_SPIN_ADAPTED");
-    print_method_banner(
-        {is_spin_adapted ? "block2 DMRG (spin-adapted)" : "block2 DMRG (non-spin-adapted)",
-         "by Huanchen Zhai", "Jan 14-16, 2023"});
-    psi::outfile->Printf("\n    Reference: H. Zhai & G. K. Chan J. Chem. Phys. 2021, 154, 224116.");
+    if (print_ >= PrintLevel::Default) {
+        print_method_banner(
+            {is_spin_adapted ? "block2 DMRG (spin-adapted)" : "block2 DMRG (non-spin-adapted)",
+             "by Huanchen Zhai", "Jan 14-16, 2023"});
+        psi::outfile->Printf(
+            "\n    Reference: H. Zhai & G. K. Chan J. Chem. Phys. 2021, 154, 224116.");
+    }
     std::string scratch = psi::PSIOManager::shared_object()->get_default_path() + "forte." +
                           std::to_string(getpid()) + ".block2." +
                           psi::Process::environment.molecule()->name();
@@ -254,6 +257,21 @@ Block2DMRGSolver::~Block2DMRGSolver() {
                 fs::remove(file.path());
     if (fs::is_empty(impl_->scratch_))
         fs::remove(impl_->scratch_);
+}
+
+void Block2DMRGSolver::dump_wave_function(const std::string&) {
+    // create a folder for the wave function
+    fs::path folder{"block2.o" + std::to_string(mo_space_info_->size("ACTIVE")) + "." +
+                    state_.str_short()};
+    fs::create_directory(folder);
+    // copy KET files to the folder
+    for (const auto& file : fs::directory_iterator(impl_->scratch_)) {
+        if (file.path().filename().string().find("KET") != std::string::npos and
+            file.path().filename().string().find(state_.str_short()) != std::string::npos) {
+            fs::copy_file(file.path(), folder / file.path().filename(),
+                          fs::copy_options::overwrite_existing);
+        }
+    }
 }
 
 double Block2DMRGSolver::compute_energy() {
@@ -442,6 +460,22 @@ double Block2DMRGSolver::compute_energy() {
                 occs[i] += occ_shift;
             else if (occs[i] > 1.25)
                 occs[i] -= occ_shift;
+    }
+    if (read_initial_guess) {
+        // copy to scratch directory
+        fs::path dir_from{"block2.o" + std::to_string(mo_space_info_->size("ACTIVE")) + "." +
+                          state_.str_short()};
+        fs::path dir_to{impl_->scratch_};
+        if (fs::exists(dir_from)) {
+            psi::outfile->Printf("\n  Copying block2 files to scratch directory");
+            for (const auto& file : fs::directory_iterator(dir_from)) {
+                if (file.path().filename().string().find("KET") != std::string::npos and
+                    file.path().filename().string().find(state_.str_short()) != std::string::npos) {
+                    fs::copy_file(file.path(), dir_to / file.path().filename(),
+                                  fs::copy_options::overwrite_existing);
+                }
+            }
+        }
     }
 
     // initialize mps

@@ -95,6 +95,8 @@ class Block2DMRGSolver : public ActiveSpaceMethod {
     void print_natural_orbitals(std::shared_ptr<MOSpaceInfo> mo_space_info,
                                 std::shared_ptr<RDMs> rdms);
 
+    void dump_wave_function(const std::string&) override;
+
   private:
     /// SCFInfo object
     std::shared_ptr<SCFInfo> scf_info_;
