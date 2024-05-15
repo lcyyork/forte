@@ -169,9 +169,6 @@ class MCSCF_2STEP {
 
     /// Print iteration information
     void print_macro_iteration(const std::vector<CASSCF_HISTORY>& history);
-
-    /// Block2 read wave function
-    bool block2_read_wfn_ = true;
 };
 
 std::unique_ptr<MCSCF_2STEP>

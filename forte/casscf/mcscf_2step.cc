@@ -194,6 +194,7 @@ double MCSCF_2STEP::compute_energy() {
     as_solver->set_r_convergence(no_orb_opt ? r_conv : 1.0e-2);
     as_solver->set_maxiter(no_orb_opt ? as_maxiter : dl_maxiter_);
     as_solver->set_die_if_not_converged(no_orb_opt);
+    bool read_wfn = options_->get_bool("READ_ACTIVE_WFN_GUESS");
 
     // initial CI and resulting RDMs
     const auto state_energies_map = as_solver->compute_energy();
@@ -335,19 +336,18 @@ double MCSCF_2STEP::compute_energy() {
 
             // test history
             bool reset_diis = false;
-            if (macro > 10 and (de_o > 0.0 or de_c > 0.0 or (g_rms / history[macro - 2].g_rms > 1.0)))
+            if (macro > 10 and
+                (de_o > 0.0 or de_c > 0.0 or (g_rms / history[macro - 2].g_rms > 1.0)))
                 ++bad_count;
             if (bad_count > 5) {
                 reset_diis = true;
                 dl_maxiter_ += 5;
                 as_solver->set_maxiter(dl_maxiter_);
-                block2_read_wfn_ = false;
                 bad_count = 0;
-            } else {
-                block2_read_wfn_ = true;
             }
-            if (ci_type_.find("BLOCK2") != std::string::npos) {
-                options_->set_bool("READ_ACTIVE_WFN_GUESS", block2_read_wfn_);
+            if (ci_type_.find("BLOCK2") != std::string::npos and
+                (std::fabs(de_o) < 1.0e-4 and std::fabs(de_c) < 1.0e-4)) {
+                options_->set_bool("READ_ACTIVE_WFN_GUESS", true);
             }
 
             // DIIS for orbitals
@@ -453,6 +453,7 @@ double MCSCF_2STEP::compute_energy() {
         if (not converged)
             throw_convergence_error();
     }
+    options_->set_bool("READ_ACTIVE_WFN_GUESS", read_wfn);
 
     return energy_;
 }
