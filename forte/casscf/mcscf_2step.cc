@@ -310,8 +310,8 @@ double MCSCF_2STEP::compute_energy() {
                     title += "  DIIS";
                 psi::outfile->Printf("\n    %s", title.c_str());
             }
-            psi::outfile->Printf("\n    %4d %20.12f %11.4e %20.12f %11.4e  %10.4e %4d/%c",
-                                 macro + 1, e_c, de_c, e_o, de_o, g_rms, n_micro, o_conv);
+            psi::outfile->Printf("\n    %4d %20.12f %11.4e %20.12f %11.4e  %10.4e %4d/%c", macro,
+                                 e_c, de_c, e_o, de_o, g_rms, n_micro, o_conv);
 
             // test convergence
             if (macro == 1 and lbfgs.converged() and std::fabs(de) < e_conv_) {
@@ -335,7 +335,7 @@ double MCSCF_2STEP::compute_energy() {
 
             // test history
             bool reset_diis = false;
-            if (de_o > 0.0 or de_c > 0.0 or (g_rms / history[macro - 2].g_rms > 1.0))
+            if (macro > 10 and de_o > 0.0 or de_c > 0.0 or (g_rms / history[macro - 2].g_rms > 1.0))
                 ++bad_count;
             if (bad_count > 5) {
                 reset_diis = true;
