@@ -345,9 +345,13 @@ double MCSCF_2STEP::compute_energy() {
                 as_solver->set_maxiter(dl_maxiter_);
                 bad_count = 0;
             }
-            if (ci_type_.find("BLOCK2") != std::string::npos and
-                (std::fabs(de_o) < 1.0e-4 and std::fabs(de_c) < 1.0e-4)) {
-                options_->set_bool("READ_ACTIVE_WFN_GUESS", true);
+            if (ci_type_.find("BLOCK2") != std::string::npos) {
+                if (std::fabs(de_o) < 1.0e-4 and std::fabs(de_c) < 1.0e-4) {
+                    options_->set_bool("READ_ACTIVE_WFN_GUESS", true);
+                } else {
+                    auto maxiter = as_solver->maxiter();
+                    as_solver->set_maxiter(maxiter + 5);
+                }
             }
 
             // DIIS for orbitals

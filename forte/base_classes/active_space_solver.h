@@ -209,6 +209,9 @@ class ActiveSpaceSolver {
         Ub_actv_ = Ub;
     }
 
+    /// Return maxiter
+    int maxiter() const { return maxiter_; }
+
   protected:
     /// a string that specifies the method used (e.g. "FCI", "ACI", ...)
     std::string method_;
@@ -291,7 +294,7 @@ class ActiveSpaceSolver {
     /// Pairs of state info and the contracted CI eigen vectors
     std::map<StateInfo, std::shared_ptr<psi::Matrix>>
         state_contracted_evecs_map_; // TODO move outside?
-};                                   // namespace forte
+}; // namespace forte
 
 /**
  * @brief Make an active space solver object.

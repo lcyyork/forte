@@ -340,7 +340,7 @@ double Block2DMRGSolver::compute_energy() {
     // dmrg sweep settings
     double e_conv = dmrg_options_->get_double("BLOCK2_SWEEP_ENERGY_CONV");
     double mps_cutoff = dmrg_options_->get_double("BLOCK2_CUTOFF");
-    int n_total_sweeps = dmrg_options_->get_int("BLOCK2_N_TOTAL_SWEEPS");
+    maxiter_ = dmrg_options_->get_int("BLOCK2_N_TOTAL_SWEEPS");
     std::vector<int> sweep_n_sweeps = dmrg_options_->get_int_list("BLOCK2_SWEEP_N_SWEEPS");
     std::vector<int> sweep_bond_dims = dmrg_options_->get_int_list("BLOCK2_SWEEP_BOND_DIMS");
     std::vector<double> sweep_noises = dmrg_options_->get_double_list("BLOCK2_SWEEP_NOISES");
@@ -365,7 +365,7 @@ double Block2DMRGSolver::compute_energy() {
             sweep_bond_dims.push_back(sweep_bond_dims.back());
     while (sweep_n_sweeps.size() < n_schedule)
         if (n_schedule == 1)
-            sweep_n_sweeps.push_back(n_total_sweeps == 0 ? 10 : n_total_sweeps);
+            sweep_n_sweeps.push_back(maxiter_ == 0 ? 10 : maxiter_);
         else
             sweep_n_sweeps.push_back(6);
 
@@ -382,8 +382,8 @@ double Block2DMRGSolver::compute_energy() {
         }
     }
 
-    if (n_total_sweeps == 0)
-        n_total_sweeps = n_total_cnt;
+    if (maxiter_ == 0)
+        maxiter_ = n_total_cnt;
 
     bool read_initial_guess = options_->get_bool("READ_ACTIVE_WFN_GUESS");
 
@@ -402,7 +402,7 @@ double Block2DMRGSolver::compute_energy() {
         psi::outfile->Printf("\n    Davidson tols  = ");
         for (auto& x : sweep_davidson_tols)
             psi::outfile->Printf("%10.2E", x);
-        psi::outfile->Printf("\n    N total sweeps = %10d", n_total_sweeps);
+        psi::outfile->Printf("\n    N total sweeps = %10d", maxiter_);
         psi::outfile->Printf("\n    E convergence  = %10.2E", e_conv);
         psi::outfile->Printf("\n    Cutoff         = %10.2E", mps_cutoff);
         psi::outfile->Printf("\n    Initial guess  = %10s", (read_initial_guess ? "load" : "new"));
@@ -487,7 +487,7 @@ double Block2DMRGSolver::compute_energy() {
 
     // do dmrg
     auto mpo = impl_->get_mpo(r, dmrg_verbose);
-    energies_ = impl_->dmrg(mpo, ket, n_total_sweeps, e_conv, bond_dims, noises, davidson_tols,
+    energies_ = impl_->dmrg(mpo, ket, maxiter_, e_conv, bond_dims, noises, davidson_tols,
                             dmrg_verbose, mps_cutoff);
 
     // compute <S^2>
