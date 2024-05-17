@@ -101,6 +101,9 @@ void MCSCF_2STEP::read_options() {
     if (ci_type_ == "") {
         throw std::runtime_error("ACTIVE_SPACE_SOLVER or CASSCF_CI_SOLVER are not specified!");
     }
+    if (ci_type_.find("BLOCK2") != std::string::npos) {
+        dl_maxiter_ = options_->get_int("BLOCK2_N_TOTAL_SWEEPS");
+    }
 
     opt_orbs_ = not options_->get_bool("CASSCF_NO_ORBOPT");
     max_rot_ = options_->get_double("CASSCF_MAX_ROTATION");
@@ -349,8 +352,7 @@ double MCSCF_2STEP::compute_energy() {
                 if (std::fabs(de_o) < 1.0e-4 and std::fabs(de_c) < 1.0e-4) {
                     options_->set_bool("READ_ACTIVE_WFN_GUESS", true);
                 } else {
-                    auto maxiter = as_solver->maxiter();
-                    as_solver->set_maxiter(maxiter + 5);
+                    as_solver->set_maxiter(dl_maxiter_ + 5);
                 }
             }
 

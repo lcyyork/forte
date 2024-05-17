@@ -244,6 +244,7 @@ Block2DMRGSolver::Block2DMRGSolver(StateInfo state, size_t nroot, std::shared_pt
     // TODO: read this info from the base class
     na_ = static_cast<int>(state.na() - core_mo_.size() - mo_space_info->size("FROZEN_DOCC"));
     nb_ = static_cast<int>(state.nb() - core_mo_.size() - mo_space_info->size("FROZEN_DOCC"));
+    maxiter_ = options->get_int("BLOCK2_N_TOTAL_SWEEPS");
 }
 
 Block2DMRGSolver::~Block2DMRGSolver() {
@@ -340,7 +341,6 @@ double Block2DMRGSolver::compute_energy() {
     // dmrg sweep settings
     double e_conv = dmrg_options_->get_double("BLOCK2_SWEEP_ENERGY_CONV");
     double mps_cutoff = dmrg_options_->get_double("BLOCK2_CUTOFF");
-    maxiter_ = dmrg_options_->get_int("BLOCK2_N_TOTAL_SWEEPS");
     std::vector<int> sweep_n_sweeps = dmrg_options_->get_int_list("BLOCK2_SWEEP_N_SWEEPS");
     std::vector<int> sweep_bond_dims = dmrg_options_->get_int_list("BLOCK2_SWEEP_BOND_DIMS");
     std::vector<double> sweep_noises = dmrg_options_->get_double_list("BLOCK2_SWEEP_NOISES");
