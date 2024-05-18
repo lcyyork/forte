@@ -339,7 +339,7 @@ double MCSCF_2STEP::compute_energy() {
 
             // test history
             bool reset_diis = false;
-            if (macro > 10 and
+            if (macro > 6 and
                 (de_o > 0.0 or de_c > 0.0 or (g_rms / history[macro - 2].g_rms > 1.0)))
                 ++bad_count;
             if (bad_count > 5) {
@@ -349,10 +349,10 @@ double MCSCF_2STEP::compute_energy() {
                 bad_count = 0;
             }
             if (ci_type_.find("BLOCK2") != std::string::npos) {
-                if (std::fabs(de_o) < 1.0e-4 and std::fabs(de_c) < 1.0e-4) {
+                if (std::fabs(de_o) < 1.0e-3 or std::fabs(de_c) < 1.0e-3) {
                     options_->set_bool("READ_ACTIVE_WFN_GUESS", true);
                 } else {
-                    as_solver->set_maxiter(dl_maxiter_ + 5);
+                    as_solver->set_maxiter(++dl_maxiter_);
                 }
             }
 
