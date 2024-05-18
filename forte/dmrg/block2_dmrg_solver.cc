@@ -475,6 +475,8 @@ double Block2DMRGSolver::compute_energy() {
                                   fs::copy_options::overwrite_existing);
                 }
             }
+        } else {
+            read_initial_guess = false;
         }
     }
 
