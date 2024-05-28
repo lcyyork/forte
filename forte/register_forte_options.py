@@ -1215,6 +1215,7 @@ def register_block2_options(options):
     options.add_double_list("BLOCK2_SWEEP_DAVIDSON_TOLS", "The residual tolerances for the Davidson diagonalization"
                             " used for one instruction during DMRG sweeps")
     options.add_int("BLOCK2_VERBOSE", 1, "Level of verbosity for DMRG calculations")
+    options.add_bool("BLOCK2_LOW_MEM_ALGO", False, "Use low-memory algorithm for DMRG calculations")
 
 
 def register_dmrg_options(options):

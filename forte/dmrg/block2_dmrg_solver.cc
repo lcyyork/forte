@@ -157,15 +157,18 @@ struct Block2DMRGSolverImpl {
              std::shared_ptr<void> bra, int site_type = 0, int iprint = 0,
              block2::ExpectationAlgorithmTypes algo_type =
                  block2::ExpectationAlgorithmTypes::SymbolFree |
-                 block2::ExpectationAlgorithmTypes::Compressed) const {
+                 block2::ExpectationAlgorithmTypes::Compressed,
+             int max_bond_dim = -1) const {
         if (is_spin_adapted_) {
             auto ket_ = std::static_pointer_cast<block2::MPS<block2::SU2, double>>(ket);
             auto bra_ = std::static_pointer_cast<block2::MPS<block2::SU2, double>>(bra);
-            return driver_su2_->get_npdm(exprs, ket_, bra_, site_type, algo_type, iprint);
+            return driver_su2_->get_npdm(exprs, ket_, bra_, site_type, algo_type, iprint, 1.0e-16,
+                                         true, max_bond_dim);
         } else {
             auto ket_ = std::static_pointer_cast<block2::MPS<block2::SZ, double>>(ket);
             auto bra_ = std::static_pointer_cast<block2::MPS<block2::SZ, double>>(bra);
-            return driver_sz_->get_npdm(exprs, ket_, bra_, site_type, algo_type, iprint);
+            return driver_sz_->get_npdm(exprs, ket_, bra_, site_type, algo_type, iprint, 1.0e-16,
+                                        true, max_bond_dim);
         }
     }
     std::shared_ptr<void> split_mps(std::shared_ptr<void> ket, int nroot, int iroot,
@@ -593,8 +596,15 @@ Block2DMRGSolver::transition_rdms(const std::vector<std::pair<size_t, size_t>>& 
                                    jroot, ket_tag);
 
         // compute all rdms
-        std::vector<std::shared_ptr<block2::GTensor<double>>> npdms =
-            impl_->get_npdm(exprs, ket, bra, 0, dmrg_verbose);
+        auto rdm_algo_type = ((block2::ExpectationAlgorithmTypes::SymbolFree) |
+                              (block2::ExpectationAlgorithmTypes::Compressed));
+        if (dmrg_options_->get_bool("BLOCK2_LOW_MEM_ALGO"))
+            rdm_algo_type = ((block2::ExpectationAlgorithmTypes::SymbolFree) |
+                             (block2::ExpectationAlgorithmTypes::Compressed) |
+                             (block2::ExpectationAlgorithmTypes::LowMem));
+        auto sweep_bond_dims = dmrg_options_->get_int_list("BLOCK2_SWEEP_BOND_DIMS");
+        std::vector<std::shared_ptr<block2::GTensor<double>>> npdms = impl_->get_npdm(
+            exprs, ket, bra, 0, dmrg_verbose, rdm_algo_type, 2 * sweep_bond_dims.back());
 
         // currently no need to add the interface for 4rdm
         assert(max_rdm_level <= 3);
