@@ -376,6 +376,8 @@ PYBIND11_MODULE(_forte, m) {
              "Return the DSRG dressed ActiveMultipoleIntegrals")
         .def("set_Uactv", &SADSRG::set_Uactv, "Ua"_a,
              "Set active part orbital rotation matrix (from original to semicanonical)")
+        .def("set_complete_valence_ints", &SADSRG::set_complete_valence_ints,
+             "Set if considering valence DOCC and UOCC for post-DSRG diagonalization")
         .def("set_active_space_solver", &SADSRG::set_active_space_solver,
              "Set the pointer of ActiveSpaceSolver")
         .def("set_state_weights_map", &SADSRG::set_state_weights_map,

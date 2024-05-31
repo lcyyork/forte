@@ -282,11 +282,27 @@ MO_Space_Info:
     type: int_list
     default: []
     help: "Number of restricted doubly occupied orbitals per irrep (in Cotton order)."
+  EXTERNAL_DOCC:
+    type: int_list
+    default: []
+    help: "Number of restricted doubly occupied orbitals per irrep (in Cotton order)."
+  VALENCE_DOCC:
+    type: int_list
+    default: []
+    help: "Number of restricted doubly occupied orbitals per irrep (in Cotton order)."
   ACTIVE:
     type: int_list
     default: []
     help: "Number of active orbitals per irrep (in Cotton order)."
   RESTRICTED_UOCC:
+    type: int_list
+    default: []
+    help: "Number of restricted unoccupied orbitals per irrep (in Cotton order)."
+  EXTERNAL_UOCC:
+    type: int_list
+    default: []
+    help: "Number of restricted unoccupied orbitals per irrep (in Cotton order)."
+  VALENCE_UOCC:
     type: int_list
     default: []
     help: "Number of restricted unoccupied orbitals per irrep (in Cotton order)."

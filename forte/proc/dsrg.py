@@ -185,6 +185,7 @@ class ProcedureDSRG:
 
         if self.solver_type in ["SA-MRDSRG", "SA_MRDSRG"]:
             self.dsrg_solver.set_Uactv(self.Ua)
+            self.dsrg_solver.set_complete_valence_ints(True)
 
         if self.solver_type in ["MRDSRG", "DSRG-MRPT2", "DSRG-MRPT3", "THREE-DSRG-MRPT2"]:
             self.dsrg_solver.set_Uactv(self.Ua, self.Ub)
@@ -212,6 +213,40 @@ class ProcedureDSRG:
         psi4.core.set_scalar_variable("UNRELAXED ENERGY", e_dsrg)
 
         psi4.core.print_out(f"\n  =>** After self.dsrg_solver.compute_energy() **<=\n")
+        
+        # HACK: make new mo_space_ CI solver
+        vdocc = self.options.get_int_list("VALENCE_DOCC")
+        vuocc = self.options.get_int_list("VALENCE_UOCC")
+        actv_occ = self.options.get_int_list("ACTIVE")
+        active = [*actv_occ]
+        if vdocc:
+            for i, j in enumerate(vdocc):
+                active[i] += j
+        if vuocc:
+            for i, j in enumerate(vuocc):
+                active[i] += j
+
+        options_dict = self.options.dict()
+        options_dict["ACTIVE"]["value"] = active
+        options_dict["VALENCE_DOCC"]["value"] = []
+        options_dict["VALENCE_UOCC"]["value"] = []
+        print("ACTIVE", options_dict["ACTIVE"]["value"])
+        print("VDOCC", options_dict["VALENCE_DOCC"]["value"])
+        print("VUOCC", options_dict["VALENCE_UOCC"]["value"])
+        print("EDOCC", options_dict["EXTERNAL_DOCC"]["value"])
+        print("EUOCC", options_dict["EXTERNAL_UOCC"]["value"])
+        self.options.set_dict(options_dict)
+
+        nmopi = self.mo_space_info.dimension("ALL")
+        point_group = self.mo_space_info.point_group_label()
+        self.mo_space_info = forte.make_mo_space_info(nmopi, point_group, self.options)
+        self.state_weights_map = forte.make_state_weights_map(self.options, self.mo_space_info)
+        state_map = forte.to_state_nroots_map(self.state_weights_map)
+        active_space_solver_type = self.options.get_str('ACTIVE_SPACE_SOLVER')
+        as_ints = forte.make_active_space_ints(self.mo_space_info, self.ints, "ACTIVE", ["EXTERNAL_DOCC"])
+        self.active_space_solver = forte.make_active_space_solver(
+            active_space_solver_type, state_map, self.scf_info, self.mo_space_info, self.options, as_ints
+        )
 
         self.energies_environment[0] = {k: v for k, v in psi4.core.variables().items() if "ROOT" in k}
 
@@ -284,10 +319,11 @@ class ProcedureDSRG:
                     self.active_space_solver.compute_fosc_same_orbs(asmpints)
 
             # Reorder weights if needed
-            if self.state_ci_wfn_map is not None:
-                state_ci_wfn_map = self.active_space_solver.state_ci_wfn_map()
-                self.reorder_weights(state_ci_wfn_map)
-                self.state_ci_wfn_map = state_ci_wfn_map
+            if (not vdocc) and (not vuocc):
+                if self.state_ci_wfn_map is not None:
+                    state_ci_wfn_map = self.active_space_solver.state_ci_wfn_map()
+                    self.reorder_weights(state_ci_wfn_map)
+                    self.state_ci_wfn_map = state_ci_wfn_map
 
             e_relax = forte.compute_average_state_energy(state_energies_list, self.state_weights_map)
             self.energies.append((e_dsrg, e_relax))

@@ -70,7 +70,10 @@ class SADSRG : public DynamicCorrelationSolver {
     void set_Uactv(ambit::Tensor& U);
 
     /// If the amplitudes are converged or not
-    bool converged() {return converged_; }
+    bool converged() { return converged_; }
+
+    /// Set if considering "valence" DOCC and UOCC in post-DSRG diagonalization
+    void set_complete_valence_ints(bool complete) { complete_valence_ints_ = complete; }
 
   protected:
     /// Startup function called in constructor
@@ -122,6 +125,9 @@ class SADSRG : public DynamicCorrelationSolver {
 
     /// Relaxation type
     std::string relax_ref_;
+
+    /// Whether to prepare an enlarged active integrals for post-DSRG diagonalization
+    bool complete_valence_ints_ = false;
 
     /// Timings for computing the commutators
     DSRG_TIME dsrg_time_;
@@ -344,6 +350,8 @@ class SADSRG : public DynamicCorrelationSolver {
      * This will change H0 and H1 !!!
      */
     void deGNO_ints(const std::string& name, double& H0, BlockedTensor& H1, BlockedTensor& H2);
+    void deGNO_ints2(const std::string& name, double& H0, BlockedTensor& H1, BlockedTensor& H2,
+                     ambit::Tensor& H1t, ambit::Tensor& H2t);
 
     /**
      * De-normal-order a 3-body DSRG transformed integrals (active only)

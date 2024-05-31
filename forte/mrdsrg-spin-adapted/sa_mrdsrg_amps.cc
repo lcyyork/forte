@@ -199,8 +199,8 @@ void SA_MRDSRG::guess_t1(BlockedTensor& F, BlockedTensor& T2, BlockedTensor& T1)
 
 void SA_MRDSRG::update_t2() {
     // make a copy of the active part of Hbar2 as it will be used as intermediate
-    auto Hbar2copy = BlockedTensor::build(tensor_type_, "Hbar2 active copy", {"aaaa"});
-    Hbar2copy["uvxy"] = Hbar2_["uvxy"];
+    auto Hbar2copy = BlockedTensor::build(tensor_type_, "Hbar2 active copy", {"hhpp"});
+    Hbar2copy["ijab"] = Hbar2_["ijab"];
 
     // special case for CCVV block
     std::vector<std::string> T2blocks(T2_.block_labels());
@@ -316,13 +316,13 @@ void SA_MRDSRG::update_t2() {
     t10.stop();
 
     // reset the active part of Hbar2
-    Hbar2_["uvxy"] = Hbar2copy["uvxy"];
+    Hbar2_["ijab"] = Hbar2copy["ijab"];
 }
 
 void SA_MRDSRG::update_t1() {
     // make a copy of the active part of Hbar2 as it will be used as intermediate
-    auto Hbar1copy = BlockedTensor::build(tensor_type_, "Hbar1 active copy", {"aa"});
-    Hbar1copy["uv"] = Hbar1_["uv"];
+    auto Hbar1copy = BlockedTensor::build(tensor_type_, "Hbar1 active copy", {"hp"});
+    Hbar1copy["ia"] = Hbar1_["ia"];
 
     // special case for CV block
     std::vector<std::string> T1blocks(T1_.block_labels());
@@ -415,7 +415,7 @@ void SA_MRDSRG::update_t1() {
     T1norm_ = T1_.norm(2);
 
     // reset the active part of Hbar2
-    Hbar1_["uv"] = Hbar1copy["uv"];
+    Hbar1_["ia"] = Hbar1copy["ia"];
 }
 
 void SA_MRDSRG::dump_amps_to_disk() {

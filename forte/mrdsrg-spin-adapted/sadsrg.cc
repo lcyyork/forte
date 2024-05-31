@@ -446,25 +446,41 @@ void SADSRG::fill_three_index_ints(ambit::BlockedTensor B) {
 std::shared_ptr<ActiveSpaceIntegrals> SADSRG::compute_Heff_actv() {
     // de-normal-order DSRG transformed Hamiltonian
     double Edsrg = Eref_ + Hbar0_;
+    ambit::Tensor H1, H2;
+
     if (foptions_->get_bool("FORM_HBAR3")) {
         deGNO_ints("Hamiltonian", Edsrg, Hbar1_, Hbar2_, Hbar3_);
         rotate_three_ints_to_original(Hbar3_);
     } else {
-        deGNO_ints("Hamiltonian", Edsrg, Hbar1_, Hbar2_);
+        if (mo_space_info_->size("VALENCE_DOCC") + mo_space_info_->size("VALENCE_UOCC") != 0) {
+            deGNO_ints2("Hamiltonian", Edsrg, Hbar1_, Hbar2_, H1, H2);
+        } else {
+            deGNO_ints("Hamiltonian", Edsrg, Hbar1_, Hbar2_);
+        }
     }
     rotate_one_ints_to_original(Hbar1_);
     rotate_two_ints_to_original(Hbar2_);
 
-    // create FCIIntegral shared_ptr
-    auto fci_ints =
-        std::make_shared<ActiveSpaceIntegrals>(ints_, actv_mos_, actv_mos_sym_, core_mos_);
-    fci_ints->set_scalar_energy(Edsrg - Enuc_ - Efrzc_);
-    fci_ints->set_restricted_one_body_operator(Hbar1_.block("aa").data(),
-                                               Hbar1_.block("aa").data());
+    // create ActiveSpaceIntegrals shared_ptr
+    std::vector<size_t> a_mos, c_mos;
+    std::vector<int> a_mos_sym;
+    if (complete_valence_ints_) {
+        a_mos = mo_space_info_->corr_absolute_mo("POST_DSRG_ACTIVE");
+        a_mos_sym = mo_space_info_->symmetry("POST_DSRG_ACTIVE");
+        c_mos = mo_space_info_->corr_absolute_mo("EXTERNAL_DOCC");
+    } else {
+        a_mos = actv_mos_;
+        a_mos_sym = actv_mos_sym_;
+        c_mos = core_mos_;
+    }
 
-    auto Hbar2aa = Hbar2_.block("aaaa").clone();
-    Hbar2aa("pqrs") -= Hbar2_.block("aaaa")("pqsr");
-    fci_ints->set_active_integrals(Hbar2aa, Hbar2_.block("aaaa"), Hbar2aa);
+    auto fci_ints = std::make_shared<ActiveSpaceIntegrals>(ints_, a_mos, a_mos_sym, c_mos);
+    fci_ints->set_scalar_energy(Edsrg - Enuc_ - Efrzc_);
+    fci_ints->set_restricted_one_body_operator(H1.data(), H1.data());
+
+    auto H2aa = H2.clone();
+    H2aa("pqrs") -= H2("pqsr");
+    fci_ints->set_active_integrals(H2aa, H2, H2aa);
 
     return fci_ints;
 }
@@ -609,6 +625,154 @@ void SADSRG::deGNO_ints(const std::string& name, double& H0, BlockedTensor& H1, 
     print_contents("Computing the 1-body term");
 
     H1.block("aa")("uv") -= 0.5 * temp("uxvy") * L1a("yx");
+    print_done(t1.get());
+}
+
+void SADSRG::deGNO_ints2(const std::string& name, double& H0, BlockedTensor& H1, BlockedTensor& H2,
+                         ambit::Tensor& H1t, ambit::Tensor& H2t) {
+    print_h2("De-Normal-Order DSRG Transformed " + name);
+
+    auto no = mo_space_info_->size("ACTIVE");
+    std::vector<std::string> cav_labels{"c", "a", "v"};
+
+    std::vector<std::string> blocks2, blocks4;
+    for (const auto& blocks_vec : math::cartesian_product(std::vector(2, cav_labels))) {
+        std::stringstream ss;
+        for (const auto& i : blocks_vec)
+            ss << i;
+        blocks2.push_back(ss.str());
+    }
+    for (const auto& blocks_vec : math::cartesian_product(std::vector(4, cav_labels))) {
+        std::stringstream ss;
+        for (const auto& i : blocks_vec)
+            ss << i;
+        blocks4.push_back(ss.str());
+    }
+
+    // test if all blocks available for H1 and H2
+    for (const auto& block : blocks2) {
+        if (not H1.is_block(block))
+            throw std::runtime_error("H1 block " + block + " not available!");
+    }
+    for (const auto& block : blocks4) {
+        if (not H2.is_block(block))
+            throw std::runtime_error("H2 block " + block + " not available!");
+    }
+    no = mo_space_info_->size("POST_DSRG_ACTIVE");
+
+    H1t = ambit::Tensor::build(tensor_type_, "H1 post-dsrg", {no, no});
+    H2t = ambit::Tensor::build(tensor_type_, "H1 post-dsrg", {no, no, no, no});
+
+    /// need to expand the diagonalization space
+    local_timer tmisc;
+    print_contents("Preparing tensors");
+
+    // valence orbitals in C/A/V blocks
+    auto vdocc_in_rdocc = mo_space_info_->pos_in_space("VALENCE_DOCC", "RESTRICTED_DOCC");
+    auto vuocc_in_ruocc = mo_space_info_->pos_in_space("VALENCE_UOCC", "RESTRICTED_UOCC");
+    std::vector<size_t> actv_in_actv(actv_mos_.size());
+    std::iota(actv_in_actv.begin(), actv_in_actv.end(), 0);
+
+    std::map<char, std::vector<size_t>> label_to_cav;
+    label_to_cav['c'] = vdocc_in_rdocc;
+    label_to_cav['a'] = actv_in_actv;
+    label_to_cav['v'] = vuocc_in_ruocc;
+
+    // valence C/A/V in entire valence
+    auto vdocc_in_valence = mo_space_info_->pos_in_space("VALENCE_DOCC", "POST_DSRG_ACTIVE");
+    auto vuocc_in_valence = mo_space_info_->pos_in_space("VALENCE_UOCC", "POST_DSRG_ACTIVE");
+    auto actv_in_valence = mo_space_info_->pos_in_space("GAS1", "POST_DSRG_ACTIVE");
+
+    std::map<char, std::vector<size_t>> label_to_valence;
+    label_to_valence['c'] = vdocc_in_valence;
+    label_to_valence['a'] = actv_in_valence;
+    label_to_valence['v'] = vuocc_in_valence;
+
+    // prepare the valence integrals
+    auto& H1t_data = H1t.data();
+    auto& H2t_data = H2t.data();
+
+    // fill in H1t with DSRG-transformed Hamiltonian
+    for (const auto& block : blocks2) {
+        auto label0 = block[0];
+        auto label1 = block[1];
+
+        auto& data = H1.block(block).data();
+        auto dim1 = label_to_spacemo_[label1].size();
+
+        for (size_t p = 0, psize = label_to_cav[label0].size(); p < psize; ++p) {
+            for (size_t q = 0, qsize = label_to_cav[label1].size(); q < qsize; ++q) {
+                H1t_data[label_to_valence[label0][p] * no + label_to_valence[label1][q]] =
+                    data[label_to_cav[label0][p] * dim1 + label_to_cav[label1][q]];
+            }
+        }
+    }
+
+    // fill in H2t with DSRG-transformed Hamiltonian
+    for (const auto& block : blocks4) {
+        auto label0 = block[0];
+        auto label1 = block[1];
+        auto label2 = block[2];
+        auto label3 = block[3];
+
+        auto& data = H2.block(block).data();
+        auto dim3 = label_to_spacemo_[label3].size();
+        auto dim2 = label_to_spacemo_[label2].size() * dim3;
+        auto dim1 = label_to_spacemo_[label1].size() * dim2;
+
+        for (size_t p = 0, psize = label_to_cav[label0].size(); p < psize; ++p) {
+            for (size_t q = 0, qsize = label_to_cav[label1].size(); q < qsize; ++q) {
+                for (size_t r = 0, rsize = label_to_cav[label2].size(); r < rsize; ++r) {
+                    for (size_t s = 0, ssize = label_to_cav[label3].size(); s < ssize; ++s) {
+                        auto small = label_to_valence[label0][p] * no * no * no +
+                                     label_to_valence[label1][q] * no * no +
+                                     label_to_valence[label2][r] * no + label_to_valence[label3][s];
+                        auto large = label_to_cav[label0][p] * dim1 +
+                                     label_to_cav[label1][q] * dim2 +
+                                     label_to_cav[label2][r] * dim3 + label_to_cav[label3][s];
+                        H2t_data[small] = data[large];
+                    }
+                }
+            }
+        }
+    }
+
+    // H2t.print();
+    // Hbar2_.print();
+
+    // build a temp["pqrs"] = 2 * H2["pqrs"] - H2["pqsr"]
+    auto temp = H2t.clone();
+    temp.scale(2.0);
+    temp("pqrs") -= H2t("pqsr");
+
+    // prepare valence RDMs
+    auto L2 = L2_.block("aaaa");
+    auto L1 = ambit::Tensor::build(tensor_type_, "L1 post-dsrg", {no, no});
+
+    auto na = mo_space_info_->size("ACTIVE");
+    for (size_t u = 0, size = actv_in_valence.size(); u < size; ++u) {
+        for (size_t v = 0; v < size; ++v) {
+            L1.data()[actv_in_valence[u] * no + actv_in_valence[v]] =
+                L1_.block("aa").data()[u * na + v];
+        }
+    }
+    for (const auto& m : vdocc_in_valence) {
+        L1.data()[m * no + m] = 2.0;
+    }
+    print_done(tmisc.get());
+
+    // compute scalar
+    local_timer t0;
+    print_contents("Computing the scalar term");
+    H0 -= H1t("vu") * L1("uv");
+    H0 -= 0.5 * Hbar2_.block("aaaa")("xyuv") * L2("uvxy");
+    H0 += 0.25 * L1("uv") * temp("vyux") * L1("xy");
+    print_done(t0.get());
+
+    // 1-body
+    local_timer t1;
+    print_contents("Computing the 1-body term");
+    H1t("uv") -= 0.5 * temp("uxvy") * L1("yx");
     print_done(t1.get());
 }
 
@@ -866,16 +1030,16 @@ std::vector<double> SADSRG::diagonalize_Fock_diagblocks(BlockedTensor& U) {
     // loop each correlated elementary space
     int nirrep = mo_space_info_->nirrep();
 
-    auto elementary_spaces = mo_space_info_->composite_space_names()["CORRELATED"];
-    for (const std::string& space : elementary_spaces) {
+    for (const std::string& space :
+         {"RESTRICTED_DOCC", "GAS1", "GAS2", "GAS3", "GAS4", "GAS5", "GAS6", "RESTRICTED_UOCC"}) {
         if (mo_space_info_->size(space) == 0 or semi_checked_results_[space])
             continue;
 
         std::string block, composite_space;
-        if (space.find("DOCC") != std::string::npos) {
+        if (space == "RESTRICTED_DOCC") {
             block = core_label_ + core_label_;
             composite_space = space;
-        } else if (space.find("UOCC") != std::string::npos) {
+        } else if (space == "RESTRICTED_UOCC") {
             block = virt_label_ + virt_label_;
             composite_space = space;
         } else {
