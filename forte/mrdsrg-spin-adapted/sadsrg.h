@@ -73,7 +73,7 @@ class SADSRG : public DynamicCorrelationSolver {
     std::vector<double> epsilon(char block);
 
     /// If the amplitudes are converged or not
-    bool converged() {return converged_; }
+    bool converged() { return converged_; }
 
   protected:
     /// Startup function called in constructor
@@ -374,6 +374,10 @@ class SADSRG : public DynamicCorrelationSolver {
      * V: antisymmetrized 2-electron integrals
      * B: 3-index integrals from DF/CD
      */
+    /// Compute commutator C0+C1+C2 = [H1+H2, A1+A2]
+    void linear_commutator_12(BlockedTensor& H1, BlockedTensor& H2, BlockedTensor& T1,
+                              BlockedTensor& T2, const double alpha, double& C0, BlockedTensor& C1,
+                              BlockedTensor& C2);
 
     /// Compute zero-body term of commutator [H1, T1]
     double H1_T1_C0(BlockedTensor& H1, BlockedTensor& T1, const double& alpha, double& C0);

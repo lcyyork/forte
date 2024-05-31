@@ -217,6 +217,10 @@ void SA_MRDSRG::compute_hbar() {
     // iteration variables
     bool converged = false;
 
+    auto X0 = 0.0;
+    auto C1 = BTF_->build(tensor_type_, "C1 X", {"gg"});
+    auto C2 = BTF_->build(tensor_type_, "C2 X", {"gggg"});
+
     // compute Hbar recursively
     for (int n = 1; n <= rsc_ncomm_; ++n) {
         // prefactor before n-nested commutator
@@ -226,6 +230,10 @@ void SA_MRDSRG::compute_hbar() {
         double C0 = 0.0;
         C1_.zero();
         C2_.zero();
+
+        X0 = 0.0;
+        C1.zero();
+        C2.zero();
 
         // printing level
         if (print_ > 3) {
@@ -271,17 +279,36 @@ void SA_MRDSRG::compute_hbar() {
             outfile->Printf("\n    %s\n", dash.c_str());
         }
 
+        linear_commutator_12(O1_, O2_, T1_, T2_, factor, X0, C1, C2);
+        C1.block("cc").print();
+
         // [H, A] = [H, T] + [H, T]^dagger
         C0 *= 2.0;
         O1_["pq"] = C1_["pq"];
         C1_["pq"] += O1_["qp"];
         O2_["pqrs"] = C2_["pqrs"];
         C2_["pqrs"] += O2_["rspq"];
+        C1_.block("cc").print();
 
         // Hbar += C
         Hbar0_ += C0;
         Hbar1_["pq"] += C1_["pq"];
         Hbar2_["pqrs"] += C2_["pqrs"];
+
+        X0 -= C0;
+        C1["pq"] -= C1_["pq"];
+        C2["pqrs"] -= C2_["pqrs"];
+        outfile->Printf("\n diff: C0 = %.15f, C1 = %.15f, C2 = %.15f", X0, C1.norm(), C2.norm());
+        // for (auto& block: C1.block_labels()) {
+        //     outfile->Printf("\n C1 block %s diff: %20.15f", block.c_str(),
+        //     C1.block(block).norm());
+        // }
+        // for (auto& block: C2.block_labels()) {
+        //     outfile->Printf("\n C2 block %s diff: %20.15f", block.c_str(),
+        //     C2.block(block).norm());
+        // }
+        if (n > 1)
+            exit(1);
 
         // copy C to O for next level commutator
         O1_["pq"] = C1_["pq"];
