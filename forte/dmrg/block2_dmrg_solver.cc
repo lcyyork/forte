@@ -232,6 +232,7 @@ Block2DMRGSolver::Block2DMRGSolver(StateInfo state, size_t nroot, std::shared_pt
     bool is_spin_adapted =
         as_ints->ints()->spin_restriction() == IntegralSpinRestriction::Restricted &&
         options_->get_bool("BLOCK2_SPIN_ADAPTED");
+    is_spin_adapted = false; // turn off spin-adaptation for now
     if (print_ >= PrintLevel::Default) {
         print_method_banner(
             {is_spin_adapted ? "block2 DMRG (spin-adapted)" : "block2 DMRG (non-spin-adapted)",
@@ -726,6 +727,150 @@ Block2DMRGSolver::transition_rdms(const std::vector<std::pair<size_t, size_t>>& 
     }
 
     return rdms;
+}
+
+std::vector<double>
+Block2DMRGSolver::compute_complementary_H2caa_overlap(const std::vector<size_t>& roots,
+                                                      ambit::Tensor Tbra, ambit::Tensor Tket) {
+    auto dims_bra = Tbra.dims();
+    auto dims_ket = Tket.dims();
+    auto nactv = mo_space_info_->size("ACTIVE");
+
+    if (dims_bra.size() != 4)
+        throw std::runtime_error("Invalid Tensor for bra: Dimension must be 4!");
+    if (dims_ket.size() != 4)
+        throw std::runtime_error("Invalid Tensor for ket: Dimension must be 4!");
+    if ((dims_bra[1] != nactv) or (dims_bra[2] != nactv) or (dims_bra[3] != nactv))
+        throw std::runtime_error("Invalid Tensor for bra: Too many non-active indices");
+    if ((dims_ket[0] != nactv) or (dims_ket[1] != nactv) or (dims_ket[3] != nactv))
+        throw std::runtime_error("Invalid Tensor for ket: Too many non-active indices");
+    if (dims_bra[0] != dims_ket[2])
+        throw std::runtime_error("Invalid contracted index for bra and ket Tensors");
+
+    auto nroots = roots.size();
+    std::vector<double> out(nroots, 0.0);
+
+    auto non_actv = dims_bra[0];
+
+    auto& Tbra_data = Tbra.data();
+    auto Tket_ = ambit::Tensor::build(Tket.type(), "Tket_T",
+                                      {dims_ket[2], dims_ket[3], dims_ket[0], dims_ket[1]});
+    Tket_("pqrs") = Tket("rspq");
+    auto& Tket_data = Tket.data();
+
+    auto na1 = static_cast<int>(nactv);
+    auto na2 = na1 * na1;
+    auto na3 = na2 * na1;
+    const std::vector<int> tshape{na1, na1, na1};
+    const std::vector<size_t> tstride{nactv * nactv, 1, nactv};
+
+    // reset stack memory
+    auto stack_mem =
+        static_cast<size_t>(dmrg_options_->get_double("BLOCK2_STACK_MEM") * 1024 * 1024 * 1024);
+    impl_->reset_stack_memory(stack_mem);
+
+    // system initialization
+    bool singlet_embedding = dmrg_options_->get_bool("BLOCK2_SINGLET_EMBEDDING");
+    auto actv_irreps = mo_space_info_->symmetry("ACTIVE");
+    int n_sites = static_cast<int>(mo_space_info_->size("ACTIVE"));
+    int n_elec = na_ + nb_;
+    int spin = state_.multiplicity() - 1;
+    int pg_irrep = state_.irrep();
+    impl_->initialize_system(n_sites, n_elec, spin, pg_irrep, actv_irreps, singlet_embedding);
+
+    int dmrg_verbose = dmrg_options_->get_int("BLOCK2_VERBOSE");
+
+    /// Ψ(N-1) = h_{pσ} (t) |Ψ (N)>
+    ///        = \sum_{uvw} t^{uv}_{pw} \sum_{σ1} w^+_{σ1} v_{σ1} u_{σ} |Ψ(N)>
+
+    for (size_t ir = 0; ir < nroots; ++ir) {
+        // loading MPSs from disk
+        std::string ket_tag_sa = "KET@" + state().str_short();
+        std::string ket_tag =
+            "KET@" + block2::Parsing::to_string(ir) + "@" + state().str_short() + "@TMP";
+        auto ket = impl_->split_mps(impl_->load_mps(ket_tag_sa, this->nroot()), this->nroot(), ir,
+                                    ket_tag);
+        auto ket_ = std::static_pointer_cast<block2::MPS<block2::SU2, double>>(ket);
+
+        auto ref_ket1 = ket_->deep_copy(ket_->info->tag + "@DSRG-REF1");
+        auto ref_ket2 = ket_->deep_copy(ket_->info->tag + "@DSRG-REF2");
+
+        for (size_t p = 0; p < non_actv; ++p) {
+            psi::outfile->Printf("\n orbital %zu", p);
+            // auto r_bra = impl_->expr_builder();
+            // r_bra->exprs.push_back("(D+(C+D)0)1");
+            // r_bra->add_sum_term(Tbra_data.data() + p * na3, na3, tshape, tstride, 1.0e-12, 1.0,
+            //                     actv_irreps);
+            // r_bra = r_bra->adjust_order();
+            // auto bra_mpo = impl_->get_mpo(r_bra, dmrg_verbose);
+            // auto bra_mpo_ = std::static_pointer_cast<block2::MPO<block2::SU2, double>>(bra_mpo);
+
+            // auto r_ket = impl_->expr_builder();
+            // r_ket->exprs.push_back("(D+(C+D)0)1");
+            // r_ket->add_sum_term(Tket_data.data() + p * na3, na3, tshape, tstride, 1.0e-12, 1.0,
+            //                     actv_irreps);
+            // r_ket = r_ket->adjust_order();
+            // auto ket_mpo = impl_->get_mpo(r_ket, dmrg_verbose);
+            // auto ket_mpo_ = std::static_pointer_cast<block2::MPO<block2::SU2, double>>(ket_mpo);
+
+            // auto bra_q = bra_mpo_->op->q_label + ket_->info->target;
+            // auto ket_q = ket_mpo_->op->q_label + ket_->info->target;
+
+            // auto bra = impl_->get_random_mps("BRA.CPS", 500, 0, 2, nroot_, occs);
+        }
+    }
+    /**
+     * bras = {}
+for si in [0, 1]: # spin of spatial orbital i
+    for i in range(n_sites):
+
+        # construct mpo for the three-operator partial Hamiltonian
+        b = driver.expr_builder()
+        if si == 0: # alpha
+            b.add_sum_term("cdd", 0.5 * g2e.transpose(0, 2, 3, 1)[i])
+            b.add_sum_term("CDd", 0.5 * g2e.transpose(0, 2, 3, 1)[i])
+            b.add_sum_term("d", h1e[i])
+        else: # beta
+            b.add_sum_term("cdD", 0.5 * g2e.transpose(0, 2, 3, 1)[i])
+            b.add_sum_term("CDD", 0.5 * g2e.transpose(0, 2, 3, 1)[i])
+            b.add_sum_term("D", h1e[i])
+        pmpo = driver.get_mpo(b.finalize())
+
+        # bra_q is the total quantum number of the bra mps
+        bra_q = pmpo.op.q_label + ket.info.target
+
+        # compute |bra> = pmpo |ket>
+        bra = driver.get_random_mps(tag='BRA.%d.%d' % (si, i), bond_dim=500,
+                                    center=ket.center, target=bra_q)
+        norm = driver.multiply(bra, pmpo, ket.deep_copy('TMP'), n_sweeps=10,
+                               iprint=0)
+        print("%5d %-8s norm(bra) = %10.5f" % (i, "beta" if si else "alpha",
+                                               norm))
+
+        # save mps
+        bras[(si, i)] = bra
+
+        # construct mpo for a single creation operator
+        smpo = driver.get_mpo(driver.expr_builder()
+                              .add_term("cC"[si], [i], 1.0).finalize())
+        hket_q = smpo.op.q_label + bra.info.target
+
+        # compute |hket> = a^\dagger_i |bra>
+        hket = driver.get_random_mps(tag='HKET', bond_dim=500,
+                                     center=bra.center, target=hket_q)
+        norm = driver.multiply(hket, smpo, bra.deep_copy('TMP'),
+                               n_sweeps=10, iprint=0)
+
+        # compute E_i = <hket|ket>
+        e_part = driver.expectation(hket, ident_mpo, ket.deep_copy('TMP'),
+                                    iprint=0)
+        print("%5d %-8s partial E = %10.5f" % (i, "beta" if si else "alpha",
+                                               e_part))
+
+        e_total += e_part
+     *
+     */
+    return out;
 }
 
 void Block2DMRGSolver::set_options(std::shared_ptr<ForteOptions> options) {

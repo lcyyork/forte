@@ -69,7 +69,7 @@ class ProcedureDSRG:
         self.max_rdm_level = 3 if options.get_str("THREEPDC") != "ZERO" else 2
         if options.get_str("DSRG_3RDM_ALGORITHM") == "DIRECT":
             as_type = options.get_str("ACTIVE_SPACE_SOLVER")
-            if as_type == "CAS" and self.solver_type in ["SA-MRDSRG", "SA_MRDSRG"]:
+            if as_type == "BLOCK2" and self.solver_type in ["SA-MRDSRG", "SA_MRDSRG"]:
                 self.max_rdm_level = 2
             else:
                 psi4.core.print_out("\n  DSRG 3RDM direct algorithm only available for CAS/SA-MRDSRG")

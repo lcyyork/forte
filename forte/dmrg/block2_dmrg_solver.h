@@ -97,6 +97,10 @@ class Block2DMRGSolver : public ActiveSpaceMethod {
 
     void dump_wave_function(const std::string&) override;
 
+    std::vector<double> compute_complementary_H2caa_overlap(const std::vector<size_t>& /*roots*/,
+                                                            ambit::Tensor /*Tbra*/,
+                                                            ambit::Tensor /*Tket*/) override;
+
   private:
     /// SCFInfo object
     std::shared_ptr<SCFInfo> scf_info_;
