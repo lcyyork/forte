@@ -456,6 +456,8 @@ std::shared_ptr<ActiveSpaceIntegrals> SADSRG::compute_Heff_actv() {
             deGNO_ints2("Hamiltonian", Edsrg, Hbar1_, Hbar2_, H1, H2);
         } else {
             deGNO_ints("Hamiltonian", Edsrg, Hbar1_, Hbar2_);
+            H1 = Hbar1_.block("aa");
+            H2 = Hbar2_.block("aaaa");
         }
     }
     rotate_one_ints_to_original(Hbar1_);
@@ -473,6 +475,7 @@ std::shared_ptr<ActiveSpaceIntegrals> SADSRG::compute_Heff_actv() {
         a_mos_sym = actv_mos_sym_;
         c_mos = core_mos_;
     }
+    outfile->Printf("\n POST_DSRG_ACTIVE = %zu, POST_DSRG_CORE = %zu", a_mos.size(), c_mos.size());
 
     auto fci_ints = std::make_shared<ActiveSpaceIntegrals>(ints_, a_mos, a_mos_sym, c_mos);
     fci_ints->set_scalar_energy(Edsrg - Enuc_ - Efrzc_);
