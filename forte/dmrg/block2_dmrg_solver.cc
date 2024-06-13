@@ -734,6 +734,10 @@ Block2DMRGSolver::transition_rdms(const std::vector<std::pair<size_t, size_t>>& 
 std::vector<double>
 Block2DMRGSolver::compute_complementary_H2caa_overlap(const std::vector<size_t>& roots,
                                                       ambit::Tensor Tbra, ambit::Tensor Tket) {
+    /// bra_{pσ} = \sum_{uvw} Tbra_{pwuv} \sum_{σ1} w^+_{σ1} v_{σ1} u_{σ} |Ψ>
+    /// ket_{pσ} = \sum_{uvw} Tket_{uvpw} \sum_{σ1} w^+_{σ1} v_{σ1} u_{σ} |Ψ>
+    /// energy <- \sum_{p} \sum_{σ} <bra_{pσ}|ket_{pσ}>
+
     auto dims_bra = Tbra.dims();
     auto dims_ket = Tket.dims();
     auto nactv = mo_space_info_->size("ACTIVE");
@@ -755,6 +759,8 @@ Block2DMRGSolver::compute_complementary_H2caa_overlap(const std::vector<size_t>&
     auto non_actv = dims_bra[0];
 
     auto& Tbra_data = Tbra.data();
+
+    // reorder Tket index from uvpw to pwuv
     auto Tket_ = ambit::Tensor::build(Tket.type(), "Tket_T",
                                       {dims_ket[2], dims_ket[3], dims_ket[0], dims_ket[1]});
     Tket_("pqrs") = Tket("rspq");
@@ -782,8 +788,12 @@ Block2DMRGSolver::compute_complementary_H2caa_overlap(const std::vector<size_t>&
 
     int dmrg_verbose = dmrg_options_->get_int("BLOCK2_VERBOSE");
 
-    /// Ψ(N-1) = h_{pσ} (t) |Ψ (N)>
-    ///        = \sum_{uvw} t^{uv}_{pw} \sum_{σ1} w^+_{σ1} v_{σ1} u_{σ} |Ψ(N)>
+    auto identity = impl_->expr_builder();
+    identity->exprs.push_back("");
+    identity->indices.push_back({});
+    identity->data.push_back({1.0});
+    identity->adjust_order();
+    auto impo = std::static_pointer_cast<block2::MPO<block2::SZ, double>>(impl_->get_mpo(identity, dmrg_verbose));
 
     for (size_t ir = 0; ir < nroots; ++ir) {
         // loading MPSs from disk
@@ -792,37 +802,87 @@ Block2DMRGSolver::compute_complementary_H2caa_overlap(const std::vector<size_t>&
             "KET@" + block2::Parsing::to_string(ir) + "@" + state().str_short() + "@TMP";
         auto ket = impl_->split_mps(impl_->load_mps(ket_tag_sa, this->nroot()), this->nroot(), ir,
                                     ket_tag);
-        auto ket_ = std::static_pointer_cast<block2::MPS<block2::SZ, double>>(ket);
-
-        auto ref_ket1 = ket_->deep_copy(ket_->info->tag + "@DSRG-REF1");
-        auto ref_ket2 = ket_->deep_copy(ket_->info->tag + "@DSRG-REF2");
+        auto ket0 = std::static_pointer_cast<block2::MPS<block2::SZ, double>>(ket);
 
         for (size_t p = 0; p < non_actv; ++p) {
             psi::outfile->Printf("\n orbital %zu", p);
+            for (size_t sigma = 0; sigma != 2; ++sigma) {
+                auto bra_expr = impl_->expr_builder();
+                if (sigma == 0) {
+                    bra_expr->exprs.push_back("cdd");
+                    bra_expr->exprs.push_back("CDd");
+                } else {
+                    bra_expr->exprs.push_back("cdD");
+                    bra_expr->exprs.push_back("CDD");
+                }
+                bra_expr->add_sum_term(Tbra_data.data() + p * na3, na3, tshape, tstride, 1.0e-12,
+                                       1.0, actv_irreps);
+                bra_expr->add_sum_term(Tbra_data.data() + p * na3, na3, tshape, tstride, 1.0e-12,
+                                       1.0, actv_irreps);
+                bra_expr = bra_expr->adjust_order();
 
-            // alpha spin
-            auto a_bra = impl_->expr_builder();
-            a_bra->exprs.push_back("cdd");
-            a_bra->exprs.push_back("CDd");
-            a_bra->add_sum_term(Tbra_data.data() + p * na3, na3, tshape, tstride, 1.0e-12, 1.0,
-                                actv_irreps);
-            a_bra->add_sum_term(Tbra_data.data() + p * na3, na3, tshape, tstride, 1.0e-12, 1.0,
-                                actv_irreps);
-            a_bra = a_bra->adjust_order();
-            auto a_bra_mpo = impl_->get_mpo(a_bra, dmrg_verbose);
-            auto a_bra_mpo_ = std::static_pointer_cast<block2::MPO<block2::SZ, double>>(a_bra_mpo);
-            auto bra_q = a_bra_mpo_->op->q_label + ket_->info->target;
+                auto bmpo = std::static_pointer_cast<block2::MPO<block2::SZ, double>>(
+                    impl_->get_mpo(bra_expr, dmrg_verbose));
+                auto bq = bmpo->op->q_label + ket0->info->target;
+                std::string btag = "BRA." + std::to_string(p);
+                btag += (sigma == 0 ? ".A" : ".B");
+                auto bra = impl_->driver_sz_->get_random_mps(btag, 500, ket0->center, 2, bq);
 
-            impl_->driver_sz_->get_random_mps("BRA.A." + std::to_string(p), 500, 0, 2, bra_q, 1, {},
-                                              true);
+                auto bme = make_shared<block2::MovingEnvironment<block2::SZ, double, double>>(
+                    bmpo, bra, ket0, "MULT");
+                bme->delayed_contraction = block2::OpNamesSet::normal_ops();
+                bme->cached_contraction = true;
+                bme->init_environments(true);
 
-            // auto me = impl_->driver_sz_->env
-            // me = bw.bs.MovingEnvironment(mpo, bra, ket, "MULT")
-            // me.delayed_contraction = bw.b.OpNamesSet.normal_ops()
-            // me.cached_contraction = pme is None  # not allowed by perturbative noise
-            // me.init_environments(iprint >= 2)
+                std::vector<block2::ubond_t> bra_bond_dims{1000};
+                std::vector<block2::ubond_t> ket_bond_dims{500};
+                std::vector<double> noises{0.0};
+
+                auto bcps = std::make_shared<block2::Linear<block2::SZ, double, double>>(
+                    bme, bra_bond_dims, ket_bond_dims, noises);
+                auto bnorm = bcps->solve(10, true, 1.0e-6);
+
+                auto ket_expr = impl_->expr_builder();
+                if (sigma == 0) {
+                    ket_expr->exprs.push_back("cdd");
+                    ket_expr->exprs.push_back("CDd");
+                } else {
+                    ket_expr->exprs.push_back("cdD");
+                    ket_expr->exprs.push_back("CDD");
+                }
+                ket_expr->add_sum_term(Tket_data.data() + p * na3, na3, tshape, tstride, 1.0e-12,
+                                       1.0, actv_irreps);
+                ket_expr->add_sum_term(Tket_data.data() + p * na3, na3, tshape, tstride, 1.0e-12,
+                                       1.0, actv_irreps);
+                ket_expr = ket_expr->adjust_order();
+
+                auto kmpo = std::static_pointer_cast<block2::MPO<block2::SZ, double>>(
+                    impl_->get_mpo(ket_expr, dmrg_verbose));
+                auto kq = kmpo->op->q_label + ket0->info->target;
+                std::string ktag = "KET." + std::to_string(p);
+                ktag += (sigma == 0 ? ".A" : ".B");
+                auto ket = impl_->driver_sz_->get_random_mps(ktag, 500, ket0->center, 2, kq);
+
+                auto kme = make_shared<block2::MovingEnvironment<block2::SZ, double, double>>(
+                    kmpo, ket, ket0, "MULT");
+                kme->delayed_contraction = block2::OpNamesSet::normal_ops();
+                kme->cached_contraction = true;
+                kme->init_environments(true);
+
+                auto kcps = std::make_shared<block2::Linear<block2::SZ, double, double>>(
+                    kme, bra_bond_dims, ket_bond_dims, noises);
+                auto knorm = kcps->solve(10, true, 1.0e-6);
+
+                auto value = impl_->driver_sz_->expectation(bra, impo, ket, true);
+
+                // auto value = impl_->driver_sz_->expectation(bra, kmpo, ket0, true);
+                if (sigma == 0) {
+                    psi::outfile->Printf(" alpha = %20.15f", value);
+                } else {
+                    psi::outfile->Printf(" beta = %20.15f", value);
+                }
+            }
             
-
             // auto r_bra = impl_->expr_builder();
             // r_bra->exprs.push_back("(D+(C+D)0)1");
             // r_bra->add_sum_term(Tbra_data.data() + p * na3, na3, tshape, tstride, 1.0e-12, 1.0,
