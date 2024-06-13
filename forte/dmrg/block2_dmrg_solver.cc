@@ -604,6 +604,8 @@ Block2DMRGSolver::transition_rdms(const std::vector<std::pair<size_t, size_t>>& 
                              (block2::ExpectationAlgorithmTypes::Compressed) |
                              (block2::ExpectationAlgorithmTypes::LowMem));
         auto sweep_bond_dims = dmrg_options_->get_int_list("BLOCK2_SWEEP_BOND_DIMS");
+        if (sweep_bond_dims.size() == 0)
+            sweep_bond_dims.push_back(500);
         std::vector<std::shared_ptr<block2::GTensor<double>>> npdms = impl_->get_npdm(
             exprs, ket, bra, 0, dmrg_verbose, rdm_algo_type, 2 * sweep_bond_dims.back());
 
@@ -790,13 +792,37 @@ Block2DMRGSolver::compute_complementary_H2caa_overlap(const std::vector<size_t>&
             "KET@" + block2::Parsing::to_string(ir) + "@" + state().str_short() + "@TMP";
         auto ket = impl_->split_mps(impl_->load_mps(ket_tag_sa, this->nroot()), this->nroot(), ir,
                                     ket_tag);
-        auto ket_ = std::static_pointer_cast<block2::MPS<block2::SU2, double>>(ket);
+        auto ket_ = std::static_pointer_cast<block2::MPS<block2::SZ, double>>(ket);
 
         auto ref_ket1 = ket_->deep_copy(ket_->info->tag + "@DSRG-REF1");
         auto ref_ket2 = ket_->deep_copy(ket_->info->tag + "@DSRG-REF2");
 
         for (size_t p = 0; p < non_actv; ++p) {
             psi::outfile->Printf("\n orbital %zu", p);
+
+            // alpha spin
+            auto a_bra = impl_->expr_builder();
+            a_bra->exprs.push_back("cdd");
+            a_bra->exprs.push_back("CDd");
+            a_bra->add_sum_term(Tbra_data.data() + p * na3, na3, tshape, tstride, 1.0e-12, 1.0,
+                                actv_irreps);
+            a_bra->add_sum_term(Tbra_data.data() + p * na3, na3, tshape, tstride, 1.0e-12, 1.0,
+                                actv_irreps);
+            a_bra = a_bra->adjust_order();
+            auto a_bra_mpo = impl_->get_mpo(a_bra, dmrg_verbose);
+            auto a_bra_mpo_ = std::static_pointer_cast<block2::MPO<block2::SZ, double>>(a_bra_mpo);
+            auto bra_q = a_bra_mpo_->op->q_label + ket_->info->target;
+
+            impl_->driver_sz_->get_random_mps("BRA.A." + std::to_string(p), 500, 0, 2, bra_q, 1, {},
+                                              true);
+
+            // auto me = impl_->driver_sz_->env
+            // me = bw.bs.MovingEnvironment(mpo, bra, ket, "MULT")
+            // me.delayed_contraction = bw.b.OpNamesSet.normal_ops()
+            // me.cached_contraction = pme is None  # not allowed by perturbative noise
+            // me.init_environments(iprint >= 2)
+            
+
             // auto r_bra = impl_->expr_builder();
             // r_bra->exprs.push_back("(D+(C+D)0)1");
             // r_bra->add_sum_term(Tbra_data.data() + p * na3, na3, tshape, tstride, 1.0e-12, 1.0,
