@@ -232,7 +232,7 @@ Block2DMRGSolver::Block2DMRGSolver(StateInfo state, size_t nroot, std::shared_pt
     bool is_spin_adapted =
         as_ints->ints()->spin_restriction() == IntegralSpinRestriction::Restricted &&
         options_->get_bool("BLOCK2_SPIN_ADAPTED");
-    is_spin_adapted = false; // turn off spin-adaptation for now
+    is_spin_adapted = false;
     if (print_ >= PrintLevel::Default) {
         print_method_banner(
             {is_spin_adapted ? "block2 DMRG (spin-adapted)" : "block2 DMRG (non-spin-adapted)",
@@ -764,7 +764,7 @@ Block2DMRGSolver::compute_complementary_H2caa_overlap(const std::vector<size_t>&
     auto Tket_ = ambit::Tensor::build(Tket.type(), "Tket_T",
                                       {dims_ket[2], dims_ket[3], dims_ket[0], dims_ket[1]});
     Tket_("pqrs") = Tket("rspq");
-    auto& Tket_data = Tket.data();
+    auto& Tket_data = Tket_.data();
 
     auto na1 = static_cast<int>(nactv);
     auto na2 = na1 * na1;
@@ -796,6 +796,8 @@ Block2DMRGSolver::compute_complementary_H2caa_overlap(const std::vector<size_t>&
     auto impo = std::static_pointer_cast<block2::MPO<block2::SZ, double>>(impl_->get_mpo(identity, dmrg_verbose));
 
     for (size_t ir = 0; ir < nroots; ++ir) {
+        double value = 0.0;
+
         // loading MPSs from disk
         std::string ket_tag_sa = "KET@" + state().str_short();
         std::string ket_tag =
@@ -816,9 +818,9 @@ Block2DMRGSolver::compute_complementary_H2caa_overlap(const std::vector<size_t>&
                     bra_expr->exprs.push_back("CDD");
                 }
                 bra_expr->add_sum_term(Tbra_data.data() + p * na3, na3, tshape, tstride, 1.0e-12,
-                                       1.0, actv_irreps);
+                                       1.0);
                 bra_expr->add_sum_term(Tbra_data.data() + p * na3, na3, tshape, tstride, 1.0e-12,
-                                       1.0, actv_irreps);
+                                       1.0);
                 bra_expr = bra_expr->adjust_order();
 
                 auto bmpo = std::static_pointer_cast<block2::MPO<block2::SZ, double>>(
@@ -851,9 +853,9 @@ Block2DMRGSolver::compute_complementary_H2caa_overlap(const std::vector<size_t>&
                     ket_expr->exprs.push_back("CDD");
                 }
                 ket_expr->add_sum_term(Tket_data.data() + p * na3, na3, tshape, tstride, 1.0e-12,
-                                       1.0, actv_irreps);
+                                       1.0);
                 ket_expr->add_sum_term(Tket_data.data() + p * na3, na3, tshape, tstride, 1.0e-12,
-                                       1.0, actv_irreps);
+                                       1.0);
                 ket_expr = ket_expr->adjust_order();
 
                 auto kmpo = std::static_pointer_cast<block2::MPO<block2::SZ, double>>(
@@ -873,14 +875,14 @@ Block2DMRGSolver::compute_complementary_H2caa_overlap(const std::vector<size_t>&
                     kme, bra_bond_dims, ket_bond_dims, noises);
                 auto knorm = kcps->solve(10, true, 1.0e-6);
 
-                auto value = impl_->driver_sz_->expectation(bra, impo, ket, true);
-
-                // auto value = impl_->driver_sz_->expectation(bra, kmpo, ket0, true);
+                auto pvalue = impl_->driver_sz_->expectation(bra, impo, ket, true);
+                // auto pvalue = impl_->driver_sz_->expectation(bra, kmpo, ket0, true);
                 if (sigma == 0) {
-                    psi::outfile->Printf(" alpha = %20.15f", value);
+                    psi::outfile->Printf(" alpha = %20.15f", pvalue);
                 } else {
-                    psi::outfile->Printf(" beta = %20.15f", value);
+                    psi::outfile->Printf(" beta = %20.15f", pvalue);
                 }
+                value += pvalue;
             }
             
             // auto r_bra = impl_->expr_builder();
@@ -904,58 +906,8 @@ Block2DMRGSolver::compute_complementary_H2caa_overlap(const std::vector<size_t>&
 
             // auto bra = impl_->get_random_mps("BRA.CPS", 500, 0, 2, nroot_, occs);
         }
+        out[ir] = value;
     }
-    /**
-     * bras = {}
-for si in [0, 1]: # spin of spatial orbital i
-    for i in range(n_sites):
-
-        # construct mpo for the three-operator partial Hamiltonian
-        b = driver.expr_builder()
-        if si == 0: # alpha
-            b.add_sum_term("cdd", 0.5 * g2e.transpose(0, 2, 3, 1)[i])
-            b.add_sum_term("CDd", 0.5 * g2e.transpose(0, 2, 3, 1)[i])
-            b.add_sum_term("d", h1e[i])
-        else: # beta
-            b.add_sum_term("cdD", 0.5 * g2e.transpose(0, 2, 3, 1)[i])
-            b.add_sum_term("CDD", 0.5 * g2e.transpose(0, 2, 3, 1)[i])
-            b.add_sum_term("D", h1e[i])
-        pmpo = driver.get_mpo(b.finalize())
-
-        # bra_q is the total quantum number of the bra mps
-        bra_q = pmpo.op.q_label + ket.info.target
-
-        # compute |bra> = pmpo |ket>
-        bra = driver.get_random_mps(tag='BRA.%d.%d' % (si, i), bond_dim=500,
-                                    center=ket.center, target=bra_q)
-        norm = driver.multiply(bra, pmpo, ket.deep_copy('TMP'), n_sweeps=10,
-                               iprint=0)
-        print("%5d %-8s norm(bra) = %10.5f" % (i, "beta" if si else "alpha",
-                                               norm))
-
-        # save mps
-        bras[(si, i)] = bra
-
-        # construct mpo for a single creation operator
-        smpo = driver.get_mpo(driver.expr_builder()
-                              .add_term("cC"[si], [i], 1.0).finalize())
-        hket_q = smpo.op.q_label + bra.info.target
-
-        # compute |hket> = a^\dagger_i |bra>
-        hket = driver.get_random_mps(tag='HKET', bond_dim=500,
-                                     center=bra.center, target=hket_q)
-        norm = driver.multiply(hket, smpo, bra.deep_copy('TMP'),
-                               n_sweeps=10, iprint=0)
-
-        # compute E_i = <hket|ket>
-        e_part = driver.expectation(hket, ident_mpo, ket.deep_copy('TMP'),
-                                    iprint=0)
-        print("%5d %-8s partial E = %10.5f" % (i, "beta" if si else "alpha",
-                                               e_part))
-
-        e_total += e_part
-     *
-     */
     return out;
 }
 
