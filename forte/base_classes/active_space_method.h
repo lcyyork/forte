@@ -166,7 +166,8 @@ class ActiveSpaceMethod {
     /// \sum_{puvwxyzστθ} v_{pwxy} t_{uvpz} <Ψ| xσ^+ yτ^+ wτ zθ^+ vθ uσ |Ψ>
     virtual std::vector<double>
     compute_complementary_H2caa_overlap(const std::vector<size_t>& /*roots*/,
-                                        ambit::Tensor /*Tbra*/, ambit::Tensor /*Tket*/) {
+                                        ambit::Tensor /*Tbra*/, ambit::Tensor /*Tket*/,
+                                        const std::string& /*nonactv_non_space*/) {
         throw std::runtime_error(
             "ActiveSpaceMethod::compute_complementary_H2caa_overlap: Not yet implemented!");
     }

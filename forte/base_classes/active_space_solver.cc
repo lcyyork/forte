@@ -900,7 +900,8 @@ std::shared_ptr<RDMs> ActiveSpaceSolver::compute_average_rdms(
 }
 
 std::map<StateInfo, std::vector<double>>
-ActiveSpaceSolver::compute_complementary_H2caa_overlap(ambit::Tensor Tbra, ambit::Tensor Tket) {
+ActiveSpaceSolver::compute_complementary_H2caa_overlap(ambit::Tensor Tbra, ambit::Tensor Tket,
+                                                       const std::string& nonactv_mo_space) {
     std::map<StateInfo, std::vector<double>> out;
     for (const auto& state_nroots : state_nroots_map_) {
         const auto& state = state_nroots.first;
@@ -909,7 +910,7 @@ ActiveSpaceSolver::compute_complementary_H2caa_overlap(ambit::Tensor Tbra, ambit
         std::iota(roots.begin(), roots.end(), 0);
 
         const auto method = state_method_map_.at(state);
-        out[state] = method->compute_complementary_H2caa_overlap(roots, Tbra, Tket);
+        out[state] = method->compute_complementary_H2caa_overlap(roots, Tbra, Tket, nonactv_mo_space);
     }
     return out;
 }

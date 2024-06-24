@@ -218,7 +218,7 @@ std::vector<double> SADSRG::H2_T2_C0_T2small(BlockedTensor& H2, BlockedTensor& T
             Tbra("ewuv") = H2.block("vaaa")("ezxy") * Ua("wz") * Ua("ux") * Ua("vy");
             Tket = T2.block("aava").clone();
             Tket("uvew") = T2.block("aava")("xyez") * Ua("wz") * Ua("ux") * Ua("vy");
-            auto E3v_map = as_solver_->compute_complementary_H2caa_overlap(Tbra, Tket);
+            auto E3v_map = as_solver_->compute_complementary_H2caa_overlap(Tbra, Tket, "RESTRICTED_UOCC");
             timer_v.stop();
 
             timer timer_c("DSRG [H2, T2] D3C direct");
@@ -226,7 +226,7 @@ std::vector<double> SADSRG::H2_T2_C0_T2small(BlockedTensor& H2, BlockedTensor& T
             Tbra("mwuv") = T2.block("caaa")("mzxy") * Ua("wz") * Ua("ux") * Ua("vy");
             Tket = H2.block("aaca").clone();
             Tket("uvmw") = H2.block("aaca")("xymz") * Ua("wz") * Ua("ux") * Ua("vy");
-            auto E3c_map = as_solver_->compute_complementary_H2caa_overlap(Tbra, Tket);
+            auto E3c_map = as_solver_->compute_complementary_H2caa_overlap(Tbra, Tket, "RESTRICTED_DOCC");
             timer_c.stop();
 
             // - 2-RDM contributions

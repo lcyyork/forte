@@ -159,7 +159,8 @@ class ActiveSpaceSolver {
     /// Useful to get the 3-RDM contribution of fully contracted term of two 2-body operators:
     /// \sum_{puvwxyzστθ} v_{pwxy} t_{uvpz} <Ψ(N)| xσ^+ yτ^+ wτ zθ^+ vθ uσ |Ψ(N)>
     std::map<StateInfo, std::vector<double>>
-    compute_complementary_H2caa_overlap(ambit::Tensor Tbra, ambit::Tensor Tket);
+    compute_complementary_H2caa_overlap(ambit::Tensor Tbra, ambit::Tensor Tket,
+                                        const std::string& nonactv_mo_space = "");
 
     /// Print a summary of the computation information
     void print_options();

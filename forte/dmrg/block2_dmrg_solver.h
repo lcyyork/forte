@@ -99,7 +99,8 @@ class Block2DMRGSolver : public ActiveSpaceMethod {
 
     std::vector<double> compute_complementary_H2caa_overlap(const std::vector<size_t>& /*roots*/,
                                                             ambit::Tensor /*Tbra*/,
-                                                            ambit::Tensor /*Tket*/) override;
+                                                            ambit::Tensor /*Tket*/,
+                                                            const std::string& /*nonactv_mo_space*/) override;
 
   private:
     /// SCFInfo object
