@@ -768,7 +768,7 @@ void SADSRG::deGNO_ints2(const std::string& name, double& H0, BlockedTensor& H1,
     local_timer t0;
     print_contents("Computing the scalar term");
     H0 -= H1t("vu") * L1("uv");
-    H0 -= 0.5 * Hbar2_.block("aaaa")("xyuv") * L2("uvxy");
+    H0 -= 0.5 * H2.block("aaaa")("xyuv") * L2("uvxy");
     H0 += 0.25 * L1("uv") * temp("vyux") * L1("xy");
     print_done(t0.get());
 

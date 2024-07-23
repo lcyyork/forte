@@ -127,6 +127,9 @@ class MASTER_DSRG : public DynamicCorrelationSolver {
     /// If amplitudes are converged
     bool converged() { return converged_; }
 
+    /// Set if considering "valence" DOCC and UOCC in post-DSRG diagonalization
+    void set_complete_valence_ints(bool complete) { complete_valence_ints_ = complete; }
+
   protected:
     /// Startup function called in constructor
     void startup();
@@ -174,9 +177,14 @@ class MASTER_DSRG : public DynamicCorrelationSolver {
     ambit::BlockedTensor Uactv_;
     /// Rotate 2-body DSRG transformed integrals from semicanonical back to original
     void rotate_ints_semi_to_origin(const std::string& name, BlockedTensor& H1, BlockedTensor& H2);
+    void rotate_ints_semi_to_origin(const std::string& name, ambit::Tensor& H1a, ambit::Tensor& H1b,
+                                    ambit::Tensor& H2aa, ambit::Tensor& H2ab, ambit::Tensor& H2bb);
     /// Rotate 3-body DSRG transformed integrals from semicanonical back to original
     void rotate_ints_semi_to_origin(const std::string& name, BlockedTensor& H1, BlockedTensor& H2,
                                     BlockedTensor& H3);
+
+    /// Whether to prepare an enlarged active integrals for post-DSRG diagonalization
+    bool complete_valence_ints_ = false;
 
     // ==> some common energies for all DSRG levels <==
 
@@ -319,6 +327,9 @@ class MASTER_DSRG : public DynamicCorrelationSolver {
      * This will change H0 and H1 !!!
      */
     void deGNO_ints(const std::string& name, double& H0, BlockedTensor& H1, BlockedTensor& H2);
+    void deGNO_ints2(const std::string& name, double& H0, BlockedTensor& H1, BlockedTensor& H2,
+                     ambit::Tensor& H1a, ambit::Tensor& H1b, ambit::Tensor& H2aa,
+                     ambit::Tensor& H2ab, ambit::Tensor& H2bb);
 
     /**
      * De-normal-order a 3-body DSRG transformed integrals

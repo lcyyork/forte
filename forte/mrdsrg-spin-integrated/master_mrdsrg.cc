@@ -13,6 +13,7 @@
 
 #include "helpers/printing.h"
 #include "helpers/timer.h"
+#include "helpers/helpers.h"
 
 #include "master_mrdsrg.h"
 
@@ -534,22 +535,44 @@ void MASTER_DSRG::compute_dm_ref() {
 std::shared_ptr<ActiveSpaceIntegrals> MASTER_DSRG::compute_Heff_actv() {
     // de-normal-order DSRG transformed Hamiltonian
     double Edsrg = Eref_ + Hbar0_;
+    ambit::Tensor H1a, H1b, H2aa, H2ab, H2bb;
+
     if (foptions_->get_bool("FORM_HBAR3")) {
         deGNO_ints("Hamiltonian", Edsrg, Hbar1_, Hbar2_, Hbar3_);
         rotate_ints_semi_to_origin("Hamiltonian", Hbar1_, Hbar2_, Hbar3_);
     } else {
-        deGNO_ints("Hamiltonian", Edsrg, Hbar1_, Hbar2_);
-        rotate_ints_semi_to_origin("Hamiltonian", Hbar1_, Hbar2_);
+        if (mo_space_info_->size("VALENCE_DOCC") + mo_space_info_->size("VALENCE_UOCC") != 0) {
+            deGNO_ints2("Hamiltonian", Edsrg, Hbar1_, Hbar2_, H1a, H1b, H2aa, H2ab, H2bb);
+        } else {
+            deGNO_ints("Hamiltonian", Edsrg, Hbar1_, Hbar2_);
+            H1a = Hbar1_.block("aa");
+            H1b = Hbar1_.block("AA");
+            H2aa = Hbar2_.block("aaaa");
+            H2ab = Hbar2_.block("aAaA");
+            H2bb = Hbar2_.block("AAAA");
+        }
+        rotate_ints_semi_to_origin("Hamiltonian", H1a, H1b, H2aa, H2ab, H2bb);
     }
 
+    // create ActiveSpaceIntegrals shared_ptr
+    std::vector<size_t> a_mos, c_mos;
+    std::vector<int> a_mos_sym;
+    if (complete_valence_ints_) {
+        a_mos = mo_space_info_->corr_absolute_mo("POST_DSRG_ACTIVE");
+        a_mos_sym = mo_space_info_->symmetry("POST_DSRG_ACTIVE");
+        c_mos = mo_space_info_->corr_absolute_mo("EXTERNAL_DOCC");
+    } else {
+        a_mos = actv_mos_;
+        a_mos_sym = actv_mos_sym_;
+        c_mos = core_mos_;
+    }
+    outfile->Printf("\n POST_DSRG_ACTIVE = %zu, POST_DSRG_CORE = %zu", a_mos.size(), c_mos.size());
+
     // create FCIIntegral shared_ptr
-    std::shared_ptr<ActiveSpaceIntegrals> fci_ints =
-        std::make_shared<ActiveSpaceIntegrals>(ints_, actv_mos_, actv_mos_sym_, core_mos_);
-    fci_ints->set_active_integrals(Hbar2_.block("aaaa"), Hbar2_.block("aAaA"),
-                                   Hbar2_.block("AAAA"));
-    fci_ints->set_restricted_one_body_operator(Hbar1_.block("aa").data(),
-                                               Hbar1_.block("AA").data());
+    auto fci_ints = std::make_shared<ActiveSpaceIntegrals>(ints_, a_mos, a_mos_sym, c_mos);
     fci_ints->set_scalar_energy(Edsrg - Enuc_ - Efrzc_);
+    fci_ints->set_restricted_one_body_operator(H1a.data(), H1b.data());
+    fci_ints->set_active_integrals(H2aa, H2ab, H2bb);
 
     return fci_ints;
 }
@@ -588,6 +611,251 @@ void MASTER_DSRG::deGNO_ints(const std::string& name, double& H0, BlockedTensor&
     H1["uv"] -= H2["uXvY"] * Gamma1_["YX"];
     H1["UV"] -= H2["xUyV"] * Gamma1_["yx"];
     H1["UV"] -= H2["UXVY"] * Gamma1_["YX"];
+    outfile->Printf("Done. Timing %8.3f s", t1.get());
+}
+
+void MASTER_DSRG::deGNO_ints2(const std::string& name, double& H0, BlockedTensor& H1,
+                              BlockedTensor& H2, ambit::Tensor& H1a, ambit::Tensor& H1b,
+                              ambit::Tensor& H2aa, ambit::Tensor& H2ab, ambit::Tensor& H2bb) {
+    print_h2("De-Normal-Order DSRG Transformed " + name);
+
+    auto no = mo_space_info_->size("ACTIVE");
+    std::vector<std::string> cav_labels{"c", "a", "v"};
+
+    std::vector<std::string> blocks2a, blocks2b, blocks4aa, blocks4ab, blocks4bb;
+    for (const auto& blocks_vec : math::cartesian_product(std::vector(2, cav_labels))) {
+        std::stringstream ss;
+        for (const auto& i : blocks_vec)
+            ss << i;
+        blocks2a.push_back(ss.str());
+    }
+    for (std::string i : blocks2a) {
+        std::transform(i.begin(), i.end(), i.begin(), ::toupper);
+        blocks2b.push_back(i);
+    }
+    for (const auto& blocks_vec : math::cartesian_product(std::vector(4, cav_labels))) {
+        std::stringstream ss;
+        for (const auto& i : blocks_vec)
+            ss << i;
+        blocks4aa.push_back(ss.str());
+    }
+    for (std::string i : blocks4aa) {
+        std::string ab{(char)tolower(i[0]), (char)toupper(i[1]), (char)tolower(i[2]),
+                       (char)toupper(i[3])};
+        blocks4ab.push_back(ab);
+        std::string bb{(char)toupper(i[0]), (char)toupper(i[1]), (char)toupper(i[2]),
+                       (char)toupper(i[3])};
+        blocks4bb.push_back(bb);
+    }
+
+    // test if all blocks available for H1 and H2
+    for (const auto& blocks2 : {blocks2a, blocks2b}) {
+        for (const auto& block : blocks2) {
+            if (not H1.is_block(block))
+                throw std::runtime_error("H1 block " + block + " not available!");
+        }
+    }
+    for (const auto& blocks4 : {blocks4aa, blocks4ab, blocks4bb}) {
+        for (const auto& block : blocks4) {
+            if (not H2.is_block(block))
+                throw std::runtime_error("H2 block " + block + " not available!");
+        }
+    }
+    no = mo_space_info_->size("POST_DSRG_ACTIVE");
+
+    H1a = ambit::Tensor::build(tensor_type_, "H1a post-dsrg", {no, no});
+    H1b = ambit::Tensor::build(tensor_type_, "H1b post-dsrg", {no, no});
+    H2aa = ambit::Tensor::build(tensor_type_, "H2aa post-dsrg", {no, no, no, no});
+    H2ab = ambit::Tensor::build(tensor_type_, "H2ab post-dsrg", {no, no, no, no});
+    H2bb = ambit::Tensor::build(tensor_type_, "H2bb post-dsrg", {no, no, no, no});
+
+    /// need to expand the diagonalization space
+    local_timer tmisc;
+    outfile->Printf("\n    Preparing tensors");
+
+    // valence orbitals in C/A/V blocks
+    auto vdocc_in_rdocc = mo_space_info_->pos_in_space("VALENCE_DOCC", "RESTRICTED_DOCC");
+    auto vuocc_in_ruocc = mo_space_info_->pos_in_space("VALENCE_UOCC", "RESTRICTED_UOCC");
+    std::vector<size_t> actv_in_actv(actv_mos_.size());
+    std::iota(actv_in_actv.begin(), actv_in_actv.end(), 0);
+
+    std::map<char, std::vector<size_t>> label_to_cav;
+    label_to_cav['c'] = vdocc_in_rdocc;
+    label_to_cav['a'] = actv_in_actv;
+    label_to_cav['v'] = vuocc_in_ruocc;
+    label_to_cav['C'] = vdocc_in_rdocc;
+    label_to_cav['A'] = actv_in_actv;
+    label_to_cav['V'] = vuocc_in_ruocc;
+
+    // valence C/A/V in entire valence
+    auto vdocc_in_valence = mo_space_info_->pos_in_space("VALENCE_DOCC", "POST_DSRG_ACTIVE");
+    auto vuocc_in_valence = mo_space_info_->pos_in_space("VALENCE_UOCC", "POST_DSRG_ACTIVE");
+    auto actv_in_valence = mo_space_info_->pos_in_space("GAS1", "POST_DSRG_ACTIVE");
+
+    std::map<char, std::vector<size_t>> label_to_valence;
+    label_to_valence['c'] = vdocc_in_valence;
+    label_to_valence['a'] = actv_in_valence;
+    label_to_valence['v'] = vuocc_in_valence;
+    label_to_valence['C'] = vdocc_in_valence;
+    label_to_valence['A'] = actv_in_valence;
+    label_to_valence['V'] = vuocc_in_valence;
+
+    // prepare the valence integrals
+    auto& H1a_data = H1a.data();
+    auto& H1b_data = H1b.data();
+    auto& H2aa_data = H2aa.data();
+    auto& H2ab_data = H2ab.data();
+    auto& H2bb_data = H2bb.data();
+
+    // fill in H1t with DSRG-transformed Hamiltonian
+    for (const auto& blocks2 : {blocks2a, blocks2b}) {
+        for (const auto& block : blocks2) {
+            auto label0 = block[0];
+            auto label1 = block[1];
+
+            auto& data = H1.block(block).data();
+            auto dim1 = label_to_spacemo_[label1].size();
+
+            if (islower(label0)) {
+                for (size_t p = 0, psize = label_to_cav[label0].size(); p < psize; ++p) {
+                    for (size_t q = 0, qsize = label_to_cav[label1].size(); q < qsize; ++q) {
+                        H1a_data[label_to_valence[label0][p] * no + label_to_valence[label1][q]] =
+                            data[label_to_cav[label0][p] * dim1 + label_to_cav[label1][q]];
+                    }
+                }
+            } else {
+                for (size_t p = 0, psize = label_to_cav[label0].size(); p < psize; ++p) {
+                    for (size_t q = 0, qsize = label_to_cav[label1].size(); q < qsize; ++q) {
+                        H1b_data[label_to_valence[label0][p] * no + label_to_valence[label1][q]] =
+                            data[label_to_cav[label0][p] * dim1 + label_to_cav[label1][q]];
+                    }
+                }
+            }
+        }
+    }
+
+    // fill in H2t with DSRG-transformed Hamiltonian
+    for (const auto& blocks4 : {blocks4aa, blocks4ab, blocks4bb}) {
+        for (const auto& block : blocks4) {
+            auto label0 = block[0];
+            auto label1 = block[1];
+            auto label2 = block[2];
+            auto label3 = block[3];
+
+            auto& data = H2.block(block).data();
+            auto dim3 = label_to_spacemo_[label3].size();
+            auto dim2 = label_to_spacemo_[label2].size() * dim3;
+            auto dim1 = label_to_spacemo_[label1].size() * dim2;
+
+            if (islower(label0) and islower(label1)) {
+                for (size_t p = 0, psize = label_to_cav[label0].size(); p < psize; ++p) {
+                    for (size_t q = 0, qsize = label_to_cav[label1].size(); q < qsize; ++q) {
+                        for (size_t r = 0, rsize = label_to_cav[label2].size(); r < rsize; ++r) {
+                            for (size_t s = 0, ssize = label_to_cav[label3].size(); s < ssize;
+                                 ++s) {
+                                auto small = label_to_valence[label0][p] * no * no * no +
+                                             label_to_valence[label1][q] * no * no +
+                                             label_to_valence[label2][r] * no +
+                                             label_to_valence[label3][s];
+                                auto large = label_to_cav[label0][p] * dim1 +
+                                             label_to_cav[label1][q] * dim2 +
+                                             label_to_cav[label2][r] * dim3 +
+                                             label_to_cav[label3][s];
+                                H2aa_data[small] = data[large];
+                            }
+                        }
+                    }
+                }
+            } else if (islower(label0) and isupper(label1)) {
+                for (size_t p = 0, psize = label_to_cav[label0].size(); p < psize; ++p) {
+                    for (size_t q = 0, qsize = label_to_cav[label1].size(); q < qsize; ++q) {
+                        for (size_t r = 0, rsize = label_to_cav[label2].size(); r < rsize; ++r) {
+                            for (size_t s = 0, ssize = label_to_cav[label3].size(); s < ssize;
+                                 ++s) {
+                                auto small = label_to_valence[label0][p] * no * no * no +
+                                             label_to_valence[label1][q] * no * no +
+                                             label_to_valence[label2][r] * no +
+                                             label_to_valence[label3][s];
+                                auto large = label_to_cav[label0][p] * dim1 +
+                                             label_to_cav[label1][q] * dim2 +
+                                             label_to_cav[label2][r] * dim3 +
+                                             label_to_cav[label3][s];
+                                H2ab_data[small] = data[large];
+                            }
+                        }
+                    }
+                }
+            } else {
+                for (size_t p = 0, psize = label_to_cav[label0].size(); p < psize; ++p) {
+                    for (size_t q = 0, qsize = label_to_cav[label1].size(); q < qsize; ++q) {
+                        for (size_t r = 0, rsize = label_to_cav[label2].size(); r < rsize; ++r) {
+                            for (size_t s = 0, ssize = label_to_cav[label3].size(); s < ssize;
+                                 ++s) {
+                                auto small = label_to_valence[label0][p] * no * no * no +
+                                             label_to_valence[label1][q] * no * no +
+                                             label_to_valence[label2][r] * no +
+                                             label_to_valence[label3][s];
+                                auto large = label_to_cav[label0][p] * dim1 +
+                                             label_to_cav[label1][q] * dim2 +
+                                             label_to_cav[label2][r] * dim3 +
+                                             label_to_cav[label3][s];
+                                H2bb_data[small] = data[large];
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // prepare valence RDMs
+    auto L1a = ambit::Tensor::build(tensor_type_, "L1a post-dsrg", {no, no});
+    auto L1b = ambit::Tensor::build(tensor_type_, "L1b post-dsrg", {no, no});
+
+    auto na = mo_space_info_->size("ACTIVE");
+    for (size_t u = 0, size = actv_in_valence.size(); u < size; ++u) {
+        for (size_t v = 0; v < size; ++v) {
+            L1a.data()[actv_in_valence[u] * no + actv_in_valence[v]] =
+                Gamma1_.block("aa").data()[u * na + v];
+            L1b.data()[actv_in_valence[u] * no + actv_in_valence[v]] =
+                Gamma1_.block("AA").data()[u * na + v];
+        }
+    }
+    for (const auto& m : vdocc_in_valence) {
+        L1a.data()[m * no + m] = 1.0;
+        L1b.data()[m * no + m] = 1.0;
+    }
+
+    // compute scalar
+    local_timer t0;
+    outfile->Printf("\n    %-40s ... ", "Computing the scalar term");
+
+    // scalar from H1
+    double scalar1 = 0.0;
+    scalar1 -= H1a("vu") * L1a("uv");
+    scalar1 -= H1b("VU") * L1b("UV");
+
+    // scalar from H2
+    double scalar2 = 0.0;
+    scalar2 += 0.5 * Gamma1_["uv"] * H2["vyux"] * Gamma1_["xy"];
+    scalar2 += 0.5 * Gamma1_["UV"] * H2["VYUX"] * Gamma1_["XY"];
+    scalar2 += Gamma1_["uv"] * H2["vYuX"] * Gamma1_["XY"];
+
+    scalar2 -= 0.25 * H2.block("aaaa")("xyuv") * Lambda2_.block("aaaa")("uvxy");
+    scalar2 -= 0.25 * H2.block("AAAA")("XYUV") * Lambda2_.block("AAAA")("UVXY");
+    scalar2 -= H2.block("aAaA")("xYuV") * Lambda2_.block("aAaA")("uVxY");
+
+    H0 += scalar1 + scalar2;
+    outfile->Printf("Done. Timing %8.3f s", t0.get());
+
+    // compute 1-body term
+    local_timer t1;
+    outfile->Printf("\n    %-40s ... ", "Computing the 1-body term");
+
+    H1a("uv") -= H2.block("aaaa")("uxvy") * L1a("yx");
+    H1a("uv") -= H2.block("aAaA")("uXvY") * L1b("YX");
+    H1b("UV") -= H2.block("aAaA")("xUyV") * L1a("yx");
+    H1b("UV") -= H2.block("AAAA")("UXVY") * L1b("YX");
     outfile->Printf("Done. Timing %8.3f s", t1.get());
 }
 
