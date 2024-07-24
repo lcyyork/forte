@@ -189,6 +189,8 @@ class ProcedureDSRG:
 
         if self.solver_type in ["MRDSRG", "DSRG-MRPT2", "DSRG-MRPT3", "THREE-DSRG-MRPT2"]:
             self.dsrg_solver.set_Uactv(self.Ua, self.Ub)
+            if self.solver_type == "MRDSRG":
+                self.dsrg_solver.set_complete_valence_ints(True)
 
     def dsrg_cleanup(self):
         """Clean up for reference relaxation."""

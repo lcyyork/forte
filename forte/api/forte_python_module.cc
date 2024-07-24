@@ -353,6 +353,8 @@ PYBIND11_MODULE(_forte, m) {
              "Return nuclear components of dipole moments")
         .def("set_Uactv", &MASTER_DSRG::set_Uactv, "Ua"_a, "Ub"_a,
              "Set active part orbital rotation matrix (from original to semicanonical)")
+        .def("set_complete_valence_ints", &MASTER_DSRG::set_complete_valence_ints,
+             "Set if considering valence DOCC and UOCC for post-DSRG diagonalization")
         .def("set_active_space_solver", &MASTER_DSRG::set_active_space_solver,
              "Set the pointer of ActiveSpaceSolver")
         .def("set_state_weights_map", &MASTER_DSRG::set_state_weights_map,
