@@ -177,8 +177,6 @@ class MASTER_DSRG : public DynamicCorrelationSolver {
     ambit::BlockedTensor Uactv_;
     /// Rotate 2-body DSRG transformed integrals from semicanonical back to original
     void rotate_ints_semi_to_origin(const std::string& name, BlockedTensor& H1, BlockedTensor& H2);
-    void rotate_ints_semi_to_origin(const std::string& name, ambit::Tensor& H1a, ambit::Tensor& H1b,
-                                    ambit::Tensor& H2aa, ambit::Tensor& H2ab, ambit::Tensor& H2bb);
     /// Rotate 3-body DSRG transformed integrals from semicanonical back to original
     void rotate_ints_semi_to_origin(const std::string& name, BlockedTensor& H1, BlockedTensor& H2,
                                     BlockedTensor& H3);

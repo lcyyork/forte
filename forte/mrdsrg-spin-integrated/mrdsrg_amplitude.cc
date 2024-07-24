@@ -656,10 +656,10 @@ void MRDSRG::update_t2_std() {
     // Step 1: work on Hbar2 where DT2 is treated as intermediate
 
     // make a copy of the active part of Hbar2 as it will be used as intermediate
-    auto Hbar2copy = BlockedTensor::build(tensor_type_, "Hbar2 active copy", spin_cases({"aaaa"}));
-    Hbar2copy["uvxy"] = Hbar2_["uvxy"];
-    Hbar2copy["uVxY"] = Hbar2_["uVxY"];
-    Hbar2copy["UVXY"] = Hbar2_["UVXY"];
+    auto Hbar2copy = BlockedTensor::build(tensor_type_, "Hbar2 active copy", spin_cases({"hhpp"}));
+    Hbar2copy["ijab"] = Hbar2_["ijab"];
+    Hbar2copy["iJaB"] = Hbar2_["iJaB"];
+    Hbar2copy["IJAB"] = Hbar2_["IJAB"];
 
     timer t1("transform Hbar2 to semi-canonical basis");
     // transform Hbar2 to semi-canonical basis
@@ -791,9 +791,9 @@ void MRDSRG::update_t2_std() {
     t10.stop();
 
     // reset the active part of Hbar2
-    Hbar2_["uvxy"] = Hbar2copy["uvxy"];
-    Hbar2_["uVxY"] = Hbar2copy["uVxY"];
-    Hbar2_["UVXY"] = Hbar2copy["UVXY"];
+    Hbar2_["ijab"] = Hbar2copy["ijab"];
+    Hbar2_["iJaB"] = Hbar2copy["iJaB"];
+    Hbar2_["IJAB"] = Hbar2copy["IJAB"];
 }
 
 void MRDSRG::update_t1_std() {
@@ -810,9 +810,9 @@ void MRDSRG::update_t1_std() {
     // Step 1: work on Hbar1 where DT1 is treated as intermediate
 
     // make a copy of the active part of Hbar2 as it will be used as intermediate
-    auto Hbar1copy = BlockedTensor::build(tensor_type_, "Hbar1 active copy", spin_cases({"aa"}));
-    Hbar1copy["uv"] = Hbar1_["uv"];
-    Hbar1copy["UV"] = Hbar1_["UV"];
+    auto Hbar1copy = BlockedTensor::build(tensor_type_, "Hbar1 active copy", spin_cases({"hp"}));
+    Hbar1copy["ia"] = Hbar1_["ia"];
+    Hbar1copy["IA"] = Hbar1_["IA"];
 
     // transform Hbar1 to semi-canonical basis
     if (!semi_canonical_) {
@@ -903,8 +903,8 @@ void MRDSRG::update_t1_std() {
     t1b_norm_ = std::sqrt(t1b_norm_);
 
     // reset the active part of Hbar2
-    Hbar1_["uv"] = Hbar1copy["uv"];
-    Hbar1_["UV"] = Hbar1copy["UV"];
+    Hbar1_["ia"] = Hbar1copy["ia"];
+    Hbar1_["IA"] = Hbar1copy["IA"];
 }
 
 void MRDSRG::update_t2_noccvv() {

@@ -543,6 +543,8 @@ std::shared_ptr<ActiveSpaceIntegrals> MASTER_DSRG::compute_Heff_actv() {
     } else {
         if (mo_space_info_->size("VALENCE_DOCC") + mo_space_info_->size("VALENCE_UOCC") != 0) {
             deGNO_ints2("Hamiltonian", Edsrg, Hbar1_, Hbar2_, H1a, H1b, H2aa, H2ab, H2bb);
+            // HACK: no rotation for H1a, H1b, H2aa, H2ab, H2bb
+            // This is OK if original orbitals are semicanonicalized.
         } else {
             deGNO_ints("Hamiltonian", Edsrg, Hbar1_, Hbar2_);
             H1a = Hbar1_.block("aa");
@@ -550,8 +552,8 @@ std::shared_ptr<ActiveSpaceIntegrals> MASTER_DSRG::compute_Heff_actv() {
             H2aa = Hbar2_.block("aaaa");
             H2ab = Hbar2_.block("aAaA");
             H2bb = Hbar2_.block("AAAA");
+            rotate_ints_semi_to_origin("Hamiltonian", Hbar1_, Hbar2_);
         }
-        rotate_ints_semi_to_origin("Hamiltonian", H1a, H1b, H2aa, H2ab, H2bb);
     }
 
     // create ActiveSpaceIntegrals shared_ptr
@@ -733,6 +735,9 @@ void MASTER_DSRG::deGNO_ints2(const std::string& name, double& H0, BlockedTensor
             }
         }
     }
+    // H1.print();
+    // H1a.print();
+    // H1b.print();
 
     // fill in H2t with DSRG-transformed Hamiltonian
     for (const auto& blocks4 : {blocks4aa, blocks4ab, blocks4bb}) {
@@ -807,6 +812,10 @@ void MASTER_DSRG::deGNO_ints2(const std::string& name, double& H0, BlockedTensor
             }
         }
     }
+    // H2.print();
+    // H2aa.print();
+    // H2ab.print();
+    // H2bb.print();
 
     // prepare valence RDMs
     auto L1a = ambit::Tensor::build(tensor_type_, "L1a post-dsrg", {no, no});
@@ -837,26 +846,39 @@ void MASTER_DSRG::deGNO_ints2(const std::string& name, double& H0, BlockedTensor
 
     // scalar from H2
     double scalar2 = 0.0;
-    scalar2 += 0.5 * Gamma1_["uv"] * H2["vyux"] * Gamma1_["xy"];
-    scalar2 += 0.5 * Gamma1_["UV"] * H2["VYUX"] * Gamma1_["XY"];
-    scalar2 += Gamma1_["uv"] * H2["vYuX"] * Gamma1_["XY"];
+    scalar2 += 0.5 * L1a("uv") * H2aa("vyux") * L1a("xy");
+    scalar2 += 0.5 * L1b("UV") * H2bb("VYUX") * L1b("XY");
+    scalar2 += L1a("uv") * H2ab("vYuX") * L1b("XY");
 
     scalar2 -= 0.25 * H2.block("aaaa")("xyuv") * Lambda2_.block("aaaa")("uvxy");
     scalar2 -= 0.25 * H2.block("AAAA")("XYUV") * Lambda2_.block("AAAA")("UVXY");
     scalar2 -= H2.block("aAaA")("xYuV") * Lambda2_.block("aAaA")("uVxY");
 
+    for (auto p : label_to_cav['c']) {
+        for (auto q : label_to_cav['a']) {
+            scalar2 += 0.5 * H2.block("caca").at({p, q, p, q});
+            scalar2 += 0.5 * H2.block("acac").at({q, p, q, p});
+            scalar2 += 0.5 * H2.block("CACA").at({p, q, p, q});
+            scalar2 += 0.5 * H2.block("ACAC").at({q, p, q, p});
+            scalar2 += H2.block("cAcA").at({p, q, p, q});
+            scalar2 += H2.block("aCaC").at({q, p, q, p});
+        }
+    }
+
     H0 += scalar1 + scalar2;
     outfile->Printf("Done. Timing %8.3f s", t0.get());
+    outfile->Printf("\n  H0 = %20.15f", H0);
 
     // compute 1-body term
     local_timer t1;
     outfile->Printf("\n    %-40s ... ", "Computing the 1-body term");
 
-    H1a("uv") -= H2.block("aaaa")("uxvy") * L1a("yx");
-    H1a("uv") -= H2.block("aAaA")("uXvY") * L1b("YX");
-    H1b("UV") -= H2.block("aAaA")("xUyV") * L1a("yx");
-    H1b("UV") -= H2.block("AAAA")("UXVY") * L1b("YX");
+    H1a("uv") -= H2aa("uxvy") * L1a("yx");
+    H1a("uv") -= H2ab("uXvY") * L1b("YX");
+    H1b("UV") -= H2ab("xUyV") * L1a("yx");
+    H1b("UV") -= H2bb("UXVY") * L1b("YX");
     outfile->Printf("Done. Timing %8.3f s", t1.get());
+    outfile->Printf("\n  H1 norm = %20.15f", H1a.norm());
 }
 
 void MASTER_DSRG::deGNO_ints(const std::string& name, double& H0, BlockedTensor& H1,

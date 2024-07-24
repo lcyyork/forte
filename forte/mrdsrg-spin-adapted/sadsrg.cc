@@ -664,7 +664,7 @@ void SADSRG::deGNO_ints2(const std::string& name, double& H0, BlockedTensor& H1,
     no = mo_space_info_->size("POST_DSRG_ACTIVE");
 
     H1t = ambit::Tensor::build(tensor_type_, "H1 post-dsrg", {no, no});
-    H2t = ambit::Tensor::build(tensor_type_, "H1 post-dsrg", {no, no, no, no});
+    H2t = ambit::Tensor::build(tensor_type_, "H2 post-dsrg", {no, no, no, no});
 
     /// need to expand the diagonalization space
     local_timer tmisc;
@@ -710,6 +710,8 @@ void SADSRG::deGNO_ints2(const std::string& name, double& H0, BlockedTensor& H1,
             }
         }
     }
+    // H1t.print();
+    // H1.print();
 
     // fill in H2t with DSRG-transformed Hamiltonian
     for (const auto& block : blocks4) {
@@ -739,9 +741,8 @@ void SADSRG::deGNO_ints2(const std::string& name, double& H0, BlockedTensor& H1,
             }
         }
     }
-
     // H2t.print();
-    // Hbar2_.print();
+    // H2.print();
 
     // build a temp["pqrs"] = 2 * H2["pqrs"] - H2["pqsr"]
     auto temp = H2t.clone();
@@ -768,15 +769,23 @@ void SADSRG::deGNO_ints2(const std::string& name, double& H0, BlockedTensor& H1,
     local_timer t0;
     print_contents("Computing the scalar term");
     H0 -= H1t("vu") * L1("uv");
-    H0 -= 0.5 * H2.block("aaaa")("xyuv") * L2("uvxy");
     H0 += 0.25 * L1("uv") * temp("vyux") * L1("xy");
+    H0 -= 0.5 * H2.block("aaaa")("xyuv") * L2("uvxy");
+    for (auto p : label_to_cav['c']) {
+        for (auto q : label_to_cav['a']) {
+            H0 += 4 * H2.block("caca").at({p, q, p, q});
+            H0 -= 2 * H2.block("caac").at({p, q, q, p});
+        }
+    }
     print_done(t0.get());
+    outfile->Printf("\n  H0 = %20.15f", H0);
 
     // 1-body
     local_timer t1;
     print_contents("Computing the 1-body term");
     H1t("uv") -= 0.5 * temp("uxvy") * L1("yx");
     print_done(t1.get());
+    outfile->Printf("\n  H1 norm = %20.15f", H1t.norm());
 }
 
 void SADSRG::deGNO_ints(const std::string& name, double& H0, BlockedTensor& H1, BlockedTensor& H2,
