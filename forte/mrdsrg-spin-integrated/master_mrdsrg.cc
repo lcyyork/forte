@@ -854,17 +854,6 @@ void MASTER_DSRG::deGNO_ints2(const std::string& name, double& H0, BlockedTensor
     scalar2 -= 0.25 * H2.block("AAAA")("XYUV") * Lambda2_.block("AAAA")("UVXY");
     scalar2 -= H2.block("aAaA")("xYuV") * Lambda2_.block("aAaA")("uVxY");
 
-    for (auto p : label_to_cav['c']) {
-        for (auto q : label_to_cav['a']) {
-            scalar2 += 0.5 * H2.block("caca").at({p, q, p, q});
-            scalar2 += 0.5 * H2.block("acac").at({q, p, q, p});
-            scalar2 += 0.5 * H2.block("CACA").at({p, q, p, q});
-            scalar2 += 0.5 * H2.block("ACAC").at({q, p, q, p});
-            scalar2 += H2.block("cAcA").at({p, q, p, q});
-            scalar2 += H2.block("aCaC").at({q, p, q, p});
-        }
-    }
-
     H0 += scalar1 + scalar2;
     outfile->Printf("Done. Timing %8.3f s", t0.get());
     outfile->Printf("\n  H0 = %20.15f", H0);

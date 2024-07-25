@@ -771,12 +771,6 @@ void SADSRG::deGNO_ints2(const std::string& name, double& H0, BlockedTensor& H1,
     H0 -= H1t("vu") * L1("uv");
     H0 += 0.25 * L1("uv") * temp("vyux") * L1("xy");
     H0 -= 0.5 * H2.block("aaaa")("xyuv") * L2("uvxy");
-    for (auto p : label_to_cav['c']) {
-        for (auto q : label_to_cav['a']) {
-            H0 += 4 * H2.block("caca").at({p, q, p, q});
-            H0 -= 2 * H2.block("caac").at({p, q, q, p});
-        }
-    }
     print_done(t0.get());
     outfile->Printf("\n  H0 = %20.15f", H0);
 
