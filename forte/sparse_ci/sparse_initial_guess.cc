@@ -71,7 +71,7 @@ compute_s2_transformed_hamiltonian_matrix(const std::vector<Determinant>& dets,
 
 std::pair<sparse_mat, sparse_mat>
 find_initial_guess_det(const std::vector<Determinant>& guess_dets,
-                       const std::vector<size_t>& guess_dets_pos, size_t num_guess_states,
+                       const std::vector<size_t>& guess_dets_pos, size_t& num_guess_states,
                        const std::shared_ptr<ActiveSpaceIntegrals>& as_ints, int multiplicity,
                        bool do_spin_project, bool print,
                        const std::vector<std::vector<std::pair<size_t, double>>>& user_guess) {
@@ -196,11 +196,12 @@ find_initial_guess_det(const std::vector<Determinant>& guess_dets,
         auto& [energies, s2, C] = guess_info[multiplicity];
 
         if (energies.size() < num_guess_states) {
-            throw std::runtime_error(
-                "\n\n  Found " + std::to_string(energies.size()) +
-                " guess(es) with the requested multiplicity but " +
-                std::to_string(num_guess_states) +
-                " were requested.\n  Increase the value of DL_DETS_PER_GUESS\n\n");
+            //throw std::runtime_error(
+            //    "\n\n  Found " + std::to_string(energies.size()) +
+            //    " guess(es) with the requested multiplicity but " +
+            //    std::to_string(num_guess_states) +
+            //    " were requested.\n  Increase the value of DL_DETS_PER_GUESS\n\n");
+            num_guess_states = energies.size();
         }
 
         // Add the guess vectors to list of guesses

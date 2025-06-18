@@ -463,6 +463,39 @@ void ActiveSpaceSolver::compute_fosc_same_orbs(std::shared_ptr<ActiveMultipoleIn
         rdms_map[{bra, ket}] =
             method1->transition_rdms(root_list, method2, rdm_level, RDMsType::spin_free);
 
+        auto rdms = method1->transition_rdms(root_list, method2, 2, RDMsType::spin_free);
+        for (size_t i = 0, size = root_list.size(); i < size; ++i) {
+            auto root1 = root_list[i].first;
+            auto root2 = root_list[i].second;
+            if (root1 == 1 and root2 == 4) {
+                auto D1 = rdms[i]->SF_G1();
+                const auto& D1data = D1.data();
+                auto dim = D1.dim(0);
+                for (size_t p = 0; p < dim; ++p) {
+                    for (size_t q = 0; q < dim; ++q) {
+                        auto v = D1data[p * dim + q];
+                        if (fabs(v) > 1.0e-8)
+                            psi::outfile->Printf("\n  %2d %2d = %20.12f", p, q, v);
+                    }
+                }
+
+                auto D2 = rdms[i]->SF_G2();
+                const auto& D2data = D2.data();
+                for (size_t p = 0; p < dim; ++p) {
+                    for (size_t q = 0; q < dim; ++q) {
+                        for (size_t r = 0; r < dim; ++r) {
+                            for (size_t s = 0; s < dim; ++s) {
+                                auto v = D2data[p * dim * dim * dim + q * dim * dim + r * dim + s];
+                                if (fabs(v) > 1.0e-8)
+                                    psi::outfile->Printf("\n  %2d %2d %2d %2d = %20.12f", p, q,
+                                                         r, s, v);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         // analyze transition reduced density matrices
         auto nactv = mo_space_info_->size("ACTIVE");
         auto U = std::make_shared<psi::Matrix>("U", nactv, nactv);
