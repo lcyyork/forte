@@ -104,6 +104,8 @@ class DSRG_MRPT2 : public MASTER_DSRG {
         p_spaces_ = p_spaces;
     }
 
+    std::shared_ptr<psi::Vector> compute_sigma(std::shared_ptr<psi::Vector> x);
+
     //    /// Compute de-normal-ordered amplitudes and return the scalar term
     //    double Tamp_deGNO();
 

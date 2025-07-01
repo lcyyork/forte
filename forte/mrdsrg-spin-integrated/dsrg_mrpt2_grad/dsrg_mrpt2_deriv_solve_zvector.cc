@@ -7,6 +7,8 @@
 #include "psi4/libpsi4util/process.h"
 #include "psi4/libmints/vector.h"
 
+#include "helpers/gmres.h"
+
 #include <numeric>
 #include <vector>
 #include <cmath>
@@ -511,175 +513,186 @@ void DSRG_MRPT2::set_z_diag() {
         Z["ef"] += 0.5 * sigma3_xi3["if"] * F["ie"];
         Z["ef"] -= 0.5 * sigma3_xi3["ie"] * F["if"];
         // contracted with T2 / Delta
-        {{BlockedTensor T2OverDelta = BTF_->build(CoreTensor, "T2/Delta", {"hhpp"}, true);
-        BlockedTensor Eeps2_m2 =
-            BTF_->build(CoreTensor, "{1-e^[-s*(Delta2)^2]}/(Delta2)^2", {"hhpp"}, true);
-        Eeps2_m2.iterate([&](const std::vector<size_t>& i, const std::vector<SpinType>& /*spin*/,
-                             double& value) {
-            value = dsrg_source_->compute_regularized_denominator_derivR(Fa_[i[0]] + Fa_[i[1]] -
-                                                                         Fa_[i[2]] - Fa_[i[3]]);
-        });
-        if (eri_df_) {
-            BlockedTensor temp1 = BTF_->build(CoreTensor, "temp1", {"pphh"}, true);
-            temp1["abij"] = B["gai"] * B["gbj"];
-            T2OverDelta["ijab"] = 2.0 * temp1["abij"] * Eeps2_m2["ijab"];
-        } else {
-            T2OverDelta["ijab"] = V["abij"] * Eeps2_m2["ijab"];
-        }
-        val["m"] -= 2.0 * T2OverDelta["mjab"] * Tau2["mjab"];
-        val["e"] += 2.0 * T2OverDelta["ijeb"] * Tau2["ijeb"];
-        val["u"] -= 2.0 * T2OverDelta["ujab"] * Tau2["ujab"];
-        val["u"] += 2.0 * T2OverDelta["ijub"] * Tau2["ijub"];
-    }
-    {
-        BlockedTensor T2OverDelta = BTF_->build(CoreTensor, "T2/Delta", {"hHpP"}, true);
-        BlockedTensor Eeps2_m2 =
-            BTF_->build(CoreTensor, "{1-e^[-s*(Delta2)^2]}/(Delta2)^2", {"hHpP"}, true);
-        Eeps2_m2.iterate([&](const std::vector<size_t>& i, const std::vector<SpinType>& /*spin*/,
-                             double& value) {
-            value = dsrg_source_->compute_regularized_denominator_derivR(Fa_[i[0]] + Fa_[i[1]] -
-                                                                         Fa_[i[2]] - Fa_[i[3]]);
-        });
-        if (eri_df_) {
-            BlockedTensor temp1 = BTF_->build(CoreTensor, "temp1", {"pPhH"}, true);
-            temp1["aBiJ"] = B["gai"] * B["gBJ"];
-            T2OverDelta["iJaB"] = temp1["aBiJ"] * Eeps2_m2["iJaB"];
-        } else {
-            T2OverDelta["iJaB"] = V["aBiJ"] * Eeps2_m2["iJaB"];
-        }
-        val["m"] -= 4.0 * T2OverDelta["mJaB"] * Tau2["mJaB"];
-        val["e"] += 4.0 * T2OverDelta["iJeB"] * Tau2["iJeB"];
-        val["u"] -= 4.0 * T2OverDelta["uJaB"] * Tau2["uJaB"];
-        val["u"] += 4.0 * T2OverDelta["iJuB"] * Tau2["iJuB"];
-    }
-}
-// contracted with temp
-{
-    if (eri_df_) {
         {
-            BlockedTensor Eeps2 = BTF_->build(CoreTensor, "e^[-s*(Delta2)^2]", {"hhpp"}, true);
-            Eeps2.iterate([&](const std::vector<size_t>& i, const std::vector<SpinType>& /*spin*/,
-                              double& value) {
-                value = dsrg_source_->compute_renormalized(Fa_[i[0]] + Fa_[i[1]] - Fa_[i[2]] -
-                                                           Fa_[i[3]]);
-            });
-            BlockedTensor Delta2 = BTF_->build(CoreTensor, "Delta2", {"hhpp"}, true);
-            Delta2.iterate(
-                [&](const std::vector<size_t>& i, const std::vector<SpinType>& /*spin*/,
-                    double& value) { value = Fa_[i[0]] + Fa_[i[1]] - Fa_[i[2]] - Fa_[i[3]]; });
-            BlockedTensor temp = BTF_->build(CoreTensor, "temporal tensor", {"hhpp"}, true);
             {
-                BlockedTensor temp2 = BTF_->build(CoreTensor, "temp2", {"hhpp"}, true);
-                temp2["ijab"] = B["gai"] * B["gbj"];
-                temp["ijab"] += 2.0 * Eeps2["ijab"] * temp2["ijab"];
-            }
-            BlockedTensor temp_1 = BTF_->build(CoreTensor, "temporal tensor_1", {"hhpp"}, true);
-            temp_1["ijab"] += Kappa["ijab"] * Delta2["ijab"];
-            val["m"] += 4.0 * s_ * Tau2["mjab"] * temp["mjab"];
-            val["m"] -= 4.0 * s_ * temp["mlcd"] * temp_1["mlcd"];
-            val["e"] -= 4.0 * s_ * Tau2["ijeb"] * temp["ijeb"];
-            val["e"] += 4.0 * s_ * temp["kled"] * temp_1["kled"];
-            val["u"] += 4.0 * s_ * Tau2["ujab"] * temp["ujab"];
-            val["u"] -= 4.0 * s_ * temp["ulcd"] * temp_1["ulcd"];
-            val["u"] -= 4.0 * s_ * Tau2["ijub"] * temp["ijub"];
-            val["u"] += 4.0 * s_ * temp["klud"] * temp_1["klud"];
-        }
-        {
-            BlockedTensor Eeps2 = BTF_->build(CoreTensor, "e^[-s*(Delta2)^2]", {"hHpP"}, true);
-            Eeps2.iterate([&](const std::vector<size_t>& i, const std::vector<SpinType>& /*spin*/,
-                              double& value) {
-                value = dsrg_source_->compute_renormalized(Fa_[i[0]] + Fa_[i[1]] - Fa_[i[2]] -
-                                                           Fa_[i[3]]);
-            });
-            BlockedTensor Delta2 = BTF_->build(CoreTensor, "Delta2", {"hHpP"}, true);
-            Delta2.iterate(
-                [&](const std::vector<size_t>& i, const std::vector<SpinType>& /*spin*/,
-                    double& value) { value = Fa_[i[0]] + Fa_[i[1]] - Fa_[i[2]] - Fa_[i[3]]; });
-            BlockedTensor temp = BTF_->build(CoreTensor, "temporal tensor", {"hHpP"}, true);
-            {
-                BlockedTensor temp2 = BTF_->build(CoreTensor, "temp2", {"hHpP"}, true);
-                temp2["iJaB"] = B["gai"] * B["gBJ"];
-                temp["iJaB"] += Eeps2["iJaB"] * temp2["iJaB"];
-            }
-            BlockedTensor temp_1 = BTF_->build(CoreTensor, "temporal tensor_1", {"hHpP"}, true);
-            temp_1["iJaB"] += Kappa["iJaB"] * Delta2["iJaB"];
-            val["m"] += 8.0 * s_ * Tau2["mJaB"] * temp["mJaB"];
-            val["m"] -= 8.0 * s_ * temp["mLcD"] * temp_1["mLcD"];
-            val["e"] -= 8.0 * s_ * Tau2["iJeB"] * temp["iJeB"];
-            val["e"] += 8.0 * s_ * temp["kLeD"] * temp_1["kLeD"];
-            val["u"] += 8.0 * s_ * Tau2["uJaB"] * temp["uJaB"];
-            val["u"] -= 8.0 * s_ * temp["uLcD"] * temp_1["uLcD"];
-            val["u"] -= 8.0 * s_ * Tau2["iJuB"] * temp["iJuB"];
-            val["u"] += 8.0 * s_ * temp["kLuD"] * temp_1["kLuD"];
-        }
-    } else {
-        BlockedTensor Eeps2 = BTF_->build(CoreTensor, "e^[-s*(Delta2)^2]", {"hhpp", "hHpP"}, true);
-        Eeps2.iterate([&](const std::vector<size_t>& i, const std::vector<SpinType>& /*spin*/,
-                          double& value) {
-            value =
-                dsrg_source_->compute_renormalized(Fa_[i[0]] + Fa_[i[1]] - Fa_[i[2]] - Fa_[i[3]]);
-        });
-        BlockedTensor Delta2 = BTF_->build(CoreTensor, "Delta2", {"hhpp", "hHpP"}, true);
-        Delta2.iterate(
-            [&](const std::vector<size_t>& i, const std::vector<SpinType>& /*spin*/,
-                double& value) { value = Fa_[i[0]] + Fa_[i[1]] - Fa_[i[2]] - Fa_[i[3]]; });
-        BlockedTensor temp = BTF_->build(CoreTensor, "temporal tensor", {"hhpp", "hHpP"}, true);
-        BlockedTensor temp_1 = BTF_->build(CoreTensor, "temporal tensor_1", {"hhpp", "hHpP"}, true);
-        temp["ijab"] += V["abij"] * Eeps2["ijab"];
-        temp["iJaB"] += V["aBiJ"] * Eeps2["iJaB"];
-        temp_1["ijab"] += Kappa["ijab"] * Delta2["ijab"];
-        temp_1["iJaB"] += Kappa["iJaB"] * Delta2["iJaB"];
-        val["m"] += 4.0 * s_ * Tau2["mjab"] * temp["mjab"];
-        val["m"] += 8.0 * s_ * Tau2["mJaB"] * temp["mJaB"];
-        val["m"] -= 4.0 * s_ * temp["mlcd"] * temp_1["mlcd"];
-        val["m"] -= 8.0 * s_ * temp["mLcD"] * temp_1["mLcD"];
-        val["e"] -= 4.0 * s_ * Tau2["ijeb"] * temp["ijeb"];
-        val["e"] -= 8.0 * s_ * Tau2["iJeB"] * temp["iJeB"];
-        val["e"] += 4.0 * s_ * temp["kled"] * temp_1["kled"];
-        val["e"] += 8.0 * s_ * temp["kLeD"] * temp_1["kLeD"];
-        val["u"] += 4.0 * s_ * Tau2["ujab"] * temp["ujab"];
-        val["u"] += 8.0 * s_ * Tau2["uJaB"] * temp["uJaB"];
-        val["u"] -= 4.0 * s_ * temp["ulcd"] * temp_1["ulcd"];
-        val["u"] -= 8.0 * s_ * temp["uLcD"] * temp_1["uLcD"];
-        val["u"] -= 4.0 * s_ * Tau2["ijub"] * temp["ijub"];
-        val["u"] -= 8.0 * s_ * Tau2["iJuB"] * temp["iJuB"];
-        val["u"] += 4.0 * s_ * temp["klud"] * temp_1["klud"];
-        val["u"] += 8.0 * s_ * temp["kLuD"] * temp_1["kLuD"];
-    }
-}
-} // namespace forte
-
-std::map<string, string> capital_blocks = {{"cc", "CC"}, {"vv", "VV"}, {"aa", "AA"}};
-auto blocklabels = {"cc", "vv", "aa"};
-std::map<char, int> orbital_size = {{'c', ncore}, {'a', na}, {'v', nvirt}};
-for (const std::string& block : blocklabels) {
-    char label = block[1];
-    std::string slabel(1, label);
-    auto block_data = val.block(slabel).data();
-    if (label != 'a') {
-        (Z.block(block)).iterate([&](const std::vector<size_t>& i, double& value) {
-            if (i[0] == i[1]) {
-                value = block_data[i[0]];
-            } else {
-                auto dmt = Delta1.block(block).data()[i[1] * orbital_size[label] + i[0]];
-                if (std::fabs(dmt) > 1e-12) {
-                    value /= dmt;
+                BlockedTensor T2OverDelta = BTF_->build(CoreTensor, "T2/Delta", {"hhpp"}, true);
+                BlockedTensor Eeps2_m2 =
+                    BTF_->build(CoreTensor, "{1-e^[-s*(Delta2)^2]}/(Delta2)^2", {"hhpp"}, true);
+                Eeps2_m2.iterate([&](const std::vector<size_t>& i,
+                                     const std::vector<SpinType>& /*spin*/, double& value) {
+                    value = dsrg_source_->compute_regularized_denominator_derivR(
+                        Fa_[i[0]] + Fa_[i[1]] - Fa_[i[2]] - Fa_[i[3]]);
+                });
+                if (eri_df_) {
+                    BlockedTensor temp1 = BTF_->build(CoreTensor, "temp1", {"pphh"}, true);
+                    temp1["abij"] = B["gai"] * B["gbj"];
+                    T2OverDelta["ijab"] = 2.0 * temp1["abij"] * Eeps2_m2["ijab"];
+                } else {
+                    T2OverDelta["ijab"] = V["abij"] * Eeps2_m2["ijab"];
                 }
+                val["m"] -= 2.0 * T2OverDelta["mjab"] * Tau2["mjab"];
+                val["e"] += 2.0 * T2OverDelta["ijeb"] * Tau2["ijeb"];
+                val["u"] -= 2.0 * T2OverDelta["ujab"] * Tau2["ujab"];
+                val["u"] += 2.0 * T2OverDelta["ijub"] * Tau2["ijub"];
             }
-        });
-    } else {
-        (Z.block(block)).iterate([&](const std::vector<size_t>& i, double& value) {
-            if (i[0] == i[1]) {
-                value = block_data[i[0]];
+            {
+                BlockedTensor T2OverDelta = BTF_->build(CoreTensor, "T2/Delta", {"hHpP"}, true);
+                BlockedTensor Eeps2_m2 =
+                    BTF_->build(CoreTensor, "{1-e^[-s*(Delta2)^2]}/(Delta2)^2", {"hHpP"}, true);
+                Eeps2_m2.iterate([&](const std::vector<size_t>& i,
+                                     const std::vector<SpinType>& /*spin*/, double& value) {
+                    value = dsrg_source_->compute_regularized_denominator_derivR(
+                        Fa_[i[0]] + Fa_[i[1]] - Fa_[i[2]] - Fa_[i[3]]);
+                });
+                if (eri_df_) {
+                    BlockedTensor temp1 = BTF_->build(CoreTensor, "temp1", {"pPhH"}, true);
+                    temp1["aBiJ"] = B["gai"] * B["gBJ"];
+                    T2OverDelta["iJaB"] = temp1["aBiJ"] * Eeps2_m2["iJaB"];
+                } else {
+                    T2OverDelta["iJaB"] = V["aBiJ"] * Eeps2_m2["iJaB"];
+                }
+                val["m"] -= 4.0 * T2OverDelta["mJaB"] * Tau2["mJaB"];
+                val["e"] += 4.0 * T2OverDelta["iJeB"] * Tau2["iJeB"];
+                val["u"] -= 4.0 * T2OverDelta["uJaB"] * Tau2["uJaB"];
+                val["u"] += 4.0 * T2OverDelta["iJuB"] * Tau2["iJuB"];
             }
-        });
+        }
+        // contracted with temp
+        {
+            if (eri_df_) {
+                {
+                    BlockedTensor Eeps2 =
+                        BTF_->build(CoreTensor, "e^[-s*(Delta2)^2]", {"hhpp"}, true);
+                    Eeps2.iterate([&](const std::vector<size_t>& i,
+                                      const std::vector<SpinType>& /*spin*/, double& value) {
+                        value = dsrg_source_->compute_renormalized(Fa_[i[0]] + Fa_[i[1]] -
+                                                                   Fa_[i[2]] - Fa_[i[3]]);
+                    });
+                    BlockedTensor Delta2 = BTF_->build(CoreTensor, "Delta2", {"hhpp"}, true);
+                    Delta2.iterate([&](const std::vector<size_t>& i,
+                                       const std::vector<SpinType>& /*spin*/, double& value) {
+                        value = Fa_[i[0]] + Fa_[i[1]] - Fa_[i[2]] - Fa_[i[3]];
+                    });
+                    BlockedTensor temp = BTF_->build(CoreTensor, "temporal tensor", {"hhpp"}, true);
+                    {
+                        BlockedTensor temp2 = BTF_->build(CoreTensor, "temp2", {"hhpp"}, true);
+                        temp2["ijab"] = B["gai"] * B["gbj"];
+                        temp["ijab"] += 2.0 * Eeps2["ijab"] * temp2["ijab"];
+                    }
+                    BlockedTensor temp_1 =
+                        BTF_->build(CoreTensor, "temporal tensor_1", {"hhpp"}, true);
+                    temp_1["ijab"] += Kappa["ijab"] * Delta2["ijab"];
+                    val["m"] += 4.0 * s_ * Tau2["mjab"] * temp["mjab"];
+                    val["m"] -= 4.0 * s_ * temp["mlcd"] * temp_1["mlcd"];
+                    val["e"] -= 4.0 * s_ * Tau2["ijeb"] * temp["ijeb"];
+                    val["e"] += 4.0 * s_ * temp["kled"] * temp_1["kled"];
+                    val["u"] += 4.0 * s_ * Tau2["ujab"] * temp["ujab"];
+                    val["u"] -= 4.0 * s_ * temp["ulcd"] * temp_1["ulcd"];
+                    val["u"] -= 4.0 * s_ * Tau2["ijub"] * temp["ijub"];
+                    val["u"] += 4.0 * s_ * temp["klud"] * temp_1["klud"];
+                }
+                {
+                    BlockedTensor Eeps2 =
+                        BTF_->build(CoreTensor, "e^[-s*(Delta2)^2]", {"hHpP"}, true);
+                    Eeps2.iterate([&](const std::vector<size_t>& i,
+                                      const std::vector<SpinType>& /*spin*/, double& value) {
+                        value = dsrg_source_->compute_renormalized(Fa_[i[0]] + Fa_[i[1]] -
+                                                                   Fa_[i[2]] - Fa_[i[3]]);
+                    });
+                    BlockedTensor Delta2 = BTF_->build(CoreTensor, "Delta2", {"hHpP"}, true);
+                    Delta2.iterate([&](const std::vector<size_t>& i,
+                                       const std::vector<SpinType>& /*spin*/, double& value) {
+                        value = Fa_[i[0]] + Fa_[i[1]] - Fa_[i[2]] - Fa_[i[3]];
+                    });
+                    BlockedTensor temp = BTF_->build(CoreTensor, "temporal tensor", {"hHpP"}, true);
+                    {
+                        BlockedTensor temp2 = BTF_->build(CoreTensor, "temp2", {"hHpP"}, true);
+                        temp2["iJaB"] = B["gai"] * B["gBJ"];
+                        temp["iJaB"] += Eeps2["iJaB"] * temp2["iJaB"];
+                    }
+                    BlockedTensor temp_1 =
+                        BTF_->build(CoreTensor, "temporal tensor_1", {"hHpP"}, true);
+                    temp_1["iJaB"] += Kappa["iJaB"] * Delta2["iJaB"];
+                    val["m"] += 8.0 * s_ * Tau2["mJaB"] * temp["mJaB"];
+                    val["m"] -= 8.0 * s_ * temp["mLcD"] * temp_1["mLcD"];
+                    val["e"] -= 8.0 * s_ * Tau2["iJeB"] * temp["iJeB"];
+                    val["e"] += 8.0 * s_ * temp["kLeD"] * temp_1["kLeD"];
+                    val["u"] += 8.0 * s_ * Tau2["uJaB"] * temp["uJaB"];
+                    val["u"] -= 8.0 * s_ * temp["uLcD"] * temp_1["uLcD"];
+                    val["u"] -= 8.0 * s_ * Tau2["iJuB"] * temp["iJuB"];
+                    val["u"] += 8.0 * s_ * temp["kLuD"] * temp_1["kLuD"];
+                }
+            } else {
+                BlockedTensor Eeps2 =
+                    BTF_->build(CoreTensor, "e^[-s*(Delta2)^2]", {"hhpp", "hHpP"}, true);
+                Eeps2.iterate([&](const std::vector<size_t>& i,
+                                  const std::vector<SpinType>& /*spin*/, double& value) {
+                    value = dsrg_source_->compute_renormalized(Fa_[i[0]] + Fa_[i[1]] - Fa_[i[2]] -
+                                                               Fa_[i[3]]);
+                });
+                BlockedTensor Delta2 = BTF_->build(CoreTensor, "Delta2", {"hhpp", "hHpP"}, true);
+                Delta2.iterate(
+                    [&](const std::vector<size_t>& i, const std::vector<SpinType>& /*spin*/,
+                        double& value) { value = Fa_[i[0]] + Fa_[i[1]] - Fa_[i[2]] - Fa_[i[3]]; });
+                BlockedTensor temp =
+                    BTF_->build(CoreTensor, "temporal tensor", {"hhpp", "hHpP"}, true);
+                BlockedTensor temp_1 =
+                    BTF_->build(CoreTensor, "temporal tensor_1", {"hhpp", "hHpP"}, true);
+                temp["ijab"] += V["abij"] * Eeps2["ijab"];
+                temp["iJaB"] += V["aBiJ"] * Eeps2["iJaB"];
+                temp_1["ijab"] += Kappa["ijab"] * Delta2["ijab"];
+                temp_1["iJaB"] += Kappa["iJaB"] * Delta2["iJaB"];
+                val["m"] += 4.0 * s_ * Tau2["mjab"] * temp["mjab"];
+                val["m"] += 8.0 * s_ * Tau2["mJaB"] * temp["mJaB"];
+                val["m"] -= 4.0 * s_ * temp["mlcd"] * temp_1["mlcd"];
+                val["m"] -= 8.0 * s_ * temp["mLcD"] * temp_1["mLcD"];
+                val["e"] -= 4.0 * s_ * Tau2["ijeb"] * temp["ijeb"];
+                val["e"] -= 8.0 * s_ * Tau2["iJeB"] * temp["iJeB"];
+                val["e"] += 4.0 * s_ * temp["kled"] * temp_1["kled"];
+                val["e"] += 8.0 * s_ * temp["kLeD"] * temp_1["kLeD"];
+                val["u"] += 4.0 * s_ * Tau2["ujab"] * temp["ujab"];
+                val["u"] += 8.0 * s_ * Tau2["uJaB"] * temp["uJaB"];
+                val["u"] -= 4.0 * s_ * temp["ulcd"] * temp_1["ulcd"];
+                val["u"] -= 8.0 * s_ * temp["uLcD"] * temp_1["uLcD"];
+                val["u"] -= 4.0 * s_ * Tau2["ijub"] * temp["ijub"];
+                val["u"] -= 8.0 * s_ * Tau2["iJuB"] * temp["iJuB"];
+                val["u"] += 4.0 * s_ * temp["klud"] * temp_1["klud"];
+                val["u"] += 8.0 * s_ * temp["kLuD"] * temp_1["kLuD"];
+            }
+        }
+    } // namespace forte
+
+    std::map<string, string> capital_blocks = {{"cc", "CC"}, {"vv", "VV"}, {"aa", "AA"}};
+    auto blocklabels = {"cc", "vv", "aa"};
+    std::map<char, int> orbital_size = {{'c', ncore}, {'a', na}, {'v', nvirt}};
+    for (const std::string& block : blocklabels) {
+        char label = block[1];
+        std::string slabel(1, label);
+        auto block_data = val.block(slabel).data();
+        if (label != 'a') {
+            (Z.block(block)).iterate([&](const std::vector<size_t>& i, double& value) {
+                if (i[0] == i[1]) {
+                    value = block_data[i[0]];
+                } else {
+                    auto dmt = Delta1.block(block).data()[i[1] * orbital_size[label] + i[0]];
+                    if (std::fabs(dmt) > 1e-12) {
+                        value /= dmt;
+                    }
+                }
+            });
+        } else {
+            (Z.block(block)).iterate([&](const std::vector<size_t>& i, double& value) {
+                if (i[0] == i[1]) {
+                    value = block_data[i[0]];
+                }
+            });
+        }
     }
-}
-// Z[Beta] = Z[Alpha]
-for (const std::string& block : blocklabels) {
-    Z.block(capital_blocks[block])("pq") = Z.block(block)("pq");
-}
-outfile->Printf("Done");
+    // Z[Beta] = Z[Alpha]
+    for (const std::string& block : blocklabels) {
+        Z.block(capital_blocks[block])("pq") = Z.block(block)("pq");
+    }
+    outfile->Printf("Done");
 }
 
 /// @brief Compute the norm of a vector
@@ -1384,8 +1397,52 @@ void DSRG_MRPT2::set_preconditioner(std::vector<double>& D) {
     }
 }
 
+std::shared_ptr<psi::Vector> DSRG_MRPT2::compute_sigma(std::shared_ptr<psi::Vector> x) {
+    // auto A = std::make_shared<psi::Matrix>("A", 4, 4);
+    // A->set(0, 0, 0.269172384589515);
+    // A->set(0, 1, 0.305766012597926);
+    // A->set(0, 2, 0.157870985755238);
+    // A->set(0, 3, 0.829166398360580);
+    // A->set(1, 0, 0.082659401641491);
+    // A->set(1, 1, 0.535763514429257);
+    // A->set(1, 2, 0.434526755166009);
+    // A->set(1, 3, 0.455737983562696);
+    // A->set(2, 0, 0.493015096666784);
+    // A->set(2, 1, 0.389328234685168);
+    // A->set(2, 2, 0.227984786345928);
+    // A->set(2, 3, 0.627316159978542);
+    // A->set(3, 0, 0.223308307596249);
+    // A->set(3, 1, 0.554790486397994);
+    // A->set(3, 2, 0.524229312879016);
+    // A->set(3, 3, 0.416003170883664);
+
+    // auto q = std::make_shared<psi::Vector>("q", 4);
+    // C_DGEMV('N', 4, 4, 1.0, A->pointer()[0], 4, x->pointer(), 1, 0.0, q->pointer(), 1);
+
+    std::vector<double> qv(dim);
+    std::vector<double> xv(dim);
+    for (auto i = 0; i < dim; ++i) {
+        xv[i] = x->get(i);
+    }
+    z_vector_contraction(xv, qv);
+    double ci_xci_dot = C_DDOT(ndets, &qv[preidx["ci"]], 1, &ci.data()[0], 1);
+    for (int i = preidx["ci"]; i < dim; ++i) {
+        qv[i] -= ci_xci_dot * ci.data()[i - preidx["ci"]];
+    }
+    auto q = std::make_shared<psi::Vector>("q", dim);
+    for (auto i = 0; i < dim; ++i) {
+        q->set(i, qv[i]);
+    }
+    return q;
+}
+
 void DSRG_MRPT2::gmres_solver(std::vector<double>& x_new) {
     outfile->Printf("\n    Solving the linear system ....................... ");
+
+    // for (int j = 0; j < dim; ++j) {
+    //     outfile->Printf("\n  b0 %6d, %20.15f", j, b[j]);
+    // }
+
     int iters;
     std::vector<double> x_old(dim);
     x_old = x_new;
@@ -1408,11 +1465,17 @@ void DSRG_MRPT2::gmres_solver(std::vector<double>& x_new) {
         r[i] = b[i] - D[i] * r[i];
     }
 
+    // for (int j = 0; j < dim; ++j) {
+    //     outfile->Printf("\n  r0 %6d, %20.15f", j, r[j]);
+    // }
+
     bh[0] = f_norm(r);
+    // outfile->Printf("\n r norm = %20.15f", bh[0]);
 
     for (int j = 0; j < dim; ++j) {
         // index here : i * dim + j, where i = 0
         q[j] = r[j] / bh[0];
+        // outfile->Printf("\n  q0 %6d, %20.15f", j, q[j]);
     }
 
     std::vector<double> y_vec(dim, 0.0);
@@ -1433,16 +1496,23 @@ void DSRG_MRPT2::gmres_solver(std::vector<double>& x_new) {
 
         for (size_t i = 0, maxi = y_vec.size(); i < maxi; ++i) {
             y_vec[i] *= D[i];
+            // outfile->Printf("\n  y%d  %6d  %20.15f", iter, i, y_vec[i]);
         }
 
         for (int i = 0; i < iter + 1; ++i) {
             h[i + iter * (max_iter + 1)] = C_DDOT(dim, &q[i * dim], 1, &y_vec[0], 1);
+            // outfile->Printf("\n  h[%d,%d]  %20.15f", i, iter, h[i + iter * (max_iter + 1)]);
             for (int j = 0; j < dim; ++j) {
                 y_vec[j] -= h[i + iter * (max_iter + 1)] * q[i * dim + j];
             }
         }
 
+        // for (size_t i = 0, maxi = y_vec.size(); i < maxi; ++i) {
+        //     outfile->Printf("\n  y%d  %6d  %20.15f", iter, i, y_vec[i]);
+        // }
+
         h[(iter + 1) + iter * (max_iter + 1)] = f_norm(y_vec);
+        // psi::outfile->Printf("\n  y norm %20.15f", h[(iter + 1) + iter * (max_iter + 1)]);
         bool condition =
             (std::fabs(h[(iter + 1) + iter * (max_iter + 1)]) < 1e-10) || (iter == max_iter - 1);
 
@@ -1481,8 +1551,43 @@ void DSRG_MRPT2::gmres_solver(std::vector<double>& x_new) {
 void DSRG_MRPT2::solve_linear_iter() {
     set_zvec_moinfo();
     set_b(dim, block_dim);
+    auto bv = std::make_shared<psi::Vector>("b", dim);
+    for (auto i = 0; i < dim; ++i) {
+        bv->set(i, b[i]);
+        outfile->Printf("\n  b %3d %20.15f", i, b[i]);
+    }
     std::vector<double> solution(dim, 0.0);
     gmres_solver(solution);
+
+    std::vector<double> y_vec(dim);
+    z_vector_contraction(solution, y_vec);
+    for (int i = 0; i < dim; ++i) {
+        outfile->Printf("\n  y %d %20.15f", i, y_vec[i]);
+    }
+
+    auto x0 = std::make_shared<psi::Vector>("x", dim);
+
+    std::vector<double> D(dim, 1.0);
+    set_preconditioner(D);
+    auto M0 = std::make_shared<psi::Vector>("M0", dim);
+    for (auto i = 0; i < dim; ++i) {
+        M0->set(i, D[i]);
+    }
+
+    // auto x0 = std::make_shared<psi::Vector>("x", 4);
+    // auto sol = std::make_shared<psi::Vector>("sol", 4);
+    // sol->set(0, 0.506790408152997);
+    // sol->set(1, 0.133479684437452);
+    // sol->set(2, 0.034488081969761);
+    // sol->set(3, 0.391790888671836);
+
+    GMRES gs(5, 1000000000, 1.0e-10);
+    gs.solve(*this, bv, x0, M0);
+    x0->print();
+
+    auto by = compute_sigma(x0);
+    by->set_name("by");
+    by->print();
 
     // Conduct projection to get the correct solution
     double ci_xci_dot = C_DDOT(ndets, &solution[preidx["ci"]], 1, &ci.data()[0], 1);
@@ -1492,6 +1597,16 @@ void DSRG_MRPT2::solve_linear_iter() {
         for (int i = idx; i < dim; ++i) {
             solution[i] -= ci_xci_dot * ci_vec[i - idx];
         }
+    }
+
+    // z_vector_contraction(solution, y_vec);
+    // for (int i = 0; i < dim; ++i) {
+    //     outfile->Printf("\n  %d %20.15f", i, y_vec[i]);
+    // }
+
+    for (auto i = 0; i < dim; ++i) {
+        outfile->Printf("\n  sol[%6d] = %15.6e", i, solution[i]);
+        // outfile->Printf("\n  diff[%6d] = %15.6e", i, x0->get(i) - solution[i]);
     }
 
     // Write the solution of z-vector equations (stored in solution) into the Z matrix
