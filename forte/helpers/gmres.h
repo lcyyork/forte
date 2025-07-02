@@ -188,16 +188,16 @@ class GMRES {
             throw std::runtime_error("Empty b vector!");
         if (x.empty())
             throw std::runtime_error("Empty x vector!");
-        auto n = b.size();
-        if (x.size() != n)
+        auto dim = b.size();
+        if (x.size() != dim)
             throw std::runtime_error("Inconsistent size between b and x!");
-        if (!Minv.empty() and Minv.size() != n)
+        if (!Minv.empty() and Minv.size() != dim)
             throw std::runtime_error("Inconsistent size between b and Minv!");
 
-        int mmiter = std::min(max_mem_ / (8 * n), (size_t)maxiter_micro_);
+        int mmiter = std::min(max_mem_ / (8 * dim), (size_t)maxiter_micro_);
         if (mmiter < 3) {
             throw std::runtime_error("Not enough memory for GMRES. Need at least " +
-                                     std::to_string(24 * n) + " bytes of memory.");
+                                     std::to_string(24 * dim) + " bytes of memory.");
         }
 
         // some helper functions
@@ -284,10 +284,12 @@ class GMRES {
             }
             psi::C_DTRSV('U', 'N', 'N', k, Hk.data(), k, beta.data(), 1);
 
+            // apply results
             for (int i = 0; i < k; ++i) {
                 scale(Q[i], beta[i]);
                 axpy(1.0, Q[i], x);
             }
+
             if (converged_)
                 break;
         }

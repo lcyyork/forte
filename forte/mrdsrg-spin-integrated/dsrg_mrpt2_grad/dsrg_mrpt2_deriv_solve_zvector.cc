@@ -1398,27 +1398,6 @@ void DSRG_MRPT2::set_preconditioner(std::vector<double>& D) {
 }
 
 std::shared_ptr<psi::Vector> DSRG_MRPT2::compute_sigma(std::shared_ptr<psi::Vector> x) {
-    // auto A = std::make_shared<psi::Matrix>("A", 4, 4);
-    // A->set(0, 0, 0.269172384589515);
-    // A->set(0, 1, 0.305766012597926);
-    // A->set(0, 2, 0.157870985755238);
-    // A->set(0, 3, 0.829166398360580);
-    // A->set(1, 0, 0.082659401641491);
-    // A->set(1, 1, 0.535763514429257);
-    // A->set(1, 2, 0.434526755166009);
-    // A->set(1, 3, 0.455737983562696);
-    // A->set(2, 0, 0.493015096666784);
-    // A->set(2, 1, 0.389328234685168);
-    // A->set(2, 2, 0.227984786345928);
-    // A->set(2, 3, 0.627316159978542);
-    // A->set(3, 0, 0.223308307596249);
-    // A->set(3, 1, 0.554790486397994);
-    // A->set(3, 2, 0.524229312879016);
-    // A->set(3, 3, 0.416003170883664);
-
-    // auto q = std::make_shared<psi::Vector>("q", 4);
-    // C_DGEMV('N', 4, 4, 1.0, A->pointer()[0], 4, x->pointer(), 1, 0.0, q->pointer(), 1);
-
     std::vector<double> qv(dim);
     std::vector<double> xv(dim);
     for (auto i = 0; i < dim; ++i) {
@@ -1439,15 +1418,16 @@ std::shared_ptr<psi::Vector> DSRG_MRPT2::compute_sigma(std::shared_ptr<psi::Vect
 std::vector<double> DSRG_MRPT2::compute_sigma(std::vector<double>& x) {
     std::vector<double> y(dim);
     z_vector_contraction(x, y);
+    double ci_xci_dot = C_DDOT(ndets, &y[preidx["ci"]], 1, &ci.data()[0], 1);
+    auto ci_vec = ci.data();
+    for (int idx = preidx["ci"], i = idx; i < dim; ++i) {
+        y[i] -= ci_xci_dot * ci_vec[i - idx];
+    }
     return y;
 }
 
 void DSRG_MRPT2::gmres_solver(std::vector<double>& x_new) {
     outfile->Printf("\n    Solving the linear system ....................... ");
-
-    // for (int j = 0; j < dim; ++j) {
-    //     outfile->Printf("\n  b0 %6d, %20.15f", j, b[j]);
-    // }
 
     int iters;
     std::vector<double> x_old(dim);
@@ -1471,17 +1451,11 @@ void DSRG_MRPT2::gmres_solver(std::vector<double>& x_new) {
         r[i] = b[i] - D[i] * r[i];
     }
 
-    // for (int j = 0; j < dim; ++j) {
-    //     outfile->Printf("\n  r0 %6d, %20.15f", j, r[j]);
-    // }
-
     bh[0] = f_norm(r);
-    // outfile->Printf("\n r norm = %20.15f", bh[0]);
 
     for (int j = 0; j < dim; ++j) {
         // index here : i * dim + j, where i = 0
         q[j] = r[j] / bh[0];
-        // outfile->Printf("\n  q0 %6d, %20.15f", j, q[j]);
     }
 
     std::vector<double> y_vec(dim, 0.0);
@@ -1502,23 +1476,16 @@ void DSRG_MRPT2::gmres_solver(std::vector<double>& x_new) {
 
         for (size_t i = 0, maxi = y_vec.size(); i < maxi; ++i) {
             y_vec[i] *= D[i];
-            // outfile->Printf("\n  y%d  %6d  %20.15f", iter, i, y_vec[i]);
         }
 
         for (int i = 0; i < iter + 1; ++i) {
             h[i + iter * (max_iter + 1)] = C_DDOT(dim, &q[i * dim], 1, &y_vec[0], 1);
-            // outfile->Printf("\n  h[%d,%d]  %20.15f", i, iter, h[i + iter * (max_iter + 1)]);
             for (int j = 0; j < dim; ++j) {
                 y_vec[j] -= h[i + iter * (max_iter + 1)] * q[i * dim + j];
             }
         }
 
-        // for (size_t i = 0, maxi = y_vec.size(); i < maxi; ++i) {
-        //     outfile->Printf("\n  y%d  %6d  %20.15f", iter, i, y_vec[i]);
-        // }
-
         h[(iter + 1) + iter * (max_iter + 1)] = f_norm(y_vec);
-        // psi::outfile->Printf("\n  y norm %20.15f", h[(iter + 1) + iter * (max_iter + 1)]);
         bool condition =
             (std::fabs(h[(iter + 1) + iter * (max_iter + 1)]) < 1e-10) || (iter == max_iter - 1);
 
@@ -1558,13 +1525,10 @@ void DSRG_MRPT2::solve_linear_iter() {
     set_zvec_moinfo();
     set_b(dim, block_dim);
     std::vector<double> bcopy(b);
-    // auto bv = std::make_shared<psi::Vector>("b", dim);
-    // for (auto i = 0; i < dim; ++i) {
-    //     bv->set(i, b[i]);
-    //     outfile->Printf("\n  b %3d %20.15f", i, b[i]);
-    // }
+    local_timer t1;
     std::vector<double> solution(dim, 0.0);
     gmres_solver(solution);
+    outfile->Printf("\n t1 %.3f", t1.get());
 
     std::vector<double> y_vec(dim);
     z_vector_contraction(solution, y_vec);
@@ -1572,31 +1536,14 @@ void DSRG_MRPT2::solve_linear_iter() {
         outfile->Printf("\n  y %d %20.15f", i, y_vec[i]);
     }
 
-    // auto x0 = std::make_shared<psi::Vector>("x", dim);
     std::vector<double> xv(dim);
-
     std::vector<double> D(dim, 1.0);
     set_preconditioner(D);
-    // auto M0 = std::make_shared<psi::Vector>("M0", dim);
-    // for (auto i = 0; i < dim; ++i) {
-    //     M0->set(i, D[i]);
-    // }
 
-    // auto x0 = std::make_shared<psi::Vector>("x", 4);
-    // auto sol = std::make_shared<psi::Vector>("sol", 4);
-    // sol->set(0, 0.506790408152997);
-    // sol->set(1, 0.133479684437452);
-    // sol->set(2, 0.034488081969761);
-    // sol->set(3, 0.391790888671836);
-
-    GMRES gs(1.0e-8);
+    t1.reset();
+    GMRES gs(1.0e-10);
     gs.solve(*this, bcopy, xv, D);
-    // gs.solve(*this, bv, x0, M0);
-    // x0->print();
-
-    // auto by = compute_sigma(x0);
-    // by->set_name("by");
-    // by->print();
+    outfile->Printf("\n t2 %.3f", t1.get());
 
     // Conduct projection to get the correct solution
     double ci_xci_dot = C_DDOT(ndets, &solution[preidx["ci"]], 1, &ci.data()[0], 1);
@@ -1608,15 +1555,9 @@ void DSRG_MRPT2::solve_linear_iter() {
         }
     }
 
-    // z_vector_contraction(solution, y_vec);
-    // for (int i = 0; i < dim; ++i) {
-    //     outfile->Printf("\n  %d %20.15f", i, y_vec[i]);
-    // }
-
     for (auto i = 0; i < dim; ++i) {
-        outfile->Printf("\n  sol[%6d] = %20.15f", i, solution[i]);
-        outfile->Printf("\n   xv[%6d] = %20.15f", i, xv[i]);
-        // outfile->Printf("\n  diff[%6d] = %15.6e", i, x0->get(i) - solution[i]);
+        outfile->Printf("\n  %6d: sol = %20.15f, xv = %20.15f, diff = %15.6e", i, solution[i],
+                        xv[i], xv[i] - solution[i]);
         solution[i] = xv[i];
     }
 
