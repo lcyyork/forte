@@ -1397,24 +1397,6 @@ void DSRG_MRPT2::set_preconditioner(std::vector<double>& D) {
     }
 }
 
-std::shared_ptr<psi::Vector> DSRG_MRPT2::compute_sigma(std::shared_ptr<psi::Vector> x) {
-    std::vector<double> qv(dim);
-    std::vector<double> xv(dim);
-    for (auto i = 0; i < dim; ++i) {
-        xv[i] = x->get(i);
-    }
-    z_vector_contraction(xv, qv);
-    double ci_xci_dot = C_DDOT(ndets, &qv[preidx["ci"]], 1, &ci.data()[0], 1);
-    for (int i = preidx["ci"]; i < dim; ++i) {
-        qv[i] -= ci_xci_dot * ci.data()[i - preidx["ci"]];
-    }
-    auto q = std::make_shared<psi::Vector>("q", dim);
-    for (auto i = 0; i < dim; ++i) {
-        q->set(i, qv[i]);
-    }
-    return q;
-}
-
 std::vector<double> DSRG_MRPT2::compute_sigma(std::vector<double>& x) {
     std::vector<double> y(dim);
     z_vector_contraction(x, y);
@@ -1524,26 +1506,8 @@ void DSRG_MRPT2::gmres_solver(std::vector<double>& x_new) {
 void DSRG_MRPT2::solve_linear_iter() {
     set_zvec_moinfo();
     set_b(dim, block_dim);
-    std::vector<double> bcopy(b);
-    local_timer t1;
     std::vector<double> solution(dim, 0.0);
     gmres_solver(solution);
-    outfile->Printf("\n t1 %.3f", t1.get());
-
-    std::vector<double> y_vec(dim);
-    z_vector_contraction(solution, y_vec);
-    for (int i = 0; i < dim; ++i) {
-        outfile->Printf("\n  y %d %20.15f", i, y_vec[i]);
-    }
-
-    std::vector<double> xv(dim);
-    std::vector<double> D(dim, 1.0);
-    set_preconditioner(D);
-
-    t1.reset();
-    GMRES gs(1.0e-10);
-    gs.solve(*this, bcopy, xv, D);
-    outfile->Printf("\n t2 %.3f", t1.get());
 
     // Conduct projection to get the correct solution
     double ci_xci_dot = C_DDOT(ndets, &solution[preidx["ci"]], 1, &ci.data()[0], 1);
@@ -1553,12 +1517,6 @@ void DSRG_MRPT2::solve_linear_iter() {
         for (int i = idx; i < dim; ++i) {
             solution[i] -= ci_xci_dot * ci_vec[i - idx];
         }
-    }
-
-    for (auto i = 0; i < dim; ++i) {
-        outfile->Printf("\n  %6d: sol = %20.15f, xv = %20.15f, diff = %15.6e", i, solution[i],
-                        xv[i], xv[i] - solution[i]);
-        solution[i] = xv[i];
     }
 
     // Write the solution of z-vector equations (stored in solution) into the Z matrix
