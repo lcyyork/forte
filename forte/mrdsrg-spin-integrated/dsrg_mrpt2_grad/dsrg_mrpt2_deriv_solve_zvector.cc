@@ -1581,7 +1581,7 @@ void DSRG_MRPT2::solve_linear_iter() {
     // sol->set(2, 0.034488081969761);
     // sol->set(3, 0.391790888671836);
 
-    GMRES gs(5, 1000000000, 1.0e-10);
+    GMRES gs(1.0e-8);
     gs.solve(*this, bv, x0, M0);
     x0->print();
 
@@ -1605,8 +1605,9 @@ void DSRG_MRPT2::solve_linear_iter() {
     // }
 
     for (auto i = 0; i < dim; ++i) {
-        outfile->Printf("\n  sol[%6d] = %15.6e", i, solution[i]);
+        // outfile->Printf("\n  sol[%6d] = %15.6e", i, solution[i]);
         // outfile->Printf("\n  diff[%6d] = %15.6e", i, x0->get(i) - solution[i]);
+        solution[i] = x0->get(i);
     }
 
     // Write the solution of z-vector equations (stored in solution) into the Z matrix
