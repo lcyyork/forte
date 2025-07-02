@@ -1436,6 +1436,12 @@ std::shared_ptr<psi::Vector> DSRG_MRPT2::compute_sigma(std::shared_ptr<psi::Vect
     return q;
 }
 
+std::vector<double> DSRG_MRPT2::compute_sigma(std::vector<double>& x) {
+    std::vector<double> y(dim);
+    z_vector_contraction(x, y);
+    return y;
+}
+
 void DSRG_MRPT2::gmres_solver(std::vector<double>& x_new) {
     outfile->Printf("\n    Solving the linear system ....................... ");
 
@@ -1551,11 +1557,12 @@ void DSRG_MRPT2::gmres_solver(std::vector<double>& x_new) {
 void DSRG_MRPT2::solve_linear_iter() {
     set_zvec_moinfo();
     set_b(dim, block_dim);
-    auto bv = std::make_shared<psi::Vector>("b", dim);
-    for (auto i = 0; i < dim; ++i) {
-        bv->set(i, b[i]);
-        outfile->Printf("\n  b %3d %20.15f", i, b[i]);
-    }
+    std::vector<double> bcopy(b);
+    // auto bv = std::make_shared<psi::Vector>("b", dim);
+    // for (auto i = 0; i < dim; ++i) {
+    //     bv->set(i, b[i]);
+    //     outfile->Printf("\n  b %3d %20.15f", i, b[i]);
+    // }
     std::vector<double> solution(dim, 0.0);
     gmres_solver(solution);
 
@@ -1565,14 +1572,15 @@ void DSRG_MRPT2::solve_linear_iter() {
         outfile->Printf("\n  y %d %20.15f", i, y_vec[i]);
     }
 
-    auto x0 = std::make_shared<psi::Vector>("x", dim);
+    // auto x0 = std::make_shared<psi::Vector>("x", dim);
+    std::vector<double> xv(dim);
 
     std::vector<double> D(dim, 1.0);
     set_preconditioner(D);
-    auto M0 = std::make_shared<psi::Vector>("M0", dim);
-    for (auto i = 0; i < dim; ++i) {
-        M0->set(i, D[i]);
-    }
+    // auto M0 = std::make_shared<psi::Vector>("M0", dim);
+    // for (auto i = 0; i < dim; ++i) {
+    //     M0->set(i, D[i]);
+    // }
 
     // auto x0 = std::make_shared<psi::Vector>("x", 4);
     // auto sol = std::make_shared<psi::Vector>("sol", 4);
@@ -1582,12 +1590,13 @@ void DSRG_MRPT2::solve_linear_iter() {
     // sol->set(3, 0.391790888671836);
 
     GMRES gs(1.0e-8);
-    gs.solve(*this, bv, x0, M0);
-    x0->print();
+    gs.solve(*this, bcopy, xv, D);
+    // gs.solve(*this, bv, x0, M0);
+    // x0->print();
 
-    auto by = compute_sigma(x0);
-    by->set_name("by");
-    by->print();
+    // auto by = compute_sigma(x0);
+    // by->set_name("by");
+    // by->print();
 
     // Conduct projection to get the correct solution
     double ci_xci_dot = C_DDOT(ndets, &solution[preidx["ci"]], 1, &ci.data()[0], 1);
@@ -1605,9 +1614,10 @@ void DSRG_MRPT2::solve_linear_iter() {
     // }
 
     for (auto i = 0; i < dim; ++i) {
-        // outfile->Printf("\n  sol[%6d] = %15.6e", i, solution[i]);
+        outfile->Printf("\n  sol[%6d] = %20.15f", i, solution[i]);
+        outfile->Printf("\n   xv[%6d] = %20.15f", i, xv[i]);
         // outfile->Printf("\n  diff[%6d] = %15.6e", i, x0->get(i) - solution[i]);
-        solution[i] = x0->get(i);
+        solution[i] = xv[i];
     }
 
     // Write the solution of z-vector equations (stored in solution) into the Z matrix

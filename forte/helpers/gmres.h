@@ -29,6 +29,7 @@
 #pragma once
 
 #include <functional>
+#include <numeric>
 #include <vector>
 
 #include "psi4/libpsi4util/PsiOutStream.h"
@@ -171,6 +172,127 @@ class GMRES {
         }
     }
 
+    /**
+     * @brief Solve the linear system Ax = b using GMRES with restart and left preconditioning
+     * @param foo Target class that should have the following methods:
+     *             y = foo.compute_sigma(q) which form the sigma vector y = Aq
+     * @param b the right-hand-side of the linear system
+     * @param x0 the initial guess (in) / the solution vector (out)
+     * @param M0 the Jacobi preconditioner (inverse of the diagonal elements of A)
+     * @return the solution vector x
+     */
+    template <class Foo>
+    void solve(Foo& foo, const std::vector<double>& b, std::vector<double>& x,
+               const std::vector<double>& Minv = {}) {
+        if (b.empty())
+            throw std::runtime_error("Empty b vector!");
+        if (x.empty())
+            throw std::runtime_error("Empty x vector!");
+        auto n = b.size();
+        if (x.size() != n)
+            throw std::runtime_error("Inconsistent size between b and x!");
+        if (!Minv.empty() and Minv.size() != n)
+            throw std::runtime_error("Inconsistent size between b and Minv!");
+
+        int mmiter = std::min(max_mem_ / (8 * n), (size_t)maxiter_micro_);
+        if (mmiter < 3) {
+            throw std::runtime_error("Not enough memory for GMRES. Need at least " +
+                                     std::to_string(24 * n) + " bytes of memory.");
+        }
+
+        // some helper functions
+        auto apply_Minv = [&](std::vector<double>& v) {
+            if (!Minv.empty())
+                std::transform(v.begin(), v.end(), Minv.begin(), v.begin(),
+                               std::multiplies<double>());
+        };
+        auto vector_dot = [](const std::vector<double>& v, const std::vector<double>& y) {
+            return psi::C_DDOT(v.size(), v.data(), 1, y.data(), 1);
+        };
+        auto norm = [&](const std::vector<double>& v) { return std::sqrt(vector_dot(v, v)); };
+        auto axpy = [](double a, const std::vector<double>& x, std::vector<double>& y) {
+            psi::C_DAXPY(x.size(), a, x.data(), 1, y.data(), 1);
+        };
+        auto scale = [](std::vector<double>& v, double scale) {
+            psi::C_DSCAL(v.size(), scale, v.data(), 1);
+        };
+
+        // GMRES(m)
+        converged_ = false;
+        std::vector<std::vector<double>> Q(mmiter + 1);
+        for (int iter = 0; iter < maxiter_macro_; ++iter) {
+            std::vector<double> sn(mmiter), cs(mmiter), beta(mmiter + 1);
+            std::vector<double> H(mmiter * mmiter + mmiter); // (mmiter + 1) x mmiter
+
+            // initial residual
+            auto r = foo.compute_sigma(x);
+            scale(r, -1.0);
+            axpy(1.0, b, r);
+            apply_Minv(r); // left preconditioning
+            auto rnorm = norm(r);
+            scale(r, 1.0 / rnorm);
+            Q[0] = r;
+            beta[0] = rnorm;
+
+            // micro iterations
+            int k = 0;
+            do {
+                // Arnoldi
+                auto y = foo.compute_sigma(Q[k]);
+                apply_Minv(y); // left preconditioning
+                for (int j = 0; j < k + 1; ++j) {
+                    auto Hjk = vector_dot(Q[j], y);
+                    H[j * mmiter + k] = Hjk;
+                    axpy(-Hjk, Q[j], y);
+                }
+                auto ynorm = norm(y);
+                H[(k + 1) * mmiter + k] = ynorm;
+                scale(y, 1.0 / ynorm);
+                Q[k + 1] = y;
+
+                // Givens rotation, H -> upper triangular
+                for (int j = 0; j < k; ++j) {
+                    auto ia = j * mmiter + k, ib = (j + 1) * mmiter + k;
+                    auto a = H[ia], b = H[ib];
+                    H[ib] = -sn[j] * a + cs[j] * b;
+                    H[ia] = cs[j] * a + sn[j] * b;
+                }
+                auto ih = k * mmiter + k, ig = (k + 1) * mmiter + k;
+                auto h = H[ih], g = H[ig];
+                auto rho = std::sqrt(h * h + g * g);
+                sn[k] = g / rho, cs[k] = h / rho;
+                H[ih] = cs[k] * h + sn[k] * g;
+                H[ig] = 0.0;
+                beta[k + 1] = -sn[k] * beta[k];
+                beta[k] = cs[k] * beta[k];
+
+                // test convergence
+                psi::outfile->Printf("\n  macro %2d  micro %2d  error %13.6e", iter, k,
+                                     beta[k + 1]);
+                if (fabs(beta[++k]) < r_conv_) { // we increase k by 1 here!!!
+                    converged_ = true;
+                    break;
+                }
+            } while (k < mmiter);
+
+            // solve upper triangular system
+            std::vector<double> Hk(k * k);
+            for (int m = 0; m < k; ++m) {
+                for (int n = m; n < k; ++n) {
+                    Hk[m * k + n] = H[m * mmiter + n];
+                }
+            }
+            psi::C_DTRSV('U', 'N', 'N', k, Hk.data(), k, beta.data(), 1);
+
+            for (int i = 0; i < k; ++i) {
+                scale(Q[i], beta[i]);
+                axpy(1.0, Q[i], x);
+            }
+            if (converged_)
+                break;
+        }
+    }
+
     /// Return true if minimization converged
     bool converged() const { return converged_; }
     /// Set max number of iterations for macro iteration
@@ -184,5 +306,7 @@ class GMRES {
 template void GMRES::solve(DSRG_MRPT2& func, std::shared_ptr<psi::Vector> b,
                            std::shared_ptr<psi::Vector> x,
                            std::shared_ptr<psi::Vector> M0 = nullptr);
+template void GMRES::solve(DSRG_MRPT2& func, const std::vector<double>& b, std::vector<double>& x,
+                           const std::vector<double>& Minv = {});
 
 } // namespace forte
