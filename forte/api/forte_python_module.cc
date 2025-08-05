@@ -118,7 +118,8 @@ PYBIND11_MODULE(_forte, m) {
           "Convert a map of StateInfo to weight lists to a map of StateInfo to number of "
           "states.");
     m.def("make_state_weights_map", &make_state_weights_map,
-          "Make a list of target states with their weigth");
+          "Make a list of target states with their weigth", "options"_a, "mo_space_info"_a,
+          "grad"_a = false);
     m.def("make_active_space_ints", &make_active_space_ints,
           "Make an object that holds the molecular orbital integrals for the active orbitals");
     m.def("make_dynamic_correlation_solver", &make_dynamic_correlation_solver,

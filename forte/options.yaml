@@ -338,6 +338,20 @@ MO_Space_Info:
     default: []
     help: "An array of MOs to swap in the format [irrep, mo_1, mo_2, irrep, mo_3, mo_4]. Irrep and MOs are all 1-based (NOT 0-based)!"
 
+Grad:
+  GRAD_AVG_STATE:
+    type: list
+    default: []
+    help: "A list of integer triplets that specify the irrep, multiplicity, and the number of states requested. Uses the format [[irrep1, multi1, nstates1], [irrep2, multi2, nstates2], ...]."
+  GRAD_AVG_WEIGHT:
+    type: list
+    default: []
+    help: "A list of lists that specify the weights assigned to all the states requested with AVG_STATE. [[w1_1, w1_2, ..., w1_n], [w2_1, w2_2, ..., w2_n], ...]."
+  GARD_TARGET_STATE:
+    type: list
+    default: []
+    help: "A list of triplet that specify the target state [irrep, multiplicity, root number]."
+
 Active_Space_Solver:
   NACT_ORB:
     type: int

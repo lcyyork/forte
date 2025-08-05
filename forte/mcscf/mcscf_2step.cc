@@ -48,6 +48,7 @@
 #include "gradient_tpdm/backtransform_tpdm.h"
 #include "mcscf/mcscf_orb_grad.h"
 #include "mcscf/mcscf_2step.h"
+#include "mcscf/cpmcscf.h"
 
 using namespace ambit;
 
@@ -462,6 +463,19 @@ double MCSCF_2STEP::compute_energy() {
             throw_convergence_error();
 
         // for nuclear gradient
+        if (not is_single_reference()) {
+            diagonalize_hamiltonian(
+                cas_grad.active_space_ints(),
+                {PrintLevel::Quiet, e_conv_, r_conv, options_->get_bool("DUMP_ACTIVE_WFN")});
+        }
+
+        // recompute gradient due to canonicalization
+        rdms = as_solver_->compute_average_rdms(state_weights_map_, 2, RDMsType::spin_free);
+        cas_grad.set_rdms(rdms);
+        cas_grad.evaluate(R, dG);
+        ints_->set_skip_build(false);
+        CPMCSCF_SOLVER cp(ints_, as_solver_, options_, mo_space_info_);
+
         if (der_type_ == "FIRST" and options_->get_str("CORRELATION_SOLVER") == "NONE") {
             // TODO: remove this re-diagonalization if CI transformation is impelementd
             if (not is_single_reference()) {

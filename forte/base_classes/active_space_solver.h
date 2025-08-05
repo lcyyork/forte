@@ -30,7 +30,9 @@
 
 #include <map>
 #include <vector>
+#include <span>
 #include <string>
+#include <filesystem>
 
 #include <ambit/tensor.h>
 #include "psi4/libmints/matrix.h"
@@ -44,6 +46,7 @@ class BlockedTensor;
 #include "helpers/printing.h"
 
 #include "sparse_ci/determinant_hashvector.h"
+#include "mrdsrg-helper/dsrg_transformed.h"
 
 namespace forte {
 
@@ -121,6 +124,13 @@ class ActiveSpaceSolver {
                           ambit::BlockedTensor& result, bool c_right, int rdm_level,
                           std::vector<std::string> spin = {});
 
+    std::shared_ptr<RDMs> grdms(const StateInfo& state, size_t root, std::span<const double> Xk,
+                                int max_rdm_level, RDMsType rdm_type, bool c_right,
+                                bool dump = false);
+
+    std::shared_ptr<RDMs> grdms_from_disk(const StateInfo& state, size_t root, int max_rdm_level,
+                                          RDMsType rdm_type);
+
     /// Add k-body contributions to the sigma vector
     ///    σ_I += h_{p1,p2,...}^{q1,q2,...} <Phi_I| a^+_p1 a^+_p2 .. a_q2 a_q1 |Phi_J> C_J
     /// @param state: StateInfo (symmetry, multiplicity, etc.)
@@ -131,6 +141,9 @@ class ActiveSpaceSolver {
     void add_sigma_kbody(const StateInfo& state, size_t root, ambit::BlockedTensor& h,
                          const std::map<std::string, double>& block_label_to_factor,
                          std::vector<double>& sigma);
+
+    void add_sigma_kbody(const StateInfo& state, size_t root, double factor,
+                         std::shared_ptr<DressedQuantity> ints, std::span<double> sigma);
 
     /// Compute generalized sigma vector
     ///     σ_I = <Phi_I| H |Phi_J> X_J where H is the active space Hamiltonian (fci_ints)
@@ -143,7 +156,12 @@ class ActiveSpaceSolver {
     /// Compute the state-averaged reference
     std::shared_ptr<RDMs>
     compute_average_rdms(const std::map<StateInfo, std::vector<double>>& state_weights_map,
-                         int max_rdm_level, RDMsType rdm_type, bool set_diagonal_3rdm = false);
+                         int max_rdm_level, RDMsType rdm_type, bool set_diagonal_3rdm = false,
+                         bool dump = false);
+
+    /// Grab RDMs from disk
+    std::shared_ptr<RDMs> rdms_from_disk(const StateInfo& state, size_t root, int max_rdm_level,
+                                         RDMsType rdm_type);
 
     /// Compute the overlap of two wave functions acted by complementary operators
     /// Return a map from state to roots of values
@@ -175,6 +193,8 @@ class ActiveSpaceSolver {
     const std::map<StateInfo, std::vector<double>>& state_energies_map() const;
     /// Return a map of StateInfo to the CI wave functions (deterministic determinant space)
     std::map<StateInfo, std::shared_ptr<psi::Matrix>> state_ci_wfn_map() const;
+    /// Return the CI wave function of the given state
+    std::shared_ptr<psi::Vector> ci_wfn(const StateInfo& state, size_t root) const;
 
     /// Pass a set of ActiveSpaceIntegrals to the solver (e.g. an effective Hamiltonian)
     /// @param as_ints the pointer to a set of active-space integrals
@@ -280,6 +300,9 @@ class ActiveSpaceSolver {
     /// Only print the transitions between states with different gas
     bool gas_diff_only_;
 
+    /// Scratch directory
+    std::filesystem::path scratch_;
+
     /// Unitary matrices for orbital rotations used to compute dipole moments
     /// The issue is dipole integrals are transformed to semi-canonical orbital basis,
     /// while active-space integrals are in the original orbital basis
@@ -319,11 +342,12 @@ to_state_nroots_map(const std::map<StateInfo, std::vector<double>>& state_weight
  * @brief Make a list of states and weights.
  * @param options user-provided options
  * @param mo_space_info orbital space information
+ * @param grad read GRAD_AVG_STATE and GRAD_AVG_WEIGHT if true
  * @return a unique pointer to an ActiveSpaceSolver object
  */
 std::map<StateInfo, std::vector<double>>
 make_state_weights_map(std::shared_ptr<ForteOptions> options,
-                       std::shared_ptr<forte::MOSpaceInfo> mo_space_info);
+                       std::shared_ptr<forte::MOSpaceInfo> mo_space_info, bool grad = false);
 
 /**
  * @brief Compute the average energy for a set of states

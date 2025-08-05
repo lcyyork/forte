@@ -28,6 +28,7 @@
 
 #pragma once
 
+#include <span>
 #include <vector>
 #include <unordered_set>
 
@@ -51,6 +52,7 @@ class BlockedTensor;
 namespace forte {
 
 class ActiveSpaceIntegrals;
+class DressedQuantity;
 class ForteIntegrals;
 class ForteOptions;
 class MOSpaceInfo;
@@ -224,6 +226,15 @@ class ActiveSpaceMethod {
             "The function generalized_rdms is not implemented for this ActiveSpaceMethod type!");
     }
 
+    virtual std::shared_ptr<RDMs> grdms([[maybe_unused]] size_t root,
+                                        [[maybe_unused]] std::span<const double> Xk,
+                                        [[maybe_unused]] int max_rdm_level,
+                                        [[maybe_unused]] RDMsType rdm_type,
+                                        [[maybe_unused]] bool c_right) {
+        throw std::runtime_error(
+            "The function grdms is not implemented for this ActiveSpaceMethod type!");
+    }
+
     /// Add k-body contributions to the sigma vector
     ///    σ_I += h_{p1,p2,...}^{q1,q2,...} <Phi_I| a^+_p1 a^+_p2 .. a_q2 a_q1 |Phi_J> C_J
     /// @param root: the root number of the state
@@ -234,6 +245,13 @@ class ActiveSpaceMethod {
     add_sigma_kbody([[maybe_unused]] size_t root, [[maybe_unused]] ambit::BlockedTensor& h,
                     [[maybe_unused]] const std::map<std::string, double>& block_label_to_factor,
                     [[maybe_unused]] std::vector<double>& sigma) {
+        throw std::runtime_error(
+            "The function add_sigma_kbody is not implemented for this ActiveSpaceMethod type!");
+    }
+
+    virtual void add_sigma_kbody([[maybe_unused]] size_t root, [[maybe_unused]] double factor,
+                                 [[maybe_unused]] std::shared_ptr<DressedQuantity> ints,
+                                 [[maybe_unused]] std::span<double> sigma) {
         throw std::runtime_error(
             "The function add_sigma_kbody is not implemented for this ActiveSpaceMethod type!");
     }
@@ -257,6 +275,12 @@ class ActiveSpaceMethod {
     /// Set options from an option object
     /// @param options the options passed in
     virtual void set_options(std::shared_ptr<ForteOptions> options) = 0;
+
+    /// Return the eigen vector of the given root
+    virtual std::shared_ptr<psi::Vector> ci_wfn([[maybe_unused]] size_t root) {
+        throw std::runtime_error(
+            "The function ci_wfn is not implemented for this ActiveSpaceMethod type!");
+    }
 
     /// Return the eigen vectors
     virtual std::vector<ambit::Tensor> eigenvectors() {

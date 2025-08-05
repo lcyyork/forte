@@ -126,6 +126,14 @@ void ForteIntegrals::read_information() {
     skip_build_ = (job_type == "MCSCF_TWO_STEP") and (integral_type_ != Custom);
 }
 
+void ForteIntegrals::set_skip_build(bool skip_build) {
+    if (skip_build_ and !skip_build) {
+        allocate();
+        __update_orbitals(true);
+    }
+    skip_build_ = skip_build;
+}
+
 void ForteIntegrals::allocate() {
     // full one-electron integrals
     full_one_electron_integrals_a_.assign(nmo_ * nmo_, 0.0);

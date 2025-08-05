@@ -345,7 +345,7 @@ double SigmaVectorSparseList::compute_spin(const std::vector<double>& c) {
 
 void SigmaVectorSparseList::add_generalized_sigma_1(const std::vector<double>& h1,
                                                     std::shared_ptr<psi::Vector> b, double factor,
-                                                    std::vector<double>& sigma,
+                                                    std::span<double> sigma,
                                                     const std::string& spin) {
     timer timer_sigma("Build generalized sigma 1" + spin);
 
@@ -372,8 +372,7 @@ void SigmaVectorSparseList::add_generalized_sigma_1(const std::vector<double>& h
 
 void SigmaVectorSparseList::add_generalized_sigma1_impl(
     const std::vector<double>& h1, std::shared_ptr<psi::Vector> b, double factor,
-    std::vector<double>& sigma,
-    const std::vector<std::vector<std::pair<size_t, short>>>& sub_lists) {
+    std::span<double> sigma, const std::vector<std::vector<std::pair<size_t, short>>>& sub_lists) {
     auto nactv = fci_ints_->nmo();
     auto b_ptr = b->pointer();
 
@@ -424,7 +423,7 @@ void SigmaVectorSparseList::add_generalized_sigma1_impl(
 
 void SigmaVectorSparseList::add_generalized_sigma_2(const std::vector<double>& h2,
                                                     std::shared_ptr<psi::Vector> b, double factor,
-                                                    std::vector<double>& sigma,
+                                                    std::span<double> sigma,
                                                     const std::string& spin) {
     timer timer_sigma("Build generalized sigma 2" + spin);
 
@@ -469,7 +468,8 @@ bool SigmaVectorSparseList::is_h2hs_antisymmetric(const std::vector<double>& h2)
     size_t nthreads = omp_get_num_threads();
     nthreads = nthreads > na4 ? na4 : nthreads;
 
-#pragma omp parallel for default(none) shared(h2, na, na2, na3, na4, zero) num_threads(nthreads) reduction(+ : pass)
+#pragma omp parallel for default(none) shared(h2, na, na2, na3, na4, zero) num_threads(nthreads)   \
+    reduction(+ : pass)
     for (size_t pqrs = 0; pqrs < na4; ++pqrs) {
         size_t p = pqrs / na3;
         size_t qrs = pqrs % na3;
@@ -497,7 +497,7 @@ bool SigmaVectorSparseList::is_h2hs_antisymmetric(const std::vector<double>& h2)
 
 void SigmaVectorSparseList::add_generalized_sigma2_impl(
     const std::vector<double>& h2, std::shared_ptr<psi::Vector> b, double factor,
-    std::vector<double>& sigma,
+    std::span<double> sigma,
     const std::vector<std::vector<std::tuple<size_t, short, short>>>& sub_lists) {
     auto b_ptr = b->pointer();
     auto na = fci_ints_->nmo();
@@ -553,7 +553,7 @@ void SigmaVectorSparseList::add_generalized_sigma2_impl(
 
 void SigmaVectorSparseList::add_generalized_sigma_3(const std::vector<double>& h3,
                                                     std::shared_ptr<psi::Vector> b, double factor,
-                                                    std::vector<double>& sigma,
+                                                    std::span<double> sigma,
                                                     const std::string& spin) {
     timer timer_sigma("Build generalized sigma 3" + spin);
 
@@ -614,7 +614,8 @@ bool SigmaVectorSparseList::is_h3hs_antisymmetric(const std::vector<double>& h3)
     size_t nthreads = omp_get_num_threads();
     nthreads = nthreads > na6 ? na6 : nthreads;
 
-#pragma omp parallel for default(none) num_threads(nthreads) shared(h3, na, na2, na3, na4, na5, na6, zero) reduction(+ : pass)
+#pragma omp parallel for default(none) num_threads(nthreads)                                       \
+    shared(h3, na, na2, na3, na4, na5, na6, zero) reduction(+ : pass)
     for (size_t pqrstu = 0; pqrstu < na6; ++pqrstu) {
         size_t p = pqrstu / na5;
         size_t qrstu = pqrstu % na5;
@@ -726,7 +727,8 @@ bool SigmaVectorSparseList::is_h3ls_antisymmetric(const std::vector<double>& h3,
     size_t nthreads = omp_get_num_threads();
     nthreads = nthreads > na6 ? na6 : nthreads;
 
-#pragma omp parallel for default(none) num_threads(nthreads) shared(h3, na, na2, na3, na4, na5, na6, zero, actv) reduction(+ : pass)
+#pragma omp parallel for default(none) num_threads(nthreads)                                       \
+    shared(h3, na, na2, na3, na4, na5, na6, zero, actv) reduction(+ : pass)
     for (size_t pqrstu = 0; pqrstu < na6; ++pqrstu) {
         size_t p = pqrstu / na5;
         size_t qrstu = pqrstu % na5;
@@ -765,7 +767,7 @@ bool SigmaVectorSparseList::is_h3ls_antisymmetric(const std::vector<double>& h3,
 
 void SigmaVectorSparseList::add_generalized_sigma3_impl(
     const std::vector<double>& h3, std::shared_ptr<psi::Vector> b, double factor,
-    std::vector<double>& sigma,
+    std::span<double> sigma,
     const std::vector<std::vector<std::tuple<size_t, short, short, short>>>& sub_lists) {
     auto b_ptr = b->pointer();
     auto na = fci_ints_->nmo();

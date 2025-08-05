@@ -28,6 +28,7 @@
 
 #pragma once
 
+#include <span>
 #include <memory>
 #include <string>
 
@@ -78,7 +79,7 @@ class SigmaVector {
     virtual void add_generalized_sigma_1([[maybe_unused]] const std::vector<double>& h1,
                                          [[maybe_unused]] std::shared_ptr<psi::Vector> b,
                                          [[maybe_unused]] double factor,
-                                         [[maybe_unused]] std::vector<double>& sigma,
+                                         [[maybe_unused]] std::span<double> sigma,
                                          [[maybe_unused]] const std::string& spin) {
         _throw_not_implemented_error("add_generalized_sigma_1");
     }
@@ -91,7 +92,7 @@ class SigmaVector {
     virtual void add_generalized_sigma_2([[maybe_unused]] const std::vector<double>& h2,
                                          [[maybe_unused]] std::shared_ptr<psi::Vector> b,
                                          [[maybe_unused]] double factor,
-                                         [[maybe_unused]] std::vector<double>& sigma,
+                                         [[maybe_unused]] std::span<double> sigma,
                                          [[maybe_unused]] const std::string& spin) {
         _throw_not_implemented_error("add_generalized_sigma_2");
     }
@@ -104,7 +105,7 @@ class SigmaVector {
     virtual void add_generalized_sigma_3([[maybe_unused]] const std::vector<double>& h3,
                                          [[maybe_unused]] std::shared_ptr<psi::Vector> b,
                                          [[maybe_unused]] double factor,
-                                         [[maybe_unused]] std::vector<double>& sigma,
+                                         [[maybe_unused]] std::span<double> sigma,
                                          [[maybe_unused]] const std::string& spin) {
         _throw_not_implemented_error("add_generalized_sigma_3");
     }

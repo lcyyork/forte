@@ -721,6 +721,44 @@ std::vector<ambit::Tensor> DETCI::eigenvectors() {
     return out;
 }
 
+void DETCI::add_sigma_kbody(size_t root, double factor, std::shared_ptr<DressedQuantity> ints,
+                            std::span<double> sigma) {
+    auto evec = evecs_->get_column(0, root);
+    auto max_kbody = ints->max_body();
+    if (sigma_vector_type_ == SigmaVectorType::Full) {
+        if (max_kbody > 2) {
+            throw std::runtime_error("3-body integrals not supported for SigmaVectorType::Full");
+            auto solver = prepare_ci_solver();
+            auto as_ints = std::make_shared<ActiveSpaceIntegrals>(
+                as_ints_->ints(), as_ints_->active_mo(), as_ints_->active_mo_symmetry(),
+                as_ints_->restricted_docc_mo());
+            as_ints->set_restricted_one_body_operator(ints->a().data(), ints->b().data());
+            auto ab = ints->ab().clone();
+            ab.scale(0.5);
+            as_ints->set_active_integrals(ints->aa(), ab, ints->bb());
+            auto H = solver->build_full_hamiltonian(p_space_.determinants(), as_ints);
+            auto sigma_vec = H->gemv(false, 1.0, *evec);
+            psi::C_DCOPY(sigma.size(), sigma_vec->pointer(), 1, sigma.data(), 1);
+        }
+    } else {
+        if (max_kbody >= 1) {
+            sigma_vector_->add_generalized_sigma_1(ints->a().data(), evec, factor, sigma, "a");
+            sigma_vector_->add_generalized_sigma_1(ints->b().data(), evec, factor, sigma, "b");
+        }
+        if (max_kbody >= 2) {
+            sigma_vector_->add_generalized_sigma_2(ints->aa().data(), evec, factor, sigma, "aa");
+            sigma_vector_->add_generalized_sigma_2(ints->ab().data(), evec, factor, sigma, "ab");
+            sigma_vector_->add_generalized_sigma_2(ints->bb().data(), evec, factor, sigma, "bb");
+        }
+        if (max_kbody >= 3) {
+            sigma_vector_->add_generalized_sigma_3(ints->aaa().data(), evec, factor, sigma, "aaa");
+            sigma_vector_->add_generalized_sigma_3(ints->aab().data(), evec, factor, sigma, "aab");
+            sigma_vector_->add_generalized_sigma_3(ints->abb().data(), evec, factor, sigma, "abb");
+            sigma_vector_->add_generalized_sigma_3(ints->bbb().data(), evec, factor, sigma, "bbb");
+        }
+    }
+}
+
 void DETCI::add_sigma_kbody(size_t root, ambit::BlockedTensor& h,
                             const std::map<std::string, double>& block_label_to_factor,
                             std::vector<double>& sigma) {
@@ -801,8 +839,82 @@ void DETCI::generalized_rdms(size_t root, const std::vector<double>& X, ambit::B
     }
 }
 
-void DETCI::generalized_sigma(std::shared_ptr<psi::Vector> x, std::shared_ptr<psi::Vector> sigma) {
-    sigma_vector_->compute_sigma(sigma, x);
+std::shared_ptr<RDMs> DETCI::grdms(size_t root, std::span<const double> Xk, int max_rdm_level,
+                                   RDMsType rdm_type, bool c_right) {
+    if (max_rdm_level > 3) {
+        throw std::runtime_error("RDM level too large!");
+    }
+
+    auto ndets = space_size();
+    if (Xk.size() != ndets) {
+        throw std::runtime_error("Incorrect dimension for the input vector X.");
+    }
+
+    // use transition RDMs to compute grdms
+    int col_c = c_right ? 1 : 0;
+    int col_x = c_right ? 0 : 1;
+    auto evecs = std::make_shared<psi::Matrix>("CI and Multiplier Vectors", ndets, 2);
+    evecs->set_column(0, col_c, evecs_->get_column(0, root));
+    for (size_t i = 0; i < ndets; ++i) {
+        evecs->set(0, i, col_x, Xk[i]);
+    }
+
+    CI_RDMS ci_rdms(as_ints_->active_mo_symmetry(), p_space_, evecs, 0, 1);
+    ci_rdms.set_print(print_ci_rdms_);
+
+    std::vector<size_t> dim2(2, nactv_);
+    std::vector<size_t> dim4(4, nactv_);
+    std::vector<size_t> dim6(6, nactv_);
+
+    if (rdm_type == RDMsType::spin_dependent) {
+        auto a = ambit::Tensor::build(CoreTensor, "gd1a", dim2);
+        auto b = ambit::Tensor::build(CoreTensor, "gd1b", dim2);
+        ci_rdms.compute_1rdm_op(a.data(), b.data());
+        if (max_rdm_level == 1)
+            return std::make_shared<RDMsSpinDependent>(a, b);
+
+        auto aa = ambit::Tensor::build(CoreTensor, "gd2aa", dim4);
+        auto ab = ambit::Tensor::build(CoreTensor, "gd2ab", dim4);
+        auto bb = ambit::Tensor::build(CoreTensor, "gd2bb", dim4);
+        ci_rdms.compute_2rdm_op(aa.data(), ab.data(), bb.data());
+        if (max_rdm_level == 2)
+            return std::make_shared<RDMsSpinDependent>(a, b, aa, ab, bb);
+
+        auto aaa = ambit::Tensor::build(CoreTensor, "gd3aaa", dim6);
+        auto aab = ambit::Tensor::build(CoreTensor, "gd3aab", dim6);
+        auto abb = ambit::Tensor::build(CoreTensor, "gd3abb", dim6);
+        auto bbb = ambit::Tensor::build(CoreTensor, "gd3bbb", dim6);
+        ci_rdms.compute_3rdm_op(aaa.data(), aab.data(), abb.data(), bbb.data());
+
+        return std::make_shared<RDMsSpinDependent>(a, b, aa, ab, bb, aaa, aab, abb, bbb);
+    } else {
+        auto D1 = ambit::Tensor::build(CoreTensor, "gd1", dim2);
+        ci_rdms.compute_1rdm_sf_op(D1.data());
+        if (max_rdm_level == 1)
+            return std::make_shared<RDMsSpinFree>(D1);
+
+        auto D2 = ambit::Tensor::build(CoreTensor, "gd2", dim4);
+        ci_rdms.compute_2rdm_sf_op(D2.data());
+        if (max_rdm_level == 2)
+            return std::make_shared<RDMsSpinFree>(D1, D2);
+
+        auto D3 = ambit::Tensor::build(CoreTensor, "TD3", dim6);
+        ci_rdms.compute_3rdm_sf_op(D3.data());
+
+        return std::make_shared<RDMsSpinFree>(D1, D2, D3);
+    }
 }
+
+void DETCI::generalized_sigma(std::shared_ptr<psi::Vector> x, std::shared_ptr<psi::Vector> sigma) {
+    if (sigma_vector_type_ == SigmaVectorType::Full) {
+        auto solver = prepare_ci_solver();
+        auto H = solver->build_full_hamiltonian(p_space_.determinants(), as_ints_);
+        sigma = H->gemv(false, 1.0, *x);
+    } else {
+        sigma_vector_->compute_sigma(sigma, x);
+    }
+}
+
+std::shared_ptr<psi::Vector> DETCI::ci_wfn(size_t root) { return evecs_->get_column(0, root); }
 
 } // namespace forte

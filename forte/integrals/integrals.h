@@ -133,7 +133,8 @@ class ForteIntegrals : public Observer, public std::enable_shared_from_this<Fort
     void update(const std::vector<std::string>& messages) override;
 
     /// Skip integral transformation
-    bool skip_build_;
+    bool skip_build_ = false;
+    void set_skip_build(bool skip);
 
     /// @brief Access the coefficient matrix for the alpha orbitals used to transform the integrals
     ///

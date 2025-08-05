@@ -115,6 +115,8 @@ void Psi4Integrals::base_initialize_psi4() {
     setup_psi4_ints();
     build_multipole_ints_ao();
 
+    outfile->Printf("\n skip ? %s", skip_build_ ? "TRUE" : "FALSE");
+
     if (not skip_build_) {
         transform_one_electron_integrals();
     }

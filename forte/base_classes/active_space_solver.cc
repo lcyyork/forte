@@ -29,13 +29,17 @@
 #include <algorithm>
 #include <numeric>
 #include <tuple>
+#include <span>
+#include <filesystem>
 
 #include "ambit/blocked_tensor.h"
 #include "ambit/tensor.h"
 
 #include "psi4/psi4-dec.h"
+#include "psi4/libqt/qt.h"
 #include "psi4/physconst.h"
 #include "psi4/libmints/vector.h"
+#include "psi4/libpsi4util/process.h"
 
 #include "base_classes/forte_options.h"
 #include "base_classes/rdms.h"
@@ -66,6 +70,8 @@ ActiveSpaceSolver::ActiveSpaceSolver(const std::string& solver_type,
     r_convergence_ = options->get_double("R_CONVERGENCE");
     read_initial_guess_ = options->get_bool("READ_ACTIVE_WFN_GUESS");
     gas_diff_only_ = options->get_bool("PRINT_DIFFERENT_GAS_ONLY");
+    scratch_ =
+        psi::PSIOManager::shared_object()->get_default_path() + "forte." + std::to_string(getpid());
 
     if (options->get_str("ACTIVE_SPACE_SOLVER") == "BLOCK2")
         maxiter_ = options_->get_int("BLOCK2_N_TOTAL_SWEEPS");
@@ -464,37 +470,37 @@ void ActiveSpaceSolver::compute_fosc_same_orbs(std::shared_ptr<ActiveMultipoleIn
             method1->transition_rdms(root_list, method2, rdm_level, RDMsType::spin_free);
 
         auto rdms = method1->transition_rdms(root_list, method2, 2, RDMsType::spin_free);
-        for (size_t i = 0, size = root_list.size(); i < size; ++i) {
-            auto root1 = root_list[i].first;
-            auto root2 = root_list[i].second;
-            if (root1 == 1 and root2 == 4) {
-                auto D1 = rdms[i]->SF_G1();
-                const auto& D1data = D1.data();
-                auto dim = D1.dim(0);
-                for (size_t p = 0; p < dim; ++p) {
-                    for (size_t q = 0; q < dim; ++q) {
-                        auto v = D1data[p * dim + q];
-                        if (fabs(v) > 1.0e-8)
-                            psi::outfile->Printf("\n  %2d %2d = %20.12f", p, q, v);
-                    }
-                }
+        // for (size_t i = 0, size = root_list.size(); i < size; ++i) {
+        //     auto root1 = root_list[i].first;
+        //     auto root2 = root_list[i].second;
+        //     if (root1 == 1 and root2 == 4) {
+        //         auto D1 = rdms[i]->SF_G1();
+        //         const auto& D1data = D1.data();
+        //         auto dim = D1.dim(0);
+        //         for (size_t p = 0; p < dim; ++p) {
+        //             for (size_t q = 0; q < dim; ++q) {
+        //                 auto v = D1data[p * dim + q];
+        //                 if (fabs(v) > 1.0e-8)
+        //                     psi::outfile->Printf("\n  %2d %2d = %20.12f", p, q, v);
+        //             }
+        //         }
 
-                auto D2 = rdms[i]->SF_G2();
-                const auto& D2data = D2.data();
-                for (size_t p = 0; p < dim; ++p) {
-                    for (size_t q = 0; q < dim; ++q) {
-                        for (size_t r = 0; r < dim; ++r) {
-                            for (size_t s = 0; s < dim; ++s) {
-                                auto v = D2data[p * dim * dim * dim + q * dim * dim + r * dim + s];
-                                if (fabs(v) > 1.0e-8)
-                                    psi::outfile->Printf("\n  %2d %2d %2d %2d = %20.12f", p, q,
-                                                         r, s, v);
-                            }
-                        }
-                    }
-                }
-            }
-        }
+        //         auto D2 = rdms[i]->SF_G2();
+        //         const auto& D2data = D2.data();
+        //         for (size_t p = 0; p < dim; ++p) {
+        //             for (size_t q = 0; q < dim; ++q) {
+        //                 for (size_t r = 0; r < dim; ++r) {
+        //                     for (size_t s = 0; s < dim; ++s) {
+        //                         auto v = D2data[p * dim * dim * dim + q * dim * dim + r * dim + s];
+        //                         if (fabs(v) > 1.0e-8)
+        //                             psi::outfile->Printf("\n  %2d %2d %2d %2d = %20.12f", p, q, r,
+        //                                                  s, v);
+        //                     }
+        //                 }
+        //             }
+        //         }
+        //     }
+        // }
 
         // analyze transition reduced density matrices
         auto nactv = mo_space_info_->size("ACTIVE");
@@ -665,11 +671,52 @@ void ActiveSpaceSolver::generalized_rdms(const StateInfo& state, size_t root,
     state_method_map_[state]->generalized_rdms(root, X, result, c_right, rdm_level, spin);
 }
 
+std::shared_ptr<RDMs> ActiveSpaceSolver::grdms(const StateInfo& state, size_t root,
+                                               std::span<const double> Xk, int max_rdm_level,
+                                               RDMsType rdm_type, bool c_right, bool dump) {
+    auto rdms = state_method_map_[state]->grdms(root, Xk, max_rdm_level, rdm_type, c_right);
+    if (dump) {
+        auto state_path = scratch_ / state.str_short();
+        auto root_path = state_path / ("grdm.root" + std::to_string(root));
+        if (not std::filesystem::exists(root_path))
+            std::filesystem::create_directories(root_path);
+        rdms->dump_to_disk(root_path.string() + "/");
+    }
+    return rdms;
+}
+
+std::shared_ptr<RDMs> ActiveSpaceSolver::grdms_from_disk(const StateInfo& state, size_t root,
+                                                         int max_rdm_level, RDMsType rdm_type) {
+    auto path = scratch_ / state.str_short() / ("grdm.root" + std::to_string(root));
+    std::shared_ptr<RDMs> rdms;
+    if (std::filesystem::exists(path)) {
+        rdms = RDMs::build_from_disk(max_rdm_level, rdm_type, path.string() + "/");
+    } else {
+        throw std::runtime_error("Cannot find GRDMs in " + path.string());
+    }
+    return rdms;
+}
+
 void ActiveSpaceSolver::add_sigma_kbody(const StateInfo& state, size_t root,
                                         ambit::BlockedTensor& h,
                                         const std::map<std::string, double>& block_label_to_factor,
                                         std::vector<double>& sigma) {
     state_method_map_[state]->add_sigma_kbody(root, h, block_label_to_factor, sigma);
+}
+
+void ActiveSpaceSolver::add_sigma_kbody(const StateInfo& state, size_t root, double factor,
+                                        std::shared_ptr<DressedQuantity> ints,
+                                        std::span<double> sigma) {
+    state_method_map_[state]->add_sigma_kbody(root, factor, ints, sigma);
+    // auto ndets = state_method_map_[state]->space_size();
+    // for (size_t i = 0, nroots = weights.size(); i < nroots; ++i) {
+    //     if (weights[i] < 1.0e-15)
+    //         continue;
+    //     auto iter_start = sigma.begin() + i * ndets;
+    //     auto iter_end = sigma.begin() + (i + 1) * ndets;
+    //     std::span<double> sigma_i(iter_start, iter_end);
+    //     state_method_map_[state]->add_sigma_kbody(i, weights[i], ints, sigma_i);
+    // }
 }
 
 void ActiveSpaceSolver::generalized_sigma(const StateInfo& state, std::shared_ptr<psi::Vector> x,
@@ -725,7 +772,7 @@ to_state_nroots_map(const std::map<StateInfo, std::vector<double>>& state_weight
 
 std::map<StateInfo, std::vector<double>>
 make_state_weights_map(std::shared_ptr<ForteOptions> options,
-                       std::shared_ptr<MOSpaceInfo> mo_space_info) {
+                       std::shared_ptr<MOSpaceInfo> mo_space_info, bool grad) {
     std::map<StateInfo, std::vector<double>> state_weights_map;
 
     // make a StateInfo object using the information
@@ -735,6 +782,11 @@ make_state_weights_map(std::shared_ptr<ForteOptions> options,
 
     // check if the user provided a AVG_STATE list
     py::list avg_state = options->get_gen_list("AVG_STATE");
+    if (grad) {
+        py::list _avg_state = options->get_gen_list("GRAD_AVG_STATE");
+        if (!_avg_state.empty())
+            avg_state = _avg_state;
+    }
 
     std::vector<size_t> gas_min(6, 0);
     std::vector<size_t> gas_max(6);
@@ -816,6 +868,11 @@ make_state_weights_map(std::shared_ptr<ForteOptions> options,
 
             std::vector<double> weights;
             py::list avg_weight = options->get_gen_list("AVG_WEIGHT");
+            if (grad) {
+                py::list _avg_weight = options->get_gen_list("GRAD_AVG_WEIGHT");
+                if (!_avg_weight.empty())
+                    avg_weight = _avg_weight;
+            }
             if (avg_weight.empty()) {
                 // use equal weights
                 weights = std::vector<double>(nstates_this, 1.0);
@@ -907,7 +964,7 @@ make_state_weights_map(std::shared_ptr<ForteOptions> options,
 
 std::shared_ptr<RDMs> ActiveSpaceSolver::compute_average_rdms(
     const std::map<StateInfo, std::vector<double>>& state_weights_map, int max_rdm_level,
-    RDMsType rdm_type, bool set_diagonal_3rdm) {
+    RDMsType rdm_type, bool set_diagonal_3rdm, bool dump) {
     auto na = mo_space_info_->size("ACTIVE");
     auto rdms = RDMs::build(max_rdm_level, na, rdm_type);
     bool store_g3d = (set_diagonal_3rdm and rdm_type == RDMsType::spin_free);
@@ -926,6 +983,8 @@ std::shared_ptr<RDMs> ActiveSpaceSolver::compute_average_rdms(
         // Get the already-run method
         const auto& method = state_method_map_.at(state);
 
+        auto state_path = scratch_ / state.str_short();
+
         // Loop through roots in the method
         for (size_t r = 0; r < nroot; r++) {
             // Don't bother if the weight is zero
@@ -939,12 +998,30 @@ std::shared_ptr<RDMs> ActiveSpaceSolver::compute_average_rdms(
                 auto g3d = method->three_rdms_diag1(state_ids, rdm_type)[0];
                 method_rdms->set_g3d(g3d);
             }
+            if (dump) {
+                auto root_path = state_path / ("rdm.root" + std::to_string(r));
+                if (not std::filesystem::exists(root_path))
+                    std::filesystem::create_directories(root_path);
+                method_rdms->dump_to_disk(root_path.string() + "/");
+            }
 
             // Add contributions
             rdms->axpy(method_rdms, weights[r]);
         }
     }
 
+    return rdms;
+}
+
+std::shared_ptr<RDMs> ActiveSpaceSolver::rdms_from_disk(const StateInfo& state, size_t root,
+                                                        int max_rdm_level, RDMsType rdm_type) {
+    auto path = scratch_ / state.str_short() / ("rdm.root" + std::to_string(root));
+    std::shared_ptr<RDMs> rdms;
+    if (std::filesystem::exists(path)) {
+        rdms = RDMs::build_from_disk(max_rdm_level, rdm_type, path.string() + "/");
+    } else {
+        throw std::runtime_error("Cannot find RDMs in " + path.string());
+    }
     return rdms;
 }
 
@@ -997,6 +1074,10 @@ std::map<StateInfo, std::shared_ptr<psi::Matrix>> ActiveSpaceSolver::state_ci_wf
         out[pair.first] = pair.second->ci_wave_functions();
     }
     return out;
+}
+
+std::shared_ptr<psi::Vector> ActiveSpaceSolver::ci_wfn(const StateInfo& state, size_t root) const {
+    return state_method_map_.at(state)->ci_wfn(root);
 }
 
 const std::map<StateInfo, std::vector<double>>&

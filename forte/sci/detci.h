@@ -39,6 +39,7 @@
 #include "integrals/active_space_integrals.h"
 #include "sparse_ci/determinant.h"
 #include "sparse_ci/sigma_vector.h"
+#include "mrdsrg-helper/dsrg_transformed.h"
 
 namespace forte {
 class DETCI : public ActiveSpaceMethod {
@@ -190,6 +191,9 @@ class DETCI : public ActiveSpaceMethod {
     void generalized_rdms(size_t root, const std::vector<double>& X, ambit::BlockedTensor& grdms,
                           bool c_right, int rdm_level, std::vector<std::string> spin) override;
 
+    std::shared_ptr<RDMs> grdms(size_t root, std::span<const double> Xk, int max_rdm_level,
+                                RDMsType rdm_type, bool c_right) override;
+
     /// Add k-body contributions to the sigma vector
     ///    σ_I += h_{p1,p2,...}^{q1,q2,...} <Phi_I| a^+_p1 a^+_p2 .. a_q2 a_q1 |Phi_J> C_J
     /// @param root: the root number of the state
@@ -200,11 +204,18 @@ class DETCI : public ActiveSpaceMethod {
                          const std::map<std::string, double>& block_label_to_factor,
                          std::vector<double>& sigma) override;
 
+    void add_sigma_kbody([[maybe_unused]] size_t root, [[maybe_unused]] double factor,
+                         [[maybe_unused]] std::shared_ptr<DressedQuantity> ints,
+                         [[maybe_unused]] std::span<double> sigma) override;
+
     /// Compute generalized sigma vector
     ///     σ_I = <Phi_I| H |Phi_J> X_J where H is the active space Hamiltonian (fci_ints)
     /// @param x: the X vector to be contracted with H_IJ
     /// @param sigma: the sigma vector (will be zeroed first)
     void generalized_sigma(std::shared_ptr<psi::Vector> x,
                            std::shared_ptr<psi::Vector> sigma) override;
+
+    /// Return the CI wave function of the given root
+    std::shared_ptr<psi::Vector> ci_wfn(size_t root) override;
 };
 } // namespace forte

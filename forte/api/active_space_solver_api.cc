@@ -47,9 +47,9 @@ void export_ActiveSpaceSolver(py::module& m) {
         .def("compute_contracted_energy", &ActiveSpaceSolver::compute_contracted_energy,
              "as_ints"_a, "max_body"_a,
              "Solve the contracted CI eigenvalue problem using given integrals")
-        .def("compute_average_rdms", &ActiveSpaceSolver::compute_average_rdms, "state_weights_map"_a,
-             "max_rdm_level"_a, "rdm_type"_a, "set_diagonal_3rdm"_a = false,
-             "Compute the weighted average reference")
+        .def("compute_average_rdms", &ActiveSpaceSolver::compute_average_rdms,
+             "state_weights_map"_a, "max_rdm_level"_a, "rdm_type"_a, "set_diagonal_3rdm"_a = false,
+             "dump"_a = false, "Compute the weighted average reference")
         .def("state_energies_map", &ActiveSpaceSolver::state_energies_map,
              "Return a map of StateInfo to the computed nroots of energies")
         .def("set_active_space_integrals", &ActiveSpaceSolver::set_active_space_integrals,

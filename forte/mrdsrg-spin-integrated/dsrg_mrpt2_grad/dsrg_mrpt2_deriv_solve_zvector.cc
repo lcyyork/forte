@@ -1063,6 +1063,7 @@ void DSRG_MRPT2::z_vector_contraction(std::vector<double>& qk_vec, std::vector<d
     y["zw"] -= temp_y["wz"];
 
     /// CI EQUATION -- MO RESPONSE
+    /// (York) OK, these are contributions from the CI normalization condition
     y_ci("K") +=
         8 * ci("K") * H.block("ac")("vn") * Gamma1_.block("aa")("uv") * qk.block("ca")("nu");
     y_ci("K") +=
@@ -1400,6 +1401,7 @@ void DSRG_MRPT2::set_preconditioner(std::vector<double>& D) {
 std::vector<double> DSRG_MRPT2::compute_sigma(std::vector<double>& x) {
     std::vector<double> y(dim);
     z_vector_contraction(x, y);
+    // it seems no need to do the projection if the initial guess is orthogonal to the CI vector
     double ci_xci_dot = C_DDOT(ndets, &y[preidx["ci"]], 1, &ci.data()[0], 1);
     auto ci_vec = ci.data();
     for (int idx = preidx["ci"], i = idx; i < dim; ++i) {
@@ -1506,18 +1508,22 @@ void DSRG_MRPT2::gmres_solver(std::vector<double>& x_new) {
 void DSRG_MRPT2::solve_linear_iter() {
     set_zvec_moinfo();
     set_b(dim, block_dim);
-    std::vector<double> solution(dim, 0.0);
-    gmres_solver(solution);
+    std::vector<double> solution(dim), Minv(dim, 1.0);
+    set_preconditioner(Minv);
+    GMRES gmres_solver(1.0e-10);
+    gmres_solver.solve(*this, b, solution, Minv); // it seems no need to do the projection if the
+                                                  // initial guess is orthogonal to the CI vector
+    // gmres_solver(solution);
 
-    // Conduct projection to get the correct solution
-    double ci_xci_dot = C_DDOT(ndets, &solution[preidx["ci"]], 1, &ci.data()[0], 1);
-    {
-        int idx = preidx["ci"];
-        auto ci_vec = ci.data();
-        for (int i = idx; i < dim; ++i) {
-            solution[i] -= ci_xci_dot * ci_vec[i - idx];
-        }
-    }
+    // // Conduct projection to get the correct solution
+    // double ci_xci_dot = C_DDOT(ndets, &solution[preidx["ci"]], 1, &ci.data()[0], 1);
+    // {
+    //     int idx = preidx["ci"];
+    //     auto ci_vec = ci.data();
+    //     for (int i = idx; i < dim; ++i) {
+    //         solution[i] -= ci_xci_dot * ci_vec[i - idx];
+    //     }
+    // }
 
     // Write the solution of z-vector equations (stored in solution) into the Z matrix
     for (const std::string block : {"vc", "ca", "va", "aa"}) {
@@ -1547,6 +1553,7 @@ void DSRG_MRPT2::solve_linear_iter() {
     Z["me"] = Z["em"];
     Z["wm"] = Z["mw"];
     Z["we"] = Z["ew"];
+    // Z.block("aa").print();
 
     // Beta part
     // Caution: This is only valid when restricted orbitals are assumed

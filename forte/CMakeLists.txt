@@ -192,6 +192,7 @@ integrals/parallel_ccvv_algorithms.cc
 integrals/paralleldfmo.cc
 integrals/psi4_integrals.cc
 mcscf/cpscf.cc
+mcscf/cpmcscf.cc
 mcscf/mcscf_2step.cc
 mcscf/mcscf_orb_grad.cc
 mcscf/mcscf_orb_grad_deriv.cc
