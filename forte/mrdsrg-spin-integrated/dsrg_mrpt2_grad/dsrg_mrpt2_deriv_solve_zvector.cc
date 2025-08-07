@@ -998,6 +998,8 @@ void DSRG_MRPT2::z_vector_contraction(std::vector<double>& qk_vec, std::vector<d
     y["wz"] += temp_y["wz"];
     y["zw"] -= temp_y["wz"];
     y["wz"] += Delta1["zw"] * qk["wz"];
+    temp_y.print();
+    y.block("aa").print();
 
     /// MO RESPONSE -- CI EQUATION
     // Form contraction between qk_ci and ci, cc1, cc2

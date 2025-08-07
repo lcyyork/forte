@@ -272,6 +272,12 @@ class ActiveSpaceMethod {
             "The function space_size is not implemented for this ActiveSpaceMethod type!");
     }
 
+    /// Return the energies of the space
+    virtual std::vector<double> space_energies([[maybe_unused]] bool include_core = false) {
+        throw std::runtime_error(
+            "The function space_energies is not implemented for this ActiveSpaceMethod type!");
+    }
+
     /// Set options from an option object
     /// @param options the options passed in
     virtual void set_options(std::shared_ptr<ForteOptions> options) = 0;

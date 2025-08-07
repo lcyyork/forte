@@ -85,6 +85,8 @@ class ActiveSpaceSolver {
                       std::shared_ptr<ForteOptions> options,
                       std::shared_ptr<ActiveSpaceIntegrals> as_ints);
 
+    ~ActiveSpaceSolver();
+
     // ==> Class Interface <==
 
     /// Set the print level
@@ -188,6 +190,9 @@ class ActiveSpaceSolver {
 
     /// Return a map StateInfo -> size of the determinant space
     std::map<StateInfo, size_t> state_space_size_map() const;
+
+    /// Return the energies of determinants of a given state
+    std::vector<double> space_energies(const StateInfo& state, bool include_core = false) const;
 
     /// Return a map of StateInfo to the computed nroots of energies
     const std::map<StateInfo, std::vector<double>>& state_energies_map() const;

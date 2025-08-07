@@ -473,8 +473,8 @@ double MCSCF_2STEP::compute_energy() {
         rdms = as_solver_->compute_average_rdms(state_weights_map_, 2, RDMsType::spin_free);
         cas_grad.set_rdms(rdms);
         cas_grad.evaluate(R, dG);
-        ints_->set_skip_build(false);
-        CPMCSCF_SOLVER cp(ints_, as_solver_, options_, mo_space_info_);
+        // ints_->set_skip_build(false);
+        // CPMCSCF_SOLVER cp(ints_, as_solver_, options_, mo_space_info_);
 
         if (der_type_ == "FIRST" and options_->get_str("CORRELATION_SOLVER") == "NONE") {
             // TODO: remove this re-diagonalization if CI transformation is impelementd

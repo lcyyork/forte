@@ -728,18 +728,17 @@ void DETCI::add_sigma_kbody(size_t root, double factor, std::shared_ptr<DressedQ
     if (sigma_vector_type_ == SigmaVectorType::Full) {
         if (max_kbody > 2) {
             throw std::runtime_error("3-body integrals not supported for SigmaVectorType::Full");
-            auto solver = prepare_ci_solver();
-            auto as_ints = std::make_shared<ActiveSpaceIntegrals>(
-                as_ints_->ints(), as_ints_->active_mo(), as_ints_->active_mo_symmetry(),
-                as_ints_->restricted_docc_mo());
-            as_ints->set_restricted_one_body_operator(ints->a().data(), ints->b().data());
-            auto ab = ints->ab().clone();
-            ab.scale(0.5);
-            as_ints->set_active_integrals(ints->aa(), ab, ints->bb());
-            auto H = solver->build_full_hamiltonian(p_space_.determinants(), as_ints);
-            auto sigma_vec = H->gemv(false, 1.0, *evec);
-            psi::C_DCOPY(sigma.size(), sigma_vec->pointer(), 1, sigma.data(), 1);
         }
+        auto solver = prepare_ci_solver();
+        auto as_ints = std::make_shared<ActiveSpaceIntegrals>(
+            as_ints_->ints(), as_ints_->active_mo(), as_ints_->active_mo_symmetry(),
+            as_ints_->restricted_docc_mo());
+        as_ints->set_restricted_one_body_operator(ints->a().data(), ints->b().data());
+        auto ab = ints->ab().clone();
+        as_ints->set_active_integrals(ints->aa(), ab, ints->bb());
+        auto H = solver->build_full_hamiltonian(p_space_.determinants(), as_ints);
+        auto sigma_vec = H->gemv(false, 1.0, *evec);
+        psi::C_DCOPY(sigma.size(), sigma_vec->pointer(), 1, sigma.data(), 1);
     } else {
         if (max_kbody >= 1) {
             sigma_vector_->add_generalized_sigma_1(ints->a().data(), evec, factor, sigma, "a");
@@ -913,6 +912,16 @@ void DETCI::generalized_sigma(std::shared_ptr<psi::Vector> x, std::shared_ptr<ps
     } else {
         sigma_vector_->compute_sigma(sigma, x);
     }
+}
+
+std::vector<double> DETCI::space_energies(bool include_core) {
+    auto ndets = p_space_.size();
+    std::vector<double> out(ndets);
+    double shift = include_core ? 0.0 : as_ints_->frozen_core_energy();
+    for (size_t I = 0; I < ndets; ++I) {
+        out[I] = as_ints_->energy(p_space_[I]) - shift;
+    }
+    return out;
 }
 
 std::shared_ptr<psi::Vector> DETCI::ci_wfn(size_t root) { return evecs_->get_column(0, root); }

@@ -217,5 +217,8 @@ class DETCI : public ActiveSpaceMethod {
 
     /// Return the CI wave function of the given root
     std::shared_ptr<psi::Vector> ci_wfn(size_t root) override;
+
+    /// Return the determinants energies
+    std::vector<double> space_energies(bool include_core = false) override;
 };
 } // namespace forte

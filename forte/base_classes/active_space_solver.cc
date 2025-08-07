@@ -87,6 +87,12 @@ ActiveSpaceSolver::ActiveSpaceSolver(const std::string& solver_type,
     }
 }
 
+ActiveSpaceSolver::~ActiveSpaceSolver() {
+    if (std::filesystem::exists(scratch_)) {
+        std::filesystem::remove_all(scratch_);
+    }
+}
+
 const std::string& ActiveSpaceSolver::solver_type() const { return solver_type_; }
 
 void ActiveSpaceSolver::set_print(PrintLevel level) { print_ = level; }
@@ -491,9 +497,10 @@ void ActiveSpaceSolver::compute_fosc_same_orbs(std::shared_ptr<ActiveMultipoleIn
         //             for (size_t q = 0; q < dim; ++q) {
         //                 for (size_t r = 0; r < dim; ++r) {
         //                     for (size_t s = 0; s < dim; ++s) {
-        //                         auto v = D2data[p * dim * dim * dim + q * dim * dim + r * dim + s];
-        //                         if (fabs(v) > 1.0e-8)
-        //                             psi::outfile->Printf("\n  %2d %2d %2d %2d = %20.12f", p, q, r,
+        //                         auto v = D2data[p * dim * dim * dim + q * dim * dim + r * dim +
+        //                         s]; if (fabs(v) > 1.0e-8)
+        //                             psi::outfile->Printf("\n  %2d %2d %2d %2d = %20.12f", p, q,
+        //                             r,
         //                                                  s, v);
         //                     }
         //                 }
@@ -677,20 +684,21 @@ std::shared_ptr<RDMs> ActiveSpaceSolver::grdms(const StateInfo& state, size_t ro
     auto rdms = state_method_map_[state]->grdms(root, Xk, max_rdm_level, rdm_type, c_right);
     if (dump) {
         auto state_path = scratch_ / state.str_short();
-        auto root_path = state_path / ("grdm.root" + std::to_string(root));
+        auto root_path = state_path / "grdms";
         if (not std::filesystem::exists(root_path))
             std::filesystem::create_directories(root_path);
-        rdms->dump_to_disk(root_path.string() + "/");
+        rdms->dump_to_disk(root_path.string() + "/root" + std::to_string(root));
     }
     return rdms;
 }
 
 std::shared_ptr<RDMs> ActiveSpaceSolver::grdms_from_disk(const StateInfo& state, size_t root,
                                                          int max_rdm_level, RDMsType rdm_type) {
-    auto path = scratch_ / state.str_short() / ("grdm.root" + std::to_string(root));
+    auto path = scratch_ / state.str_short() / "grdms";
     std::shared_ptr<RDMs> rdms;
     if (std::filesystem::exists(path)) {
-        rdms = RDMs::build_from_disk(max_rdm_level, rdm_type, path.string() + "/");
+        rdms = RDMs::build_from_disk(max_rdm_level, rdm_type,
+                                     path.string() + "/root" + std::to_string(root));
     } else {
         throw std::runtime_error("Cannot find GRDMs in " + path.string());
     }
@@ -999,10 +1007,10 @@ std::shared_ptr<RDMs> ActiveSpaceSolver::compute_average_rdms(
                 method_rdms->set_g3d(g3d);
             }
             if (dump) {
-                auto root_path = state_path / ("rdm.root" + std::to_string(r));
+                auto root_path = state_path / "rdm";
                 if (not std::filesystem::exists(root_path))
                     std::filesystem::create_directories(root_path);
-                method_rdms->dump_to_disk(root_path.string() + "/");
+                method_rdms->dump_to_disk(root_path.string() + "/root" + std::to_string(r));
             }
 
             // Add contributions
@@ -1015,10 +1023,11 @@ std::shared_ptr<RDMs> ActiveSpaceSolver::compute_average_rdms(
 
 std::shared_ptr<RDMs> ActiveSpaceSolver::rdms_from_disk(const StateInfo& state, size_t root,
                                                         int max_rdm_level, RDMsType rdm_type) {
-    auto path = scratch_ / state.str_short() / ("rdm.root" + std::to_string(root));
+    auto path = scratch_ / state.str_short() / "rdm";
     std::shared_ptr<RDMs> rdms;
     if (std::filesystem::exists(path)) {
-        rdms = RDMs::build_from_disk(max_rdm_level, rdm_type, path.string() + "/");
+        rdms = RDMs::build_from_disk(max_rdm_level, rdm_type,
+                                     path.string() + "/root" + std::to_string(root));
     } else {
         throw std::runtime_error("Cannot find RDMs in " + path.string());
     }
@@ -1182,6 +1191,11 @@ std::map<StateInfo, size_t> ActiveSpaceSolver::state_space_size_map() const {
         out[state] = method->space_size();
     }
     return out;
+}
+
+std::vector<double> ActiveSpaceSolver::space_energies(const StateInfo& state,
+                                                      bool include_core) const {
+    return state_method_map_.at(state)->space_energies(include_core);
 }
 
 std::vector<ambit::Tensor> ActiveSpaceSolver::eigenvectors(const StateInfo& state) const {
